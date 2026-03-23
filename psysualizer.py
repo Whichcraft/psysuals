@@ -56,7 +56,7 @@ def get_audio():
 # ── Colour helpers ────────────────────────────────────────────────────────────
 
 def hsl(h, s=1.0, l=0.5):
-    r, g, b = colorsys.hls_to_rgb(h % 1.0, l, s)
+    r, g, b = colorsys.hls_to_rgb(h % 1.0, max(0.0, min(l, 1.0)), s)
     return (int(r * 255), int(g * 255), int(b * 255))
 
 
