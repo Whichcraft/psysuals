@@ -14,7 +14,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | 5 | **Particles** | 3-D particle burst — beats eject spherical shells; perspective projection gives depth |
 | 6 | **Tunnel** | First-person ride through a curving tube — rings physically fly toward you and wrap to the far end, bass and beat control speed |
-| 7 | **Lissajous** | True 3-D Lissajous knot — x=sin(ax·t), y=sin(ay·t), z=sin(az·t); audio drives frequency ratios, knot rotates freely in 3-D |
+| 7 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot drawn with 3-fold symmetry and two-pass neon glow (wide dim halo + thin bright core); beat explodes the scale outward with spring physics |
 | 8 | **Yantra** | Psychedelic sacred-geometry mandala — 6 concentric polygon rings (triangle→octagon) alternating rotation, web connections between rings, neon spokes, beat-driven spring pulses |
 | 9 | **Bubbles** | Translucent rising bubbles with specular highlights — size and spawn rate driven by bass |
 | 10 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
