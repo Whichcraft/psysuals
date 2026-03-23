@@ -9,7 +9,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | # | Mode | Description |
 |---|------|-------------|
 | 1 | **Spiral** | Fly through a curving 3-D helix vortex — 6 arms with rainbow trails that fade from black in the distance to bright colour up close, axis drifts like Tunnel |
-| 2 | **Tentacles** | 8 octopus tentacles with suckers — each arm driven by its own frequency band, traveling sine wave creates organic undulation |
+| 2 | **Plasma** | Full-screen sine-interference plasma — four overlapping wave fields create a flowing psychedelic texture; bass shifts the palette, beat flashes the whole screen |
 | 3 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
 | 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | 5 | **Particles** | 3-D particle burst — beats eject spherical shells; perspective projection gives depth |
@@ -17,7 +17,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 7 | **Lissajous** | True 3-D Lissajous knot — x=sin(ax·t), y=sin(ay·t), z=sin(az·t); audio drives frequency ratios, knot rotates freely in 3-D |
 | 8 | **Yantra** | Psychedelic sacred-geometry mandala — 6 concentric polygon rings (triangle→octagon) alternating rotation, web connections between rings, neon spokes, beat-driven spring pulses |
 | 9 | **Bubbles** | Translucent rising bubbles with specular highlights — size and spawn rate driven by bass |
-| 10 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy |
+| 10 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
 
 ## Requirements
 
