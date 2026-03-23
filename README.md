@@ -15,6 +15,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 5 | **Particles** | Coloured particles burst from the centre on every beat |
 | 6 | **Tunnel** | Receding hexagonal rings that accelerate with bass |
 | 7 | **Lissajous** | 3-D rotating Lissajous figure that morphs with audio |
+| 8 | **Mandelbrot** | Animated zoom into the Mandelbrot set — speed and palette driven by bass |
 
 ## Requirements
 
@@ -24,13 +25,14 @@ Real-time music visualizer — listens to audio input and renders animated visua
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
 ## Usage
 
 ```bash
-python visualizer.py
+.venv/bin/python visualizer.py
 ```
 
 ### Controls
@@ -38,7 +40,7 @@ python visualizer.py
 | Key / Action | Effect |
 |---|---|
 | `Space` or click | Cycle to next mode |
-| `1` – `7` | Jump directly to a mode |
+| `1` – `8` | Jump directly to a mode |
 | `F` | Toggle fullscreen |
 | `Q` / `Esc` | Quit |
 

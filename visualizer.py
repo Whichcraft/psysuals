@@ -4,7 +4,7 @@ Music Visualizer — Real-time audio → visuals.
 
 Controls:
   SPACE / click   Switch to next mode
-  1-6             Jump to a specific mode
+  1-8             Jump to a specific mode
   F               Toggle fullscreen
   Q / ESC         Quit
 """
@@ -335,16 +335,108 @@ class Lissajous:
             prev = (sx, sy)
 
 
+class Mandelbrot:
+    """Animated Mandelbrot zoom — speed and colour palette driven by audio."""
+
+    # A deep spiral near the boundary of the set
+    TARGET_CX = -0.7269
+    TARGET_CY =  0.1889
+    RES_W, RES_H = 320, 180
+    MAX_ITER     = 60
+
+    def __init__(self):
+        self.hue   = 0.0
+        self.zoom  = 1.0
+        self.cx    = -0.5
+        self.cy    =  0.0
+        self._surf = pygame.Surface((self.RES_W, self.RES_H))
+
+    # ── Vectorised HSL → RGB (operates on 2-D numpy arrays) ──────────────────
+    @staticmethod
+    def _hsl_to_rgb(h, l):
+        """h, l are (H, W) float arrays in [0, 1]; s is fixed at 1."""
+        c  = (1.0 - np.abs(2.0 * l - 1.0))          # chroma  (s=1)
+        h6 = h * 6.0
+        x  = c * (1.0 - np.abs(h6 % 2.0 - 1.0))
+        m  = l - c / 2.0
+        i  = h6.astype(int) % 6
+
+        def ch(v0, v1, v2, v3, v4, v5):
+            return np.select([i==0,i==1,i==2,i==3,i==4,i==5],
+                             [v0,  v1,  v2,  v3,  v4,  v5]) + m
+
+        z = np.zeros_like(h)
+        r = ch(c, x, z, z, x, c)
+        g = ch(x, c, c, x, z, z)
+        b = ch(z, z, x, c, c, x)
+        to8 = lambda a: np.clip(a * 255, 0, 255).astype(np.uint8)
+        return to8(r), to8(g), to8(b)
+
+    # ── Escape-time computation ───────────────────────────────────────────────
+    def _compute(self):
+        w  = 3.5 / self.zoom
+        h  = 2.0 / self.zoom
+        x0 = np.linspace(self.cx - w/2, self.cx + w/2, self.RES_W)
+        y0 = np.linspace(self.cy - h/2, self.cy + h/2, self.RES_H)
+        C  = x0[np.newaxis, :] + 1j * y0[:, np.newaxis]
+        Z  = np.zeros_like(C)
+        M  = np.full(C.shape, self.MAX_ITER, dtype=float)
+        alive = np.ones(C.shape, dtype=bool)
+
+        for i in range(self.MAX_ITER):
+            Z[alive]  = Z[alive] ** 2 + C[alive]
+            escaped   = alive & (np.abs(Z) > 2.0)
+            # Smooth colouring: fractional escape count
+            M[escaped] = i + 1.0 - np.log2(np.log2(np.abs(Z[escaped]) + 1e-10))
+            alive[escaped] = False
+
+        return M / self.MAX_ITER   # shape (RES_H, RES_W), range [0, 1]
+
+    def draw(self, surf, waveform, fft, beat, tick):
+        self.hue  += 0.004
+        # Bass drives zoom speed; beat gives extra punch
+        bass       = float(np.mean(fft[:6]))
+        self.zoom *= 1.004 + bass * 0.012 + beat * 0.015
+
+        # Drift toward the target point
+        t  = 0.003
+        self.cx += (self.TARGET_CX - self.cx) * t
+        self.cy += (self.TARGET_CY - self.cy) * t
+
+        # Reset after deep zoom
+        if self.zoom > 5e5:
+            self.zoom = 1.0
+            self.cx, self.cy = -0.5, 0.0
+
+        M = self._compute()         # (H, W) in [0, 1]
+        inside = M >= 0.999         # points that never escaped → black
+
+        # Colour: hue shifts with music; inside set stays black
+        mid   = float(np.mean(fft[6:30]))
+        h_arr = (M * 4.0 + self.hue + mid) % 1.0
+        l_arr = np.where(inside, 0.0, 0.35 + M * 0.45)
+
+        r, g, b = self._hsl_to_rgb(h_arr, l_arr)
+
+        # Assemble pixel array — pygame surfarray uses (W, H, 3)
+        rgb = np.stack([r, g, b], axis=2).transpose(1, 0, 2)
+        pygame.surfarray.blit_array(self._surf, rgb)
+
+        scaled = pygame.transform.scale(self._surf, (WIDTH, HEIGHT))
+        surf.blit(scaled, (0, 0))
+
+
 # ── Mode registry ─────────────────────────────────────────────────────────────
 
 MODES = [
-    ("Spiral",     Spiral),
-    ("Tentacles",  Tentacles),
-    ("Cube",       Cube),
-    ("Spectrum",   Bars),
-    ("Particles",  Particles),
-    ("Tunnel",     Tunnel),
-    ("Lissajous",  Lissajous),
+    ("Spiral",      Spiral),
+    ("Tentacles",   Tentacles),
+    ("Cube",        Cube),
+    ("Spectrum",    Bars),
+    ("Particles",   Particles),
+    ("Tunnel",      Tunnel),
+    ("Lissajous",   Lissajous),
+    ("Mandelbrot",  Mandelbrot),
 ]
 
 
