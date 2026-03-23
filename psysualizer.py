@@ -286,13 +286,13 @@ class Cube:
         high = min(float(np.mean(fft[25:])),  1.0)
 
         # Slower rotation — gentler base speed, smaller beat kick
-        self.rvx += 0.002 + mid  * 0.030 + beat * 0.08
-        self.rvy += 0.003 + bass * 0.040 + beat * 0.10
-        self.rvz += 0.001 + high * 0.020 + beat * 0.04
-        # More damping → settles faster, stays slow between beats
-        self.rvx *= 0.92
-        self.rvy *= 0.92
-        self.rvz *= 0.92
+        self.rvx += 0.001 + mid  * 0.012 + beat * 0.05
+        self.rvy += 0.0015 + bass * 0.015 + beat * 0.06
+        self.rvz += 0.0005 + high * 0.008 + beat * 0.025
+        # Heavy damping → stays slow, only kicks on strong beats
+        self.rvx *= 0.94
+        self.rvy *= 0.94
+        self.rvz *= 0.94
         self.rx  += self.rvx
         self.ry  += self.rvy
         self.rz  += self.rvz
@@ -689,27 +689,36 @@ class Yantra:
 
 
 class Bubbles:
-    """Translucent rising bubbles — size and spawn rate driven by bass."""
+    """Translucent rising bubbles — fills the full screen; size and spawn rate driven by bass."""
 
-    MAX = 250
+    MAX = 700
 
     def __init__(self):
         self.hue  = 0.0
-        self.pool = []
+        # Pre-populate bubbles scattered across the whole screen so it fills instantly
+        self.pool = [self._make(y=random.uniform(0, HEIGHT)) for _ in range(400)]
+
+    @staticmethod
+    def _make(y=None):
+        r = random.uniform(8, 45)
+        return {
+            "x":      random.uniform(WIDTH * 0.02, WIDTH * 0.98),
+            "y":      float(HEIGHT + r) if y is None else y,
+            "r":      r,
+            "vx":     random.gauss(0, 0.4),
+            "vy":    -random.uniform(1.0, 3.2),
+            "hue":    random.uniform(0, 1.0),
+            "wobble": random.uniform(0.025, 0.07),
+            "phase":  random.uniform(0, math.tau),
+        }
 
     def _spawn(self, beat, bass):
-        for _ in range(int(2 + beat * 14 + bass * 8)):
-            r = random.uniform(8, 45) * (1 + bass * 1.5)
-            self.pool.append({
-                "x":      random.uniform(WIDTH * 0.05, WIDTH * 0.95),
-                "y":      float(HEIGHT + r),
-                "r":      r,
-                "vx":     random.gauss(0, 0.4),
-                "vy":    -random.uniform(1.2, 3.5) * (1 + beat * 0.8),
-                "hue":    (self.hue + random.uniform(0, 0.35)) % 1.0,
-                "wobble": random.uniform(0.025, 0.07),
-                "phase":  random.uniform(0, math.tau),
-            })
+        for _ in range(int(2 + beat * 12 + bass * 6)):
+            b = self._make()
+            b["vy"]  *= (1 + beat * 0.8)
+            b["r"]   *= (1 + bass * 1.2)
+            b["hue"]  = (self.hue + random.uniform(0, 0.35)) % 1.0
+            self.pool.append(b)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
@@ -723,7 +732,7 @@ class Bubbles:
             if b["y"] + b["r"] < 0:
                 continue
 
-            life  = max(0.0, min(1.0, (HEIGHT - b["y"]) / HEIGHT))
+            life  = max(0.0, min(1.0, b["y"] / HEIGHT))
             r     = int(b["r"])
             alpha = int(life * 130)
             bsurf = pygame.Surface((r * 2 + 6, r * 2 + 6), pygame.SRCALPHA)
