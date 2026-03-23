@@ -10,7 +10,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 |---|------|-------------|
 | 1 | **Spiral** | 7 logarithmic spiral arms that warp with every frequency band |
 | 2 | **Tentacles** | 14 segmented arms that writhe and sway with audio |
-| 3 | **Cube** | Dual wireframe cubes with spring-physics bounce — scale and spin velocity kick on every beat |
+| 3 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
 | 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | 5 | **Particles** | Coloured particles burst from the centre on every beat |
 | 6 | **Tunnel** | Receding hexagonal rings that accelerate with bass |

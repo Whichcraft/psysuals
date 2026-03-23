@@ -145,9 +145,10 @@ class Cube:
     def __init__(self):
         self.rx = self.ry = self.rz = 0.0
         self.hue     = 0.0
-        self.scale   = 1.0   # spring scale
-        self.svel    = 0.0   # scale velocity
-        self.rvx = self.rvy = self.rvz = 0.0  # rotation velocities
+        self.fade_hue = 0.0   # slowly drifting base hue for colour fade
+        self.scale   = 1.0
+        self.svel    = 0.0
+        self.rvx = self.rvy = self.rvz = 0.0
 
     @staticmethod
     def _Rx(a):
@@ -164,35 +165,36 @@ class Cube:
         c, s = math.cos(a), math.sin(a)
         return np.array([[c,-s,0],[s,c,0],[0,0,1]])
 
-    def _project(self, v, fov=420):
-        z = v[2] + 4.5
+    def _project(self, v, fov=680):
+        z = v[2] + 3.8
         return (int(v[0] * fov / z + WIDTH // 2),
                 int(v[1] * fov / z + HEIGHT // 2))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue += 0.004
+        # Slow colour fade independent of beat
+        self.fade_hue += 0.0008
         bass = min(float(np.mean(fft[:5])),   1.0)
         mid  = min(float(np.mean(fft[5:25])), 1.0)
         high = min(float(np.mean(fft[25:])),  1.0)
 
-        # Beat kicks rotation velocity; inertia carries it forward
-        self.rvx += 0.005 + mid  * 0.08 + beat * 0.12
-        self.rvy += 0.007 + bass * 0.10 + beat * 0.18
-        self.rvz += 0.003 + high * 0.06 + beat * 0.08
-        # Damping so spin settles between beats
-        self.rvx *= 0.88
-        self.rvy *= 0.88
-        self.rvz *= 0.88
+        # Slower rotation — gentler base speed, smaller beat kick
+        self.rvx += 0.002 + mid  * 0.025 + beat * 0.04
+        self.rvy += 0.003 + bass * 0.030 + beat * 0.05
+        self.rvz += 0.001 + high * 0.015 + beat * 0.02
+        # More damping → settles faster, stays slow between beats
+        self.rvx *= 0.92
+        self.rvy *= 0.92
+        self.rvz *= 0.92
         self.rx  += self.rvx
         self.ry  += self.rvy
         self.rz  += self.rvz
 
-        # Spring scale: beat fires a strong upward kick; spring pulls back to 1.0
-        self.svel  += beat * 0.55          # impulse on beat
-        self.svel  += (1.0 - self.scale) * 0.25  # spring restore force
-        self.svel  *= 0.60                 # damping
+        # Gentler spring: smaller impulse, softer restore, heavier damping
+        self.svel  += beat * 0.18
+        self.svel  += (1.0 - self.scale) * 0.12
+        self.svel  *= 0.75
         self.scale += self.svel
-        self.scale  = max(0.3, self.scale) # don't invert
+        self.scale  = max(0.5, self.scale)
 
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
@@ -200,9 +202,10 @@ class Cube:
             verts = (R @ (self.VERTS * base_scale).T).T
             proj  = [self._project(v) for v in verts]
             for ei, (a, b) in enumerate(self.EDGES):
-                h     = (self.hue + hue_off + ei / len(self.EDGES)) % 1.0
-                lw    = max(1, int(2 + self.svel * 8)) if base_scale > 0.4 else 1
-                color = hsl(h, l=0.45 + min(self.svel, 1.0) * 0.4)
+                # Colour fades slowly across the full spectrum; edges shift slightly
+                h     = (self.fade_hue + hue_off + ei / len(self.EDGES) * 0.4) % 1.0
+                lw    = max(1, int(2 + self.svel * 4)) if base_scale > 0.4 else 1
+                color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25)
                 pygame.draw.line(surf, color, proj[a], proj[b], lw)
 
 
