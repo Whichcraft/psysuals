@@ -472,28 +472,30 @@ class Tunnel:
 
 
 class Lissajous:
-    """True 3-D Lissajous knot — x=sin(ax·t+dx), y=sin(ay·t+dy), z=sin(az·t+dz).
-    Audio drives the frequency ratios; the knot rotates freely in 3-D."""
+    """Psytrance 3-D Lissajous knot — trefoil (3-fold) symmetry, neon glow,
+    beat-driven spring bursts.
 
-    TRAIL = 2400
+    Three copies of the knot are drawn at 0 / 120 / 240 ° around the centre.
+    Each trail is rendered in two passes (wide dim halo + thin bright core)
+    for a neon bloom effect.  Beat explodes the scale outward then snaps back.
+    """
+
+    TRAIL = 1400
+    N_SYM = 3
 
     def __init__(self):
-        self.hue  = 0.0
-        self.t    = 0.0
-        self.rx   = 0.0
-        self.ry   = 0.0
-        self.rvx  = 0.005
-        self.rvy  = 0.007
-        self.hist = deque(maxlen=self.TRAIL)
-        self.dx   = 0.0
-        self.dy   = math.pi / 2
-        self.dz   = math.pi / 4
-
-    def _proj(self, x, y, z):
-        fov  = min(WIDTH, HEIGHT) * 0.42
-        zcam = max(z + 2.8, 0.05)
-        return (int(x * fov / zcam + WIDTH  / 2),
-                int(y * fov / zcam + HEIGHT / 2))
+        self.hue   = 0.0
+        self.t     = 0.0
+        self.rx    = 0.0
+        self.ry    = 0.0
+        self.rvx   = 0.006
+        self.rvy   = 0.009
+        self.hist  = deque(maxlen=self.TRAIL)
+        self.dx    = 0.0
+        self.dy    = math.pi / 2
+        self.dz    = math.pi / 4
+        self.scale = 1.0
+        self.svel  = 0.0
 
     def _rot(self, x, y, z):
         cx, sx = math.cos(self.rx), math.sin(self.rx)
@@ -504,40 +506,83 @@ class Lissajous:
         z3 = -x * sy + z2 * cy
         return x3, y2, z3
 
+    def _proj_flat(self, x, y, z):
+        """Return (float, float) relative to centre — no rounding yet."""
+        fov  = min(WIDTH, HEIGHT) * 0.40
+        zcam = max(z + 2.8, 0.05)
+        return x * fov / zcam, y * fov / zcam
+
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue += 0.003
+        self.hue += 0.006
         bass = float(np.mean(fft[:6]))
         mid  = float(np.mean(fft[6:30]))
         high = float(np.mean(fft[30:]))
 
-        ax = 3.0 + bass * 1.0
-        ay = 2.0 + mid  * 1.0
-        az = 5.0 + high * 1.0
+        ax = 3.0 + bass * 1.3
+        ay = 2.0 + mid  * 1.3
+        az = 5.0 + high * 1.3
 
-        self.dx += 0.0007 + bass * 0.002
-        self.dz += 0.0005 + high * 0.0015
+        self.dx += 0.001  + bass * 0.003
+        self.dz += 0.0008 + high * 0.002
 
-        self.t += 0.018 + beat * 0.04
+        self.t += 0.022 + beat * 0.06
         self.hist.append((math.sin(ax * self.t + self.dx),
                           math.sin(ay * self.t + self.dy),
                           math.sin(az * self.t + self.dz)))
 
-        self.rvx += 0.0001 + beat * 0.003
-        self.rvy += 0.0002 + beat * 0.004
-        self.rvx *= 0.98
-        self.rvy *= 0.98
+        # Beat scale burst — spring physics
+        self.svel  += beat * 0.38
+        self.svel  += (1.0 - self.scale) * 0.26
+        self.svel  *= 0.63
+        self.scale += self.svel
+        self.scale  = max(0.35, self.scale)
+
+        # 3-D rotation with beat inertia
+        self.rvx += beat * 0.009 + 0.0002
+        self.rvy += beat * 0.011 + 0.0003
+        self.rvx *= 0.97
+        self.rvy *= 0.97
         self.rx  += self.rvx
         self.ry  += self.rvy
 
-        scale = 0.82 + beat * 0.18
-        pts2d = [self._proj(*self._rot(px * scale, py * scale, pz * scale))
-                 for px, py, pz in self.hist]
+        s   = self.scale
+        raw = [self._proj_flat(*self._rot(px * s, py * s, pz * s))
+               for px, py, pz in self.hist]
 
-        n = len(pts2d)
-        for j in range(1, n):
-            t  = j / n
-            pygame.draw.line(surf, hsl((self.hue + t) % 1.0, l=0.2 + t * 0.65),
-                             pts2d[j - 1], pts2d[j], max(1, int(t * 3)))
+        cx, cy = WIDTH // 2, HEIGHT // 2
+        n = len(raw)
+        if n < 2:
+            return
+
+        # Glow pass constants: (line-width multiplier, l_tail, l_head)
+        PASSES = [(4, 0.08, 0.22), (1, 0.50, 0.90)]
+
+        for sym in range(self.N_SYM):
+            a     = sym / self.N_SYM * math.tau
+            ca, sa = math.cos(a), math.sin(a)
+            pts = [(int(cx + px * ca - py * sa),
+                    int(cy + px * sa + py * ca))
+                   for px, py in raw]
+
+            for lw_mul, l0, l1 in PASSES:
+                for j in range(1, n):
+                    t  = j / n
+                    h  = (self.hue + sym / self.N_SYM * 0.33 + t * 0.55) % 1.0
+                    lw = max(1, int(t * 4 * lw_mul))
+                    pygame.draw.line(surf, hsl(h, l=l0 + t * (l1 - l0)),
+                                     pts[j - 1], pts[j], lw)
+
+        # Bright head dot at the current draw point
+        hx, hy = raw[-1]
+        for sym in range(self.N_SYM):
+            a      = sym / self.N_SYM * math.tau
+            ca, sa = math.cos(a), math.sin(a)
+            sx     = int(cx + hx * ca - hy * sa)
+            sy_    = int(cy + hx * sa + hy * ca)
+            r      = max(3, int(7 + beat * 14))
+            pygame.draw.circle(surf,
+                               hsl((self.hue + sym * 0.33) % 1.0, l=0.88), (sx, sy_), r)
+            pygame.draw.circle(surf, (255, 255, 255), (sx, sy_), max(1, r // 3))
 
 
 class Yantra:
