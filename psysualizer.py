@@ -573,99 +573,119 @@ class Lissajous:
                              pts2d[j - 1], pts2d[j], max(1, int(t * 3)))
 
 
-class Mandelbrot:
-    """Animated Mandelbrot zoom — always centred on a vivid boundary region."""
+class Yantra:
+    """Psychedelic sacred-geometry mandala for psytrance.
 
-    # Curated boundary points: all confirmed to stay colourful when deep-zoomed
-    TARGETS = [
-        (-0.7435669,   0.1314023),   # Seahorse valley
-        (-0.74364085,  0.13182733),  # Deep seahorse spiral
-        (-0.7269,      0.1889),      # Classic mini-brot spiral
-        (-0.16070135,  1.0375665),   # Upper antenna filament
-        (-1.25066,     0.02012),     # Elephant valley tip
-        ( 0.37865401,  0.66940249),  # Rabbit island
-        (-0.5591870,   0.6347110),   # Dendrite arms
-    ]
-    RES_W, RES_H = 320, 180
-    MAX_ITER     = 80
+    Six concentric polygon rings (triangle → octagon) alternate rotation
+    direction, each driven by its own frequency band.  Web lines connect
+    adjacent ring vertices. Neon spokes radiate from the centre. Beat
+    triggers spring-physics pulses that push every ring outward then snap
+    it back — timed to the kick drum of fast BPM tracks.
+    """
+
+    N_RINGS  = 6    # triangle(3) → octagon(8)
+    N_SPOKES = 24   # radial lines from centre
 
     def __init__(self):
-        self.hue      = 0.0
-        self.zoom     = 1.0
-        self.target_i = 0
-        self.cx, self.cy = self.TARGETS[0]
-        self._surf    = pygame.Surface((self.RES_W, self.RES_H))
+        self.hue  = 0.0
+        self.time = 0.0
+        signs = [1, -1, 1, -1, 1, -1]
+        # per-ring state: rotation angle, velocity, pulse offset, pulse velocity
+        self.rot  = [0.0] * self.N_RINGS
+        self.rvel = [signs[i] * (0.004 + i * 0.0018) for i in range(self.N_RINGS)]
+        self.poff = [0.0] * self.N_RINGS
+        self.pvel = [0.0] * self.N_RINGS
 
-    def _next_target(self):
-        self.target_i = (self.target_i + 1) % len(self.TARGETS)
-        self.cx, self.cy = self.TARGETS[self.target_i]
-        self.zoom = 1.0
-
-    # ── Vectorised HSL → RGB (operates on 2-D numpy arrays) ──────────────────
-    @staticmethod
-    def _hsl_to_rgb(h, l):
-        """h, l are (H, W) float arrays in [0, 1]; s is fixed at 1."""
-        c  = (1.0 - np.abs(2.0 * l - 1.0))
-        h6 = h * 6.0
-        x  = c * (1.0 - np.abs(h6 % 2.0 - 1.0))
-        m  = l - c / 2.0
-        i  = h6.astype(int) % 6
-
-        def ch(v0, v1, v2, v3, v4, v5):
-            return np.select([i==0,i==1,i==2,i==3,i==4,i==5],
-                             [v0,  v1,  v2,  v3,  v4,  v5]) + m
-
-        z = np.zeros_like(h)
-        r = ch(c, x, z, z, x, c)
-        g = ch(x, c, c, x, z, z)
-        b = ch(z, z, x, c, c, x)
-        to8 = lambda a: np.clip(a * 255, 0, 255).astype(np.uint8)
-        return to8(r), to8(g), to8(b)
-
-    # ── Escape-time computation ───────────────────────────────────────────────
-    def _compute(self):
-        w  = 3.5 / self.zoom
-        h  = 2.0 / self.zoom
-        x0 = np.linspace(self.cx - w/2, self.cx + w/2, self.RES_W)
-        y0 = np.linspace(self.cy - h/2, self.cy + h/2, self.RES_H)
-        C  = x0[np.newaxis, :] + 1j * y0[:, np.newaxis]
-        Z  = np.zeros_like(C)
-        M  = np.full(C.shape, float(self.MAX_ITER), dtype=float)
-        alive = np.ones(C.shape, dtype=bool)
-
-        for i in range(self.MAX_ITER):
-            Z[alive]   = Z[alive] ** 2 + C[alive]
-            escaped    = alive & (np.abs(Z) > 2.0)
-            M[escaped] = i + 1.0 - np.log2(np.log2(np.abs(Z[escaped]) + 1e-10))
-            alive[escaped] = False
-
-        return M / self.MAX_ITER   # (RES_H, RES_W) in [0, 1]
+    def _ring_verts(self, i, r, cx, cy):
+        """Polygon vertices for ring i at radius r."""
+        n   = 3 + i
+        rot = self.rot[i]
+        return [(cx + math.cos(v / n * math.tau + rot) * r,
+                 cy + math.sin(v / n * math.tau + rot) * r)
+                for v in range(n)]
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue  += 0.004
-        bass       = float(np.mean(fft[:6]))
-        self.zoom *= 1.004 + bass * 0.012 + beat * 0.015
+        self.hue  += 0.005
+        self.time += 0.02 + beat * 0.04
 
-        M      = self._compute()
-        inside = M >= 0.999
+        cx, cy  = WIDTH // 2, HEIGHT // 2
+        max_r   = min(WIDTH, HEIGHT) * 0.46
 
-        # If >80 % of pixels are inside the set (black) or zoom too deep → next target
-        if float(np.mean(inside)) > 0.80 or self.zoom > 8e5:
-            self._next_target()
+        bass = float(np.mean(fft[:6]))
+        mid  = float(np.mean(fft[6:30]))
+        high = float(np.mean(fft[30:]))
+        bands = [bass, (bass + mid) * 0.5, mid,
+                 (mid + high) * 0.5, high, (bass + high) * 0.5]
 
-        # Colour: hue shifts with music; inside set stays black
-        mid   = float(np.mean(fft[6:30]))
-        h_arr = (M * 4.0 + self.hue + mid) % 1.0
-        l_arr = np.where(inside, 0.0, 0.35 + M * 0.45)
+        # ── Physics update ────────────────────────────────────────────────────
+        for i in range(self.N_RINGS):
+            e = min(bands[i], 1.0)
+            # Spring: beat kick pushes out, restore force pulls back
+            self.pvel[i] += beat * (0.15 + e * 0.10)
+            self.pvel[i] += -self.poff[i] * 0.20
+            self.pvel[i] *= 0.70
+            self.poff[i] += self.pvel[i]
+            # Rotation speed driven by band energy
+            self.rot[i]  += self.rvel[i] * (1.0 + e * 2.8 + bass * 1.2)
 
-        r, g, b = self._hsl_to_rgb(h_arr, l_arr)
+        # ── Collect all ring vertex lists ─────────────────────────────────────
+        all_verts = []
+        for i in range(self.N_RINGS):
+            base_r = max_r * (0.13 + i / (self.N_RINGS - 1) * 0.83)
+            r      = base_r * (1.0 + self.poff[i] * 0.38)
+            all_verts.append(self._ring_verts(i, r, cx, cy))
 
-        # Assemble pixel array — pygame surfarray uses (W, H, 3)
-        rgb = np.stack([r, g, b], axis=2).transpose(1, 0, 2)
-        pygame.surfarray.blit_array(self._surf, rgb)
+        # ── Draw web lines between adjacent rings (inner first) ───────────────
+        for i in range(self.N_RINGS - 1):
+            v_out = all_verts[i + 1]
+            v_in  = all_verts[i]
+            n_out = len(v_out)
+            n_in  = len(v_in)
+            e     = min(bands[i], 1.0)
+            h     = (self.hue + i / self.N_RINGS * 0.5) % 1.0
+            for k, (ox, oy) in enumerate(v_out):
+                nearest = round(k / n_out * n_in) % n_in
+                ix, iy  = v_in[nearest]
+                pygame.draw.line(surf,
+                                 hsl(h, l=0.18 + e * 0.28),
+                                 (int(ox), int(oy)), (int(ix), int(iy)), 1)
 
-        scaled = pygame.transform.scale(self._surf, (WIDTH, HEIGHT))
-        surf.blit(scaled, (0, 0))
+        # ── Draw polygon rings (outer → inner so inner overdraw outer) ────────
+        for i in range(self.N_RINGS - 1, -1, -1):
+            e     = min(bands[i], 1.0)
+            h     = (self.hue + i / self.N_RINGS * 0.55) % 1.0
+            bright = 0.42 + e * 0.44
+            lw    = max(1, int(1 + e * 2.5 + beat * 1.5))
+            ipts  = [(int(x), int(y)) for x, y in all_verts[i]]
+            pygame.draw.polygon(surf, hsl(h, l=bright), ipts, lw)
+            # Star: connect every vertex to the one two steps ahead
+            n = len(ipts)
+            if n >= 5:
+                step = 2
+                for k in range(n):
+                    pygame.draw.line(surf, hsl(h, l=bright * 0.6),
+                                     ipts[k], ipts[(k + step) % n], 1)
+
+        # ── Radial spokes from centre ─────────────────────────────────────────
+        outer_r = max_r * (1.02 + beat * 0.18)
+        for s in range(self.N_SPOKES):
+            a   = s / self.N_SPOKES * math.tau + self.time * 0.22
+            # Wiggle spokes with audio-driven sine
+            a  += math.sin(self.time * 2.4 + s * 0.85) * (0.05 + mid * 0.10)
+            x2  = int(cx + math.cos(a) * outer_r)
+            y2  = int(cy + math.sin(a) * outer_r)
+            h   = (self.hue + s / self.N_SPOKES * 0.35 + high * 0.2) % 1.0
+            lw  = max(1, int(beat * 2.5))
+            if lw:
+                pygame.draw.line(surf,
+                                 hsl(h, l=0.18 + beat * 0.50 + high * 0.18),
+                                 (cx, cy), (x2, y2), lw)
+
+        # ── Central bright circle that pulses with bass ───────────────────────
+        cr = max(2, int(8 + bass * 28 + beat * 20))
+        pygame.draw.circle(surf, hsl(self.hue, l=0.55 + beat * 0.35), (cx, cy), cr)
+        pygame.draw.circle(surf, hsl((self.hue + 0.5) % 1.0, l=0.75),
+                           (cx, cy), max(1, cr // 3))
 
 
 class Bubbles:
@@ -780,7 +800,7 @@ MODES = [
     ("Particles",   Particles),
     ("Tunnel",      Tunnel),
     ("Lissajous",   Lissajous),
-    ("Mandelbrot",  Mandelbrot),
+    ("Yantra",      Yantra),
     ("Bubbles",     Bubbles),
     ("Waterfall",   GlowSquares),
 ]
