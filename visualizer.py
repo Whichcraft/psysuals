@@ -4,7 +4,7 @@ Music Visualizer — Real-time audio → visuals.
 
 Controls:
   SPACE / click   Switch to next mode
-  1-8             Jump to a specific mode
+  1-9 / 0         Jump to a specific mode (0 = mode 10, 11 onwards use SPACE)
   F               Toggle fullscreen
   Q / ESC         Quit
 """
@@ -455,6 +455,177 @@ class Mandelbrot:
         surf.blit(scaled, (0, 0))
 
 
+class Bubbles:
+    """Translucent rising bubbles — size and spawn rate driven by bass."""
+
+    MAX = 250
+
+    def __init__(self):
+        self.hue  = 0.0
+        self.pool = []
+
+    def _spawn(self, beat, bass):
+        for _ in range(int(1 + beat * 7 + bass * 5)):
+            r = random.uniform(8, 45) * (1 + bass * 1.5)
+            self.pool.append({
+                "x":      random.uniform(WIDTH * 0.05, WIDTH * 0.95),
+                "y":      float(HEIGHT + r),
+                "r":      r,
+                "vx":     random.gauss(0, 0.4),
+                "vy":    -random.uniform(1.2, 3.5) * (1 + beat * 0.8),
+                "hue":    (self.hue + random.uniform(0, 0.35)) % 1.0,
+                "wobble": random.uniform(0.025, 0.07),
+                "phase":  random.uniform(0, math.tau),
+            })
+
+    def draw(self, surf, waveform, fft, beat, tick):
+        self.hue += 0.003
+        bass = float(np.mean(fft[:8]))
+        self._spawn(beat, bass)
+
+        alive = []
+        for b in self.pool:
+            b["x"] += b["vx"] + math.sin(tick * b["wobble"] + b["phase"]) * 0.9
+            b["y"] += b["vy"]
+            if b["y"] + b["r"] < 0:
+                continue
+
+            life  = max(0.0, min(1.0, (HEIGHT - b["y"]) / HEIGHT))
+            r     = int(b["r"])
+            alpha = int(life * 130)
+            bsurf = pygame.Surface((r * 2 + 6, r * 2 + 6), pygame.SRCALPHA)
+            cx, cy = r + 3, r + 3
+            # Outer glow ring
+            pygame.draw.circle(bsurf, (*hsl(b["hue"], l=0.55), alpha // 2),
+                               (cx, cy), r + 2, 3)
+            # Main bubble rim
+            pygame.draw.circle(bsurf, (*hsl(b["hue"], l=0.70), alpha),
+                               (cx, cy), r, 2)
+            # Specular highlight
+            hr = max(1, r // 4)
+            pygame.draw.circle(bsurf, (255, 255, 255, alpha // 2),
+                               (cx - r // 3, cy - r // 3), hr)
+            surf.blit(bsurf, (int(b["x"]) - cx, int(b["y"]) - cy))
+            alive.append(b)
+
+        self.pool = alive[-self.MAX:]
+
+
+class Flax:
+    """Flow-field strands — particle trails follow a noise-like vector field
+    modulated by the audio spectrum, creating silk/fibre-like motion."""
+
+    TARGET_N = 300
+    MAX_TRAIL = 14
+
+    def __init__(self):
+        self.hue  = 0.0
+        self.time = 0.0
+        self.pool = [self._new() for _ in range(self.TARGET_N)]
+
+    @staticmethod
+    def _new():
+        return {
+            "x":    random.uniform(0, WIDTH),
+            "y":    random.uniform(0, HEIGHT),
+            "life": random.uniform(0.4, 1.0),
+            "hoff": random.uniform(0, 0.4),
+            "trail": [],
+        }
+
+    def draw(self, surf, waveform, fft, beat, tick):
+        self.hue  += 0.003
+        self.time += 0.007 + beat * 0.018
+        bass = float(np.mean(fft[:6]))
+
+        alive = []
+        for p in self.pool:
+            nx  = p["x"] / WIDTH
+            ny  = p["y"] / HEIGHT
+            fi  = min(int(nx * len(fft) * 0.45), len(fft) - 1)
+            # Flow angle: sine noise field perturbed by the FFT at that x position
+            angle = (math.sin(nx * 5.1 + self.time) *
+                     math.cos(ny * 3.7 + self.time * 0.6) +
+                     fft[fi] * 2.8) * math.pi
+
+            speed = 1.8 + bass * 5 + beat * 2.5
+            p["trail"].append((int(p["x"]), int(p["y"])))
+            if len(p["trail"]) > self.MAX_TRAIL:
+                p["trail"].pop(0)
+
+            p["x"]    += math.cos(angle) * speed
+            p["y"]    += math.sin(angle) * speed
+            p["life"] -= 0.010
+
+            if (p["life"] > 0
+                    and -10 < p["x"] < WIDTH + 10
+                    and -10 < p["y"] < HEIGHT + 10
+                    and len(p["trail"]) > 1):
+                h = (self.hue + p["hoff"] + ny * 0.25) % 1.0
+                for j in range(1, len(p["trail"])):
+                    t     = j / len(p["trail"])
+                    color = hsl(h, l=0.15 + t * 0.65)
+                    pygame.draw.line(surf, color,
+                                     p["trail"][j - 1], p["trail"][j], 1)
+                alive.append(p)
+
+        # Refill dead / out-of-bounds particles
+        while len(alive) < self.TARGET_N:
+            alive.append(self._new())
+        self.pool = alive
+
+
+class GlowSquares:
+    """Grid of squares that bloom and pulse — each column tracks a frequency band."""
+
+    COLS = 22
+    ROWS = 13
+
+    def __init__(self):
+        self.hue      = 0.0
+        self.energies = np.zeros(self.COLS * self.ROWS)
+
+    def draw(self, surf, waveform, fft, beat, tick):
+        self.hue += 0.003
+        sq_w = WIDTH  // self.COLS
+        sq_h = HEIGHT // self.ROWS
+        pad  = 5
+
+        for row in range(self.ROWS):
+            for col in range(self.COLS):
+                idx = row * self.COLS + col
+                fi  = min(int(col / self.COLS * len(fft) * 0.55), len(fft) - 1)
+                # Higher rows amplify higher energy for a stacked look
+                target = fft[fi] * (0.6 + row / self.ROWS * 0.8) * (1 + beat * 0.5)
+                self.energies[idx] = self.energies[idx] * 0.75 + target * 0.25
+                e = float(self.energies[idx])
+                if e < 0.015:
+                    continue
+
+                x = col * sq_w + pad
+                y = row * sq_h + pad
+                w = sq_w - pad * 2
+                h = sq_h - pad * 2
+                hue = (self.hue + col / self.COLS + row / self.ROWS * 0.25) % 1.0
+
+                # Glow layers — progressively larger & more transparent
+                for g in range(4, 0, -1):
+                    gs    = g * 5
+                    alpha = int(e * 80 / g)
+                    if alpha < 5:
+                        continue
+                    gs_surf = pygame.Surface((w + gs * 2, h + gs * 2), pygame.SRCALPHA)
+                    pygame.draw.rect(gs_surf,
+                                     (*hsl(hue, l=0.55), alpha),
+                                     (0, 0, w + gs * 2, h + gs * 2),
+                                     border_radius=4)
+                    surf.blit(gs_surf, (x - gs, y - gs))
+
+                # Core square
+                pygame.draw.rect(surf, hsl(hue, l=0.25 + e * 0.75),
+                                 (x, y, w, h), border_radius=3)
+
+
 # ── Mode registry ─────────────────────────────────────────────────────────────
 
 MODES = [
@@ -465,7 +636,10 @@ MODES = [
     ("Particles",   Particles),
     ("Tunnel",      Tunnel),
     ("Lissajous",   Lissajous),
-    ("Mandelbrot",  Mandelbrot),
+    ("Mandelbrot",   Mandelbrot),
+    ("Bubbles",      Bubbles),
+    ("Flax",         Flax),
+    ("Glow Squares", GlowSquares),
 ]
 
 

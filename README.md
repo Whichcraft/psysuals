@@ -16,6 +16,9 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 6 | **Tunnel** | Receding hexagonal rings that accelerate with bass |
 | 7 | **Lissajous** | 3-D rotating Lissajous figure that morphs with audio |
 | 8 | **Mandelbrot** | Animated zoom through 7 curated boundary points — auto-advances when the frame goes dark, speed and palette driven by bass |
+| 9 | **Bubbles** | Translucent rising bubbles with specular highlights — size and spawn rate driven by bass |
+| 10 | **Flax** | Flow-field particle strands following a noise field modulated by the spectrum — silk/fibre-like motion |
+| 11 | **Glow Squares** | Grid of squares with multi-layer bloom glow — each column tracks a frequency band |
 
 ## Requirements
 
@@ -40,7 +43,7 @@ python3 -m venv .venv
 | Key / Action | Effect |
 |---|---|
 | `Space` or click | Cycle to next mode |
-| `1` – `8` | Jump directly to a mode |
+| `1` – `9`, `0` | Jump directly to modes 1–10 (use Space to reach 11+) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `Q` / `Esc` | Quit |
