@@ -13,7 +13,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 3 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
 | 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | 5 | **Particles** | Coloured particles burst from the centre on every beat |
-| 6 | **Tunnel** | Receding hexagonal rings that accelerate with bass |
+| 6 | **Tunnel** | First-person ride through a curving tube — rings and longitudinal wall lines, centre shifts as the path bends |
 | 7 | **Lissajous** | 3-D rotating Lissajous figure that morphs with audio |
 | 8 | **Mandelbrot** | Animated zoom through 7 curated boundary points — auto-advances when the frame goes dark, speed and palette driven by bass |
 | 9 | **Bubbles** | Translucent rising bubbles with specular highlights — size and spawn rate driven by bass |
