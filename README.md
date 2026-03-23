@@ -43,7 +43,9 @@ python3 -m venv .venv
 | Key / Action | Effect |
 |---|---|
 | `Space` or click | Cycle to next mode |
-| `1` – `9`, `0` | Jump directly to modes 1–10 (use Space to reach 11+) |
+| `1` – `9` | Jump to modes 1–9 |
+| `0` | Jump to mode 10 (Flax) |
+| `-` | Jump to mode 11 (Glow Squares) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `Q` / `Esc` | Quit |
