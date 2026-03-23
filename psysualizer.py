@@ -340,61 +340,81 @@ class Bars:
             pygame.draw.lines(surf, hsl(self.hue, l=0.75), False, pts, 2)
 
 
-class Particles:
-    """3-D particle burst — beats spawn spherical shells that fly outward with
-    perspective projection; depth gives a genuine volumetric feel."""
+class Nova:
+    """Extremely psychedelic waveform kaleidoscope — audio waveform mapped to
+    polar sectors with 7-fold mirror symmetry across 4 concentric spinning
+    layers.  Each layer reacts to a different frequency band; beat explodes
+    all layers outward with spring physics then snaps them back."""
 
-    MAX = 1200
+    N_SYM    = 7    # prime-fold kaleidoscope symmetry
+    N_LAYERS = 4
+    N_WAVE   = 120  # waveform samples per sector
 
     def __init__(self):
         self.hue  = 0.0
-        self.pool = []
-
-    def _proj(self, x, y, z):
-        fov  = min(WIDTH, HEIGHT) * 0.55
-        zcam = max(z + 6.0, 0.05)
-        return (int(x * fov / zcam + WIDTH  / 2),
-                int(y * fov / zcam + HEIGHT / 2),
-                fov / zcam)
-
-    def _spawn(self, fft, beat):
-        for _ in range(int(5 + beat * 28)):
-            phi   = random.uniform(0, math.tau)
-            theta = math.acos(random.uniform(-1, 1))
-            sp, cp = math.sin(phi), math.cos(phi)
-            st, ct = math.sin(theta), math.cos(theta)
-            fi    = random.randint(0, len(fft) - 1)
-            speed = random.uniform(0.06, 0.22) * (1 + beat * 3.5 + fft[fi] * 2)
-            self.pool.append({
-                "x": 0.0, "y": 0.0, "z": 0.0,
-                "vx": st * cp * speed,
-                "vy": ct * speed,
-                "vz": st * sp * speed,
-                "life": 1.0,
-                "hue":  (self.hue + fi / len(fft)) % 1.0,
-                "size": max(2, int(2 + fft[fi] * 10)),
-            })
+        self.time = 0.0
+        signs = [1, -1, 1, -1]
+        self.rot   = [i / self.N_LAYERS * math.pi for i in range(self.N_LAYERS)]
+        self.rvel  = [signs[i] * (0.005 + i * 0.0022) for i in range(self.N_LAYERS)]
+        self.poff  = [0.0] * self.N_LAYERS
+        self.pvel  = [0.0] * self.N_LAYERS
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue += 0.004
-        self._spawn(fft, beat)
-        alive = []
-        for p in self.pool:
-            p["x"] += p["vx"]
-            p["y"] += p["vy"]
-            p["z"] += p["vz"]
-            p["vy"]  -= 0.003      # gentle gravity
-            p["life"] -= 0.013
-            if p["life"] <= 0:
-                continue
-            sx, sy, sc = self._proj(p["x"], p["y"], p["z"])
-            if sc < 0.5:
-                continue
-            r = max(1, int(p["size"] * p["life"] * sc * 0.08))
-            color = hsl(p["hue"], l=0.3 + p["life"] * 0.5)
-            pygame.draw.circle(surf, color, (sx, sy), r)
-            alive.append(p)
-        self.pool = alive[-self.MAX:]
+        self.hue  += 0.007
+        self.time += 0.018 + beat * 0.025
+        bass = float(np.mean(fft[:6]))
+        mid  = float(np.mean(fft[6:30]))
+        high = float(np.mean(fft[30:]))
+        bands = [bass, mid, high, (bass + mid + high) / 3.0]
+
+        cx, cy = WIDTH // 2, HEIGHT // 2
+        max_r  = min(WIDTH, HEIGHT) * 0.44
+
+        # Spring physics per layer
+        for i in range(self.N_LAYERS):
+            e = min(bands[i], 1.0)
+            self.pvel[i] += beat * (0.32 + e * 0.14)
+            self.pvel[i] += -self.poff[i] * 0.24
+            self.pvel[i] *= 0.63
+            self.poff[i] += self.pvel[i]
+            self.rot[i]  += self.rvel[i] * (1.0 + e * 2.8 + bass * 1.2)
+
+        # Downsample waveform
+        step   = max(1, len(waveform) // self.N_WAVE)
+        wave   = waveform[::step][:self.N_WAVE]
+        sector = math.tau / self.N_SYM
+
+        # Draw outermost layer first
+        for i in range(self.N_LAYERS - 1, -1, -1):
+            e      = min(bands[i], 1.0)
+            base_r = max_r * (0.22 + i / max(self.N_LAYERS - 1, 1) * 0.72)
+            r_off  = self.poff[i] * base_r * 0.42
+            h      = (self.hue + i / self.N_LAYERS * 0.45) % 1.0
+            bright = 0.44 + e * 0.44 + beat * 0.10
+            amp    = base_r * (0.14 + e * 0.20 + beat * 0.10)
+            lw     = max(1, int(1 + e * 2.5 + beat * 2))
+
+            for sym in range(self.N_SYM):
+                # Alternate sectors are time-reversed for mirror continuity
+                w_slice   = wave if sym % 2 == 0 else wave[::-1]
+                angle_off = sym * sector + self.rot[i]
+                pts = []
+                for j, w in enumerate(w_slice):
+                    theta = j / len(w_slice) * sector + angle_off
+                    r_pt  = max(2.0, base_r + r_off + float(w) * amp)
+                    pts.append((int(cx + math.cos(theta) * r_pt),
+                                int(cy + math.sin(theta) * r_pt)))
+                if len(pts) > 1:
+                    pygame.draw.lines(surf, hsl(h, l=bright), False, pts, lw)
+
+            # Thin connecting ring at base radius
+            pygame.draw.circle(surf, hsl(h, l=bright * 0.28),
+                               (cx, cy), max(1, int(base_r + r_off)), 1)
+
+        # Central pulse on beat
+        cr = max(2, int(10 + bass * 22 + beat * 40))
+        pygame.draw.circle(surf, hsl(self.hue, l=0.55 + beat * 0.35), (cx, cy), cr)
+        pygame.draw.circle(surf, (255, 255, 255), (cx, cy), max(1, cr // 4))
 
 
 class Tunnel:
@@ -558,15 +578,18 @@ class Lissajous:
                           math.sin(az * self.t + self.dz)))
 
         # Beat scale burst — spring physics
-        self.svel  += beat * 0.38
+        self.svel  += beat * 0.55
         self.svel  += (1.0 - self.scale) * 0.26
-        self.svel  *= 0.63
+        self.svel  *= 0.60
         self.scale += self.svel
         self.scale  = max(0.35, self.scale)
 
-        # 3-D rotation with beat inertia
-        self.rvx += beat * 0.009 + 0.0002
-        self.rvy += beat * 0.011 + 0.0003
+        # Hue jump on beat — each kick shifts the palette
+        self.hue += beat * 0.12
+
+        # 3-D rotation with stronger beat inertia
+        self.rvx += beat * 0.016 + 0.0002
+        self.rvy += beat * 0.019 + 0.0003
         self.rvx *= 0.97
         self.rvy *= 0.97
         self.rx  += self.rvx
@@ -582,7 +605,9 @@ class Lissajous:
             return
 
         # Glow pass constants: (line-width multiplier, l_tail, l_head)
-        PASSES = [(4, 0.08, 0.22), (1, 0.50, 0.90)]
+        # Beat raises the bright-core brightness
+        l1_bright = min(0.90 + beat * 0.08, 0.98)
+        PASSES = [(4, 0.08, 0.22), (1, 0.50, l1_bright)]
 
         for sym in range(self.N_SYM):
             a     = sym / self.N_SYM * math.tau
@@ -599,17 +624,23 @@ class Lissajous:
                     pygame.draw.line(surf, hsl(h, l=l0 + t * (l1 - l0)),
                                      pts[j - 1], pts[j], lw)
 
-        # Bright head dot at the current draw point
+        # Bright head dot — radius and a white flash scale with beat
         hx, hy = raw[-1]
         for sym in range(self.N_SYM):
             a      = sym / self.N_SYM * math.tau
             ca, sa = math.cos(a), math.sin(a)
             sx     = int(cx + hx * ca - hy * sa)
             sy_    = int(cy + hx * sa + hy * ca)
-            r      = max(3, int(7 + beat * 14))
+            r      = max(3, int(7 + beat * 22))
             pygame.draw.circle(surf,
                                hsl((self.hue + sym * 0.33) % 1.0, l=0.88), (sx, sy_), r)
             pygame.draw.circle(surf, (255, 255, 255), (sx, sy_), max(1, r // 3))
+            # Extra glow halo on strong beats
+            if beat > 0.5:
+                pygame.draw.circle(surf,
+                                   hsl((self.hue + sym * 0.33 + 0.5) % 1.0,
+                                       l=0.45 + beat * 0.25),
+                                   (sx, sy_), max(2, int(r * 1.8)), 2)
 
 
 class Yantra:
@@ -849,7 +880,7 @@ MODES = [
     ("Plasma",      Plasma),      # 3
     ("Tunnel",      Tunnel),      # 4
     ("Lissajous",   Lissajous),   # 5
-    ("Particles",   Particles),   # 6
+    ("Nova",        Nova),         # 6
     ("Spiral",      Spiral),      # 7
     ("Bubbles",     Bubbles),     # 8
     ("Spectrum",    Bars),        # 9
