@@ -8,15 +8,15 @@ Real-time music visualizer — listens to audio input and renders animated visua
 
 | # | Mode | Description |
 |---|------|-------------|
-| 1 | **Spiral** | Fly through a curving 3-D helix vortex — 6 arms with rainbow trails that fade from black in the distance to bright colour up close, axis drifts like Tunnel |
-| 2 | **Plasma** | Full-screen sine-interference plasma — four overlapping wave fields create a flowing psychedelic texture; bass shifts the palette, beat flashes the whole screen |
-| 3 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
-| 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
-| 5 | **Particles** | 3-D particle burst — beats eject spherical shells; perspective projection gives depth |
-| 6 | **Tunnel** | First-person ride through a curving tube — rings physically fly toward you and wrap to the far end, bass and beat control speed |
-| 7 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot drawn with 3-fold symmetry and two-pass neon glow (wide dim halo + thin bright core); beat explodes the scale outward with spring physics |
-| 8 | **Yantra** | Psychedelic sacred-geometry mandala — 6 concentric polygon rings (triangle→octagon) alternating rotation, web connections between rings, neon spokes, beat-driven spring pulses |
-| 9 | **Bubbles** | Translucent rising bubbles with specular highlights — size and spawn rate driven by bass |
+| 1 | **Yantra** | Psychedelic sacred-geometry mandala — 6 concentric polygon rings (triangle→octagon) alternating rotation, web connections between rings, neon spokes, beat-driven spring pulses |
+| 2 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
+| 3 | **Plasma** | Full-screen sine-interference plasma — four overlapping wave fields create a flowing psychedelic texture; bass shifts the palette, beat flashes the whole screen |
+| 4 | **Tunnel** | First-person ride through a curving tube — rings physically fly toward you and wrap to the far end, bass and beat control speed |
+| 5 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot drawn with 3-fold symmetry and two-pass neon glow (wide dim halo + thin bright core); beat explodes the scale outward with spring physics |
+| 6 | **Particles** | 3-D particle burst — beats eject spherical shells; perspective projection gives depth |
+| 7 | **Spiral** | Fly through a curving 3-D helix vortex — 6 arms with rainbow trails that fade from black in the distance to bright colour up close, axis drifts like Tunnel |
+| 8 | **Bubbles** | Translucent rising bubbles filling the full screen — size and spawn rate driven by bass |
+| 9 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | 10 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
 
 ## Requirements

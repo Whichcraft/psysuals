@@ -817,16 +817,16 @@ class GlowSquares:
 # ── Mode registry ─────────────────────────────────────────────────────────────
 
 MODES = [
-    ("Spiral",      Spiral),
-    ("Plasma",      Plasma),
-    ("Cube",        Cube),
-    ("Spectrum",    Bars),
-    ("Particles",   Particles),
-    ("Tunnel",      Tunnel),
-    ("Lissajous",   Lissajous),
-    ("Yantra",      Yantra),
-    ("Bubbles",     Bubbles),
-    ("Waterfall",   GlowSquares),
+    ("Yantra",      Yantra),      # 1
+    ("Cube",        Cube),        # 2
+    ("Plasma",      Plasma),      # 3
+    ("Tunnel",      Tunnel),      # 4
+    ("Lissajous",   Lissajous),   # 5
+    ("Particles",   Particles),   # 6
+    ("Spiral",      Spiral),      # 7
+    ("Bubbles",     Bubbles),     # 8
+    ("Spectrum",    Bars),        # 9
+    ("Waterfall",   GlowSquares), # 0
 ]
 
 
@@ -877,8 +877,9 @@ def main():
     global WIDTH, HEIGHT
 
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
     pygame.display.set_caption("Music Visualizer")
+    WIDTH, HEIGHT = screen.get_size()
     clock  = pygame.time.Clock()
     font   = pygame.font.SysFont("monospace", 16)
 
@@ -892,7 +893,7 @@ def main():
     mode_idx      = 0
     name, VisCls  = MODES[mode_idx]
     vis           = VisCls()
-    fullscreen    = False
+    fullscreen    = True
     tick          = 0
     energy_hist   = deque(maxlen=30)
     picking       = False      # device-picker overlay open?
