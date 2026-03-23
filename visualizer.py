@@ -190,21 +190,23 @@ class Cube:
 class Bars:
     """Classic spectrum bars with peak markers and a waveform overlay."""
 
-    N = 80
-
     def __init__(self):
-        self.hue   = 0.0
-        self.peaks = np.zeros(self.N)
+        self.hue = 0.0
+        # Pre-compute unique log-spaced bin edges (done once, not per frame).
+        # np.unique removes duplicates that astype(int) creates at the low end,
+        # so every bar always covers a distinct, non-overlapping range of bins.
+        n_bins     = BLOCK_SIZE // 2
+        raw        = np.geomspace(2, int(n_bins * 0.85), 81).astype(int)
+        self.edges = np.unique(np.clip(raw, 1, n_bins - 1))
+        self.n     = len(self.edges) - 1   # actual bar count after dedup
+        self.peaks = np.zeros(self.n)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
-        bar_w  = WIDTH // self.N
-        # Logarithmic frequency mapping — perceptually uniform like a real analyser
-        edges  = np.geomspace(2, len(fft) // 3, self.N + 1).astype(int)
-        edges  = np.clip(edges, 1, len(fft) - 1)
+        bar_w   = WIDTH // self.n
         heights = np.array([
-            np.mean(fft[edges[i] : max(edges[i] + 1, edges[i + 1])])
-            for i in range(self.N)
+            np.mean(fft[self.edges[i] : self.edges[i + 1]])
+            for i in range(self.n)
         ])
         heights /= (heights.max() + 1e-6)
         self.peaks = np.maximum(self.peaks * 0.97, heights)
@@ -213,7 +215,7 @@ class Bars:
             bar_h = int(h * HEIGHT * 0.82)
             peak  = int(self.peaks[i] * HEIGHT * 0.82)
             x     = i * bar_w
-            hue   = (self.hue + i / self.N) % 1.0
+            hue   = (self.hue + i / self.n) % 1.0
             pygame.draw.rect(surf, hsl(hue, l=0.38 + h * 0.42),
                              (x, HEIGHT - bar_h, bar_w - 2, bar_h))
             pygame.draw.rect(surf, hsl(hue, l=0.9),
