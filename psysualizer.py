@@ -87,9 +87,9 @@ class Spiral:
         ]
 
     def _path(self, t):
-        """Curving axis offset in world space — same gentle sine curves as Tunnel."""
-        return (math.sin(t * 0.18) * 1.2,
-                math.cos(t * 0.13) * 0.9)
+        """Subtle sway — small enough that the camera stays inside the helix."""
+        return (math.sin(t * 0.18) * 0.25,
+                math.cos(t * 0.13) * 0.20)
 
     def _world_pos(self, pt, arm):
         angle   = pt * self.SPIN + arm / self.N_ARMS * math.tau
