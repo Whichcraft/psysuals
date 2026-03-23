@@ -488,6 +488,8 @@ def _draw_device_picker(screen, font, devices, selected, active_idx):
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 def main():
+    global WIDTH, HEIGHT
+
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Music Visualizer")
@@ -510,9 +512,13 @@ def main():
     picking       = False      # device-picker overlay open?
     pick_sel      = 0          # highlighted row in picker
 
-    fade = pygame.Surface((WIDTH, HEIGHT))
-    fade.set_alpha(38)
-    fade.fill((0, 0, 0))
+    def make_fade():
+        s = pygame.Surface((WIDTH, HEIGHT))
+        s.set_alpha(38)
+        s.fill((0, 0, 0))
+        return s
+
+    fade = make_fade()
 
     hint = ("  SPACE/click: next mode  |  1-{n}: pick mode  "
             "|  D: device  |  F: fullscreen  |  Q: quit").format(n=len(MODES))
@@ -557,6 +563,9 @@ def main():
                         fullscreen = not fullscreen
                         flags  = pygame.FULLSCREEN if fullscreen else 0
                         screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+                        WIDTH, HEIGHT = screen.get_size()
+                        fade = make_fade()
+                        vis  = VisCls()   # re-init with new dimensions
                     elif event.key == pygame.K_d:
                         devices  = _input_devices()   # refresh list
                         picking  = True
