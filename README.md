@@ -12,13 +12,13 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 2 | **Tentacles** | 8 octopus tentacles with suckers — each arm driven by its own frequency band, traveling sine wave creates organic undulation |
 | 3 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
 | 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
-| 5 | **Particles** | Coloured particles burst from the centre on every beat |
+| 5 | **Particles** | 3-D particle burst — beats eject spherical shells; perspective projection gives depth |
 | 6 | **Tunnel** | First-person ride through a curving tube — rings physically fly toward you and wrap to the far end, bass and beat control speed |
-| 7 | **Lissajous** | 3-D rotating Lissajous figure that morphs with audio |
+| 7 | **Lissajous** | True 3-D Lissajous knot — x=sin(ax·t), y=sin(ay·t), z=sin(az·t); audio drives frequency ratios, knot rotates freely in 3-D |
 | 8 | **Mandelbrot** | Animated zoom through 7 curated boundary points — auto-advances when the frame goes dark, speed and palette driven by bass |
 | 9 | **Bubbles** | Translucent rising bubbles with specular highlights — size and spawn rate driven by bass |
 | 10 | **Flax** | Flow-field particle strands following a noise field modulated by the spectrum — silk/fibre-like motion |
-| 11 | **Glow Squares** | Grid of squares with multi-layer bloom glow — each column tracks a frequency band |
+| 11 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy |
 
 ## Requirements
 
@@ -45,7 +45,7 @@ python3 -m venv .venv
 | `Space` or click | Cycle to next mode |
 | `1` – `9` | Jump to modes 1–9 |
 | `0` | Jump to mode 10 (Flax) |
-| `-` | Jump to mode 11 (Glow Squares) |
+| `-` | Jump to mode 11 (Waterfall) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `Q` / `Esc` | Quit |

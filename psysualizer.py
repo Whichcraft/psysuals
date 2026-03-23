@@ -6,7 +6,7 @@ Controls:
   SPACE / click   Switch to next mode
   1-9             Jump to modes 1-9
   0               Jump to mode 10 (Flax)
-  -               Jump to mode 11 (Glow Squares)
+  -               Jump to mode 11 (Waterfall)
   F               Toggle fullscreen
   Q / ESC         Quit
 """
@@ -134,82 +134,99 @@ class Spiral:
 
 
 class Tentacles:
-    """8 octopus tentacles — thick tapered arms with suckers, each driven by its
-    own frequency band.  A traveling sine wave creates organic undulation."""
+    """8 octopus tentacles in 3-D — arms spread over a hemisphere, scene
+    rotates slowly around Y to reveal depth.  Suckers placed in screen space."""
 
     N_ARMS = 8
-    N_SEGS = 22
-    SEG_LEN = 36    # base segment length (pixels)
+    N_SEGS = 20
+    SEG_W  = 0.30   # world-unit segment length
 
     def __init__(self):
         self.hue   = 0.0
         self.phase = 0.0
+        self.ry    = 0.0
+        # Arm base directions: evenly spaced azimuth, fixed elevation (~105° from top)
+        el = math.pi * 0.58
+        self.dirs = [
+            np.array([math.sin(el) * math.cos(i / self.N_ARMS * math.tau),
+                      math.cos(el),
+                      math.sin(el) * math.sin(i / self.N_ARMS * math.tau)],
+                     dtype=float)
+            for i in range(self.N_ARMS)
+        ]
+
+    def _proj(self, x, y, z):
+        fov  = min(WIDTH, HEIGHT) * 0.52
+        zcam = max(z + 5.0, 0.05)
+        return (int(x * fov / zcam + WIDTH  / 2),
+                int(y * fov / zcam + HEIGHT / 2),
+                fov / zcam)
+
+    def _rot_y(self, v, c, s):
+        return np.array([v[0]*c + v[2]*s, v[1], -v[0]*s + v[2]*c])
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue   += 0.002
         self.phase += 0.045 + beat * 0.07
+        self.ry    += 0.007
         norm  = fft / (fft.max() + 1e-6)
         bass  = float(np.mean(norm[:5]))
+        cy_s, sy_s = math.cos(self.ry), math.sin(self.ry)
 
-        cx = WIDTH  // 2
-        cy = HEIGHT // 2 + HEIGHT // 10   # root slightly below centre
-
-        # Central mantle (body)
-        mantle_r = int(38 + bass * 18 + beat * 12)
-        pygame.draw.circle(surf, hsl(self.hue, l=0.28), (cx, cy), mantle_r)
-        pygame.draw.circle(surf, hsl(self.hue, l=0.45), (cx, cy), mantle_r, 3)
+        # Mantle body at world origin
+        mx, my, _ = self._proj(0, 0, 0)
+        mr = int(32 + bass * 16 + beat * 10)
+        pygame.draw.circle(surf, hsl(self.hue, l=0.28), (mx, my), mr)
+        pygame.draw.circle(surf, hsl(self.hue, l=0.45), (mx, my), mr, 2)
 
         for ai in range(self.N_ARMS):
-            # Each arm gets its own frequency band
             b_lo   = int( ai      / self.N_ARMS * len(norm) * 0.45)
             b_hi   = int((ai + 1) / self.N_ARMS * len(norm) * 0.45)
             energy = float(np.mean(norm[b_lo : max(b_lo + 1, b_hi)]))
+            seg_w  = self.SEG_W * (1 + energy * 0.45 + beat * 0.18)
 
-            # Arms spread evenly around the body
-            base_angle = ai / self.N_ARMS * math.tau
-            seg_len    = self.SEG_LEN * (1 + energy * 0.5 + beat * 0.2)
+            d   = self._rot_y(self.dirs[ai], cy_s, sy_s)
+            pos = np.zeros(3)
+            spts = []   # (sx, sy, width) for sucker pass
 
-            x, y  = float(cx), float(cy)
-            angle = base_angle
-            pts   = [(x, y)]   # joint positions for sucker placement
-
-            # ── draw segments ──────────────────────────────────────────────
             for s in range(self.N_SEGS):
-                t = s / self.N_SEGS
+                t  = s / self.N_SEGS
+                wh = (math.sin(self.phase * 1.3 - s * 0.55 + ai * 1.1) *
+                      (0.26 + energy * 0.72) * (1 - t * 0.4))
+                wv = (math.sin(self.phase * 0.85 - s * 0.42 + ai * 0.75) *
+                      (0.10 + energy * 0.28) * (1 - t * 0.4))
+                # Bend in 3-D: horizontal (around Y) then vertical (around X)
+                d = self._rot_y(d, math.cos(wh), math.sin(wh))
+                cxv, sxv = math.cos(wv), math.sin(wv)
+                d = np.array([d[0], d[1]*cxv - d[2]*sxv, d[1]*sxv + d[2]*cxv])
+                ln = np.linalg.norm(d)
+                if ln > 1e-6:
+                    d /= ln
 
-                # Traveling wave from base → tip gives organic undulation
-                wave = (math.sin(self.phase * 1.3 - s * 0.55 + ai * 1.1) *
-                        (0.28 + energy * 0.75) * (1 - t * 0.4))
-                angle += wave
+                npos = pos + d * seg_w * (1 - t * 0.68)
+                sx1, sy1, sc1 = self._proj(*pos)
+                sx2, sy2, _   = self._proj(*npos)
+                w_px = max(1, int((1 - t) * sc1 * 0.14 * (1 + beat * 0.35)))
+                hh   = (self.hue + ai / self.N_ARMS * 0.35 + t * 0.12) % 1.0
+                pygame.draw.line(surf, hsl(hh, l=0.22 + energy * 0.50 + beat * 0.08),
+                                 (sx1, sy1), (sx2, sy2), w_px)
+                spts.append((sx1, sy1, w_px))
+                pos = npos
 
-                eff_len = seg_len * (1 - t * 0.68)   # taper strongly
-                nx = x + math.cos(angle) * eff_len
-                ny = y + math.sin(angle) * eff_len
-
-                w   = max(1, int((1 - t) * 20 * (1 + beat * 0.35)))
-                h   = (self.hue + ai / self.N_ARMS * 0.35 + t * 0.12) % 1.0
-                col = hsl(h, l=0.22 + energy * 0.48 + beat * 0.08)
-                pygame.draw.line(surf, col,
-                                 (int(x), int(y)), (int(nx), int(ny)), w)
-                pts.append((nx, ny))
-                x, y = nx, ny
-
-            # ── suckers along arm ──────────────────────────────────────────
-            for s in range(1, len(pts) - 1, 2):
-                t   = s / self.N_SEGS
-                px, py = pts[s]
-                # Perpendicular direction (one side of arm)
-                dx  = pts[min(s+1, len(pts)-1)][0] - pts[s-1][0]
-                dy  = pts[min(s+1, len(pts)-1)][1] - pts[s-1][1]
-                ln  = math.sqrt(dx*dx + dy*dy) + 1e-6
-                ox, oy = -dy / ln, dx / ln       # outward normal
-                arm_w   = max(2, int((1 - t) * 20))
-                sr      = max(1, arm_w // 3)
-                sx = int(px + ox * arm_w * 0.55)
-                sy = int(py + oy * arm_w * 0.55)
+            # Suckers in screen space
+            for s in range(1, len(spts) - 1, 2):
+                px, py, pw = spts[s]
+                nx, ny, _  = spts[min(s + 1, len(spts) - 1)]
+                bx, by, _  = spts[s - 1]
+                dx, dy = nx - bx, ny - by
+                dl = math.sqrt(dx*dx + dy*dy) + 1e-6
+                ox, oy = -dy / dl, dx / dl
+                sr  = max(1, pw // 3)
+                ssx = int(px + ox * pw * 0.55)
+                ssy = int(py + oy * pw * 0.55)
                 pygame.draw.circle(surf, hsl((self.hue + 0.55) % 1.0, l=0.65),
-                                   (sx, sy), sr)
-                pygame.draw.circle(surf, (30, 30, 30), (sx, sy), max(1, sr - 1))
+                                   (ssx, ssy), sr)
+                pygame.draw.circle(surf, (30, 30, 30), (ssx, ssy), max(1, sr - 1))
 
 
 class Cube:
@@ -333,27 +350,38 @@ class Bars:
 
 
 class Particles:
-    """Burst of colour particles expelled from the centre on every beat."""
+    """3-D particle burst — beats spawn spherical shells that fly outward with
+    perspective projection; depth gives a genuine volumetric feel."""
 
-    MAX = 800
+    MAX = 1200
 
     def __init__(self):
         self.hue  = 0.0
         self.pool = []
 
+    def _proj(self, x, y, z):
+        fov  = min(WIDTH, HEIGHT) * 0.55
+        zcam = max(z + 6.0, 0.05)
+        return (int(x * fov / zcam + WIDTH  / 2),
+                int(y * fov / zcam + HEIGHT / 2),
+                fov / zcam)
+
     def _spawn(self, fft, beat):
-        for _ in range(int(3 + beat * 12)):
-            angle = random.uniform(0, math.tau)
-            speed = random.uniform(1, 4) * (1 + beat * 5)
+        for _ in range(int(4 + beat * 18)):
+            phi   = random.uniform(0, math.tau)
+            theta = math.acos(random.uniform(-1, 1))
+            sp, cp = math.sin(phi), math.cos(phi)
+            st, ct = math.sin(theta), math.cos(theta)
             fi    = random.randint(0, len(fft) - 1)
+            speed = random.uniform(0.06, 0.22) * (1 + beat * 3.5 + fft[fi] * 2)
             self.pool.append({
-                "x":    WIDTH  // 2 + random.gauss(0, 20),
-                "y":    HEIGHT // 2 + random.gauss(0, 20),
-                "vx":   math.cos(angle) * speed,
-                "vy":   math.sin(angle) * speed,
+                "x": 0.0, "y": 0.0, "z": 0.0,
+                "vx": st * cp * speed,
+                "vy": ct * speed,
+                "vz": st * sp * speed,
                 "life": 1.0,
                 "hue":  (self.hue + fi / len(fft)) % 1.0,
-                "size": max(2, int(2 + fft[fi] * 9)),
+                "size": max(2, int(2 + fft[fi] * 10)),
             })
 
     def draw(self, surf, waveform, fft, beat, tick):
@@ -361,16 +389,20 @@ class Particles:
         self._spawn(fft, beat)
         alive = []
         for p in self.pool:
-            p["x"]    += p["vx"]
-            p["y"]    += p["vy"]
-            p["vy"]   += 0.06          # gravity
-            p["vx"]   *= 0.99
-            p["life"] -= 0.014
-            if p["life"] > 0:
-                color = hsl(p["hue"], l=0.3 + p["life"] * 0.5)
-                r     = max(1, int(p["size"] * p["life"]))
-                pygame.draw.circle(surf, color, (int(p["x"]), int(p["y"])), r)
-                alive.append(p)
+            p["x"] += p["vx"]
+            p["y"] += p["vy"]
+            p["z"] += p["vz"]
+            p["vy"]  -= 0.003      # gentle gravity
+            p["life"] -= 0.013
+            if p["life"] <= 0:
+                continue
+            sx, sy, sc = self._proj(p["x"], p["y"], p["z"])
+            if sc < 0.5:
+                continue
+            r = max(1, int(p["size"] * p["life"] * sc * 0.08))
+            color = hsl(p["hue"], l=0.3 + p["life"] * 0.5)
+            pygame.draw.circle(surf, color, (sx, sy), r)
+            alive.append(p)
         self.pool = alive[-self.MAX:]
 
 
@@ -462,42 +494,72 @@ class Tunnel:
 
 
 class Lissajous:
-    """3-D Lissajous figure mapped onto a rotating plane — morphs with audio."""
+    """True 3-D Lissajous knot — x=sin(ax·t+dx), y=sin(ay·t+dy), z=sin(az·t+dz).
+    Audio drives the frequency ratios; the knot rotates freely in 3-D."""
+
+    TRAIL = 2400
 
     def __init__(self):
-        self.hue   = 0.0
-        self.angle = 0.0
-        self.hist  = deque(maxlen=1200)
+        self.hue  = 0.0
+        self.t    = 0.0
+        self.rx   = 0.0
+        self.ry   = 0.0
+        self.rvx  = 0.005
+        self.rvy  = 0.007
+        self.hist = deque(maxlen=self.TRAIL)
+        self.dx   = 0.0
+        self.dy   = math.pi / 2
+        self.dz   = math.pi / 4
+
+    def _proj(self, x, y, z):
+        fov  = min(WIDTH, HEIGHT) * 0.42
+        zcam = max(z + 2.8, 0.05)
+        return (int(x * fov / zcam + WIDTH  / 2),
+                int(y * fov / zcam + HEIGHT / 2))
+
+    def _rot(self, x, y, z):
+        cx, sx = math.cos(self.rx), math.sin(self.rx)
+        cy, sy = math.cos(self.ry), math.sin(self.ry)
+        y2 =  y * cx - z * sx
+        z2 =  y * sx + z * cx
+        x3 =  x * cy + z2 * sy
+        z3 = -x * sy + z2 * cy
+        return x3, y2, z3
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue   += 0.003
-        self.angle += 0.004 + beat * 0.02
-
+        self.hue += 0.003
         bass = float(np.mean(fft[:6]))
         mid  = float(np.mean(fft[6:30]))
         high = float(np.mean(fft[30:]))
 
-        ax, ay = 3 + bass * 2, 2 + mid * 2
-        px     = math.sin(ax * tick * 0.015 + high * 2)
-        py     = math.sin(ay * tick * 0.015)
-        self.hist.append((px, py))
+        ax = 3.0 + bass * 1.0
+        ay = 2.0 + mid  * 1.0
+        az = 5.0 + high * 1.0
 
-        scale = 260 + beat * 180
-        cx, cy = WIDTH // 2, HEIGHT // 2
+        self.dx += 0.0007 + bass * 0.002
+        self.dz += 0.0005 + high * 0.0015
 
-        prev = None
-        for j, (px, py) in enumerate(self.hist):
-            t     = j / len(self.hist)
-            # gentle 3-D rotation projected
-            rx    = px * math.cos(self.angle) - py * math.sin(self.angle) * 0.3
-            ry    = py * math.cos(self.angle * 0.7)
-            sx    = int(cx + rx * scale)
-            sy    = int(cy + ry * scale)
-            if prev:
-                h     = (self.hue + t) % 1.0
-                color = hsl(h, l=0.2 + t * 0.7)
-                pygame.draw.line(surf, color, prev, (sx, sy), max(1, int(t * 3)))
-            prev = (sx, sy)
+        self.t += 0.018 + beat * 0.04
+        self.hist.append((math.sin(ax * self.t + self.dx),
+                          math.sin(ay * self.t + self.dy),
+                          math.sin(az * self.t + self.dz)))
+
+        self.rvx += 0.0001 + beat * 0.003
+        self.rvy += 0.0002 + beat * 0.004
+        self.rvx *= 0.98
+        self.rvy *= 0.98
+        self.rx  += self.rvx
+        self.ry  += self.rvy
+
+        scale = 0.82 + beat * 0.18
+        pts2d = [self._proj(*self._rot(px * scale, py * scale, pz * scale))
+                 for px, py, pz in self.hist]
+
+        n = len(pts2d)
+        for j in range(1, n):
+            t  = j / n
+            pygame.draw.line(surf, hsl((self.hue + t) % 1.0, l=0.2 + t * 0.65),
+                             pts2d[j - 1], pts2d[j], max(1, int(t * 3)))
 
 
 class Mandelbrot:
@@ -718,57 +780,48 @@ class Flax:
 
 
 class GlowSquares:
-    """Grid of squares that bloom and pulse — columns use log-spaced frequency bins."""
+    """Waterfall spectrogram — scrolling time-frequency display.
 
-    COLS = 22
-    ROWS = 13
+    Each new frame adds a row at the top; older slices scroll downward.
+    Log-spaced frequency bins; hue = frequency position, brightness = energy.
+    """
+
+    ROWS = 100   # time slices to keep (history depth)
+    COLS = 80    # frequency bins
 
     def __init__(self):
-        self.hue = 0.0
-        # Log-spaced bin edges so every column covers a unique audible range
+        self.hue   = 0.0
         n_bins     = BLOCK_SIZE // 2
         raw        = np.geomspace(2, int(n_bins * 0.85), self.COLS + 1).astype(int)
         self.edges = np.unique(np.clip(raw, 1, n_bins - 1))
-        self.cols  = len(self.edges) - 1          # actual column count after dedup
-        self.energies = np.zeros(self.cols * self.ROWS)
+        self.cols  = len(self.edges) - 1
+        self.buf   = deque(maxlen=self.ROWS)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
-        sq_w = WIDTH  // self.cols
-        sq_h = HEIGHT // self.ROWS
-        pad  = 5
+        row = np.array([
+            float(np.mean(fft[self.edges[c]:self.edges[c + 1]]))
+            for c in range(self.cols)
+        ])
+        row /= (row.max() + 1e-6)
+        self.buf.appendleft(row)
 
-        for row in range(self.ROWS):
-            for col in range(self.cols):
-                idx    = row * self.cols + col
-                e_fft  = float(np.mean(fft[self.edges[col]:self.edges[col + 1]]))
-                # Higher rows amplify energy for a stacked/layered look
-                target = e_fft * (0.6 + row / self.ROWS * 0.9) * (1 + beat * 0.5)
-                self.energies[idx] = self.energies[idx] * 0.75 + target * 0.25
-                e = float(self.energies[idx])
-                if e < 0.015:
+        bw  = max(1, WIDTH  // self.cols)
+        bh  = max(4, HEIGHT // self.ROWS)
+
+        for ri, r in enumerate(self.buf):
+            y = ri * bh
+            if y > HEIGHT:
+                break
+            age = ri / max(len(self.buf), 1)
+            for ci, e in enumerate(r):
+                if e < 0.02:
                     continue
-
-                x   = col * sq_w + pad
-                y   = row * sq_h + pad
-                w   = sq_w - pad * 2
-                h   = sq_h - pad * 2
-                hue = (self.hue + col / self.cols + row / self.ROWS * 0.25) % 1.0
-
-                # Glow layers — progressively larger & more transparent
-                for g in range(4, 0, -1):
-                    gs    = g * 5
-                    alpha = int(e * 80 / g)
-                    if alpha < 5:
-                        continue
-                    gs_surf = pygame.Surface((w + gs * 2, h + gs * 2), pygame.SRCALPHA)
-                    pygame.draw.rect(gs_surf, (*hsl(hue, l=0.55), alpha),
-                                     (0, 0, w + gs * 2, h + gs * 2), border_radius=4)
-                    surf.blit(gs_surf, (x - gs, y - gs))
-
-                # Core square
-                pygame.draw.rect(surf, hsl(hue, l=0.25 + e * 0.75),
-                                 (x, y, w, h), border_radius=3)
+                x   = ci * bw
+                hue = (self.hue + ci / self.cols * 0.75) % 1.0
+                lit = (1 - age * 0.7) * (0.2 + e * 0.8)
+                pygame.draw.rect(surf, hsl(hue, l=min(lit, 0.95)),
+                                 (x, y, bw - 1, bh - 1))
 
 
 # ── Mode registry ─────────────────────────────────────────────────────────────
