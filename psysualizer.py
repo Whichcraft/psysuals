@@ -144,100 +144,67 @@ class Spiral:
                 prev_color = color
 
 
-class Tentacles:
-    """8 octopus tentacles in 3-D — arms spread over a hemisphere, scene
-    rotates slowly around Y to reveal depth.  Suckers placed in screen space."""
+class Plasma:
+    """Full-screen sine-interference plasma — four overlapping wave fields
+    create a flowing psychedelic texture.  Audio modulates wave frequency,
+    time speed, palette, and beat triggers a global brightness flash."""
 
-    N_ARMS = 8
-    N_SEGS = 20
-    SEG_W  = 0.30   # world-unit segment length
+    RES_DIV = 4   # render at ¼ resolution then upscale (keeps 60 fps)
 
     def __init__(self):
-        self.hue   = 0.0
-        self.phase = 0.0
-        self.ry    = 0.0
-        # Arm base directions: evenly spaced azimuth, fixed elevation (~105° from top)
-        el = math.pi * 0.58
-        self.dirs = [
-            np.array([math.sin(el) * math.cos(i / self.N_ARMS * math.tau),
-                      math.cos(el),
-                      math.sin(el) * math.sin(i / self.N_ARMS * math.tau)],
-                     dtype=float)
-            for i in range(self.N_ARMS)
-        ]
+        self.hue  = 0.0
+        self.time = 0.0
+        rw = max(1, WIDTH  // self.RES_DIV)
+        rh = max(1, HEIGHT // self.RES_DIV)
+        self._surf = pygame.Surface((rw, rh))
+        # Centred coordinate grids, reused every frame
+        xs = np.linspace(-math.pi * 2.5, math.pi * 2.5, rw)
+        ys = np.linspace(-math.pi * 2.5, math.pi * 2.5, rh)
+        self._X, self._Y = np.meshgrid(xs, ys)
+        self._R = np.sqrt(self._X ** 2 + self._Y ** 2)
 
-    def _proj(self, x, y, z):
-        fov  = min(WIDTH, HEIGHT) * 0.52
-        zcam = max(z + 5.0, 0.05)
-        return (int(x * fov / zcam + WIDTH  / 2),
-                int(y * fov / zcam + HEIGHT / 2),
-                fov / zcam)
-
-    def _rot_y(self, v, c, s):
-        return np.array([v[0]*c + v[2]*s, v[1], -v[0]*s + v[2]*c])
+    @staticmethod
+    def _hsl_arr(h, l):
+        """Vectorised HSL→RGB (s=1) for 2-D numpy arrays; returns uint8 (H,W,3)."""
+        c  = 1.0 - np.abs(2.0 * l - 1.0)
+        h6 = h * 6.0
+        x  = c * (1.0 - np.abs(h6 % 2.0 - 1.0))
+        m  = l - c / 2.0
+        i  = h6.astype(int) % 6
+        z  = np.zeros_like(h)
+        r = np.select([i==0,i==1,i==2,i==3,i==4,i==5], [c,x,z,z,x,c]) + m
+        g = np.select([i==0,i==1,i==2,i==3,i==4,i==5], [x,c,c,x,z,z]) + m
+        b = np.select([i==0,i==1,i==2,i==3,i==4,i==5], [z,z,x,c,c,x]) + m
+        u8 = lambda a: np.clip(a * 255, 0, 255).astype(np.uint8)
+        return np.stack([u8(r), u8(g), u8(b)], axis=2)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue   += 0.007
-        self.phase += 0.07 + beat * 0.32
-        self.ry    += 0.013
-        norm  = fft / (fft.max() + 1e-6)
-        bass  = float(np.mean(norm[:5]))
-        cy_s, sy_s = math.cos(self.ry), math.sin(self.ry)
+        self.hue  += 0.005
+        bass = float(np.mean(fft[:6]))
+        mid  = float(np.mean(fft[6:30]))
+        high = float(np.mean(fft[30:]))
 
-        # Mantle body at world origin
-        mx, my, _ = self._proj(0, 0, 0)
-        mr = int(26 + bass * 22 + beat * 45)
-        pygame.draw.circle(surf, hsl(self.hue, l=0.28), (mx, my), mr)
-        pygame.draw.circle(surf, hsl(self.hue, l=0.45), (mx, my), mr, 2)
+        self.time += 0.045 + bass * 0.09 + beat * 0.14
 
-        for ai in range(self.N_ARMS):
-            b_lo   = int( ai      / self.N_ARMS * len(norm) * 0.45)
-            b_hi   = int((ai + 1) / self.N_ARMS * len(norm) * 0.45)
-            energy = float(np.mean(norm[b_lo : max(b_lo + 1, b_hi)]))
-            seg_w  = self.SEG_W * (1 + energy * 0.65 + beat * 0.55)
+        # Frequency modulation — mid pushes waves tighter
+        fm = 1.0 + mid * 0.7
 
-            d   = self._rot_y(self.dirs[ai], cy_s, sy_s)
-            pos = np.zeros(3)
-            spts = []   # (sx, sy, width) for sucker pass
+        t  = self.time
+        # Four sine fields at different angles and phases
+        v  = (np.sin(self._X * fm          +  t        ) +
+              np.sin(self._Y * fm * 0.8    +  t * 1.4  ) +
+              np.sin((self._X * 0.6 + self._Y * 0.8) * fm + t * 0.9) +
+              np.sin(self._R * fm * 0.5    -  t * 1.2  )) * 0.25   # −1 … 1
 
-            for s in range(self.N_SEGS):
-                t  = s / self.N_SEGS
-                wh = (math.sin(self.phase * 1.3 - s * 0.55 + ai * 1.1) *
-                      (0.32 + energy * 0.95 + beat * 0.45) * (1 - t * 0.4))
-                wv = (math.sin(self.phase * 0.85 - s * 0.42 + ai * 0.75) *
-                      (0.14 + energy * 0.38 + beat * 0.22) * (1 - t * 0.4))
-                # Bend in 3-D: horizontal (around Y) then vertical (around X)
-                d = self._rot_y(d, math.cos(wh), math.sin(wh))
-                cxv, sxv = math.cos(wv), math.sin(wv)
-                d = np.array([d[0], d[1]*cxv - d[2]*sxv, d[1]*sxv + d[2]*cxv])
-                ln = np.linalg.norm(d)
-                if ln > 1e-6:
-                    d /= ln
+        # Hue: plasma value + slowly drifting global hue + bass palette shift
+        h = (v * 0.55 + 0.5 + self.hue + bass * 0.35) % 1.0
+        # Brightness: beat flashes the whole screen
+        l = np.clip(0.28 + v * 0.22 + beat * 0.22 + high * 0.08, 0.0, 0.95)
 
-                npos = pos + d * seg_w * (1 - t * 0.68)
-                sx1, sy1, sc1 = self._proj(*pos)
-                sx2, sy2, _   = self._proj(*npos)
-                w_px = max(1, int((1 - t) * sc1 * 0.16 * (1 + beat * 0.75)))
-                hh   = (self.hue + ai / self.N_ARMS * 0.45 + t * 0.15) % 1.0
-                pygame.draw.line(surf, hsl(hh, l=0.25 + energy * 0.55 + beat * 0.22),
-                                 (sx1, sy1), (sx2, sy2), w_px)
-                spts.append((sx1, sy1, w_px))
-                pos = npos
-
-            # Suckers in screen space
-            for s in range(1, len(spts) - 1, 2):
-                px, py, pw = spts[s]
-                nx, ny, _  = spts[min(s + 1, len(spts) - 1)]
-                bx, by, _  = spts[s - 1]
-                dx, dy = nx - bx, ny - by
-                dl = math.sqrt(dx*dx + dy*dy) + 1e-6
-                ox, oy = -dy / dl, dx / dl
-                sr  = max(1, pw // 3)
-                ssx = int(px + ox * pw * 0.55)
-                ssy = int(py + oy * pw * 0.55)
-                pygame.draw.circle(surf, hsl((self.hue + 0.55) % 1.0, l=0.72 + beat * 0.20),
-                                   (ssx, ssy), sr)
-                pygame.draw.circle(surf, (30, 30, 30), (ssx, ssy), max(1, sr - 1))
+        rgb = self._hsl_arr(h, l)
+        # surfarray expects (W, H, 3)
+        pygame.surfarray.blit_array(self._surf, rgb.transpose(1, 0, 2))
+        surf.blit(pygame.transform.scale(self._surf, (WIDTH, HEIGHT)), (0, 0))
 
 
 class Cube:
@@ -773,7 +740,7 @@ class GlowSquares:
         self.buf   = deque(maxlen=self.ROWS)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue += 0.003
+        self.hue += 0.003 + beat * 0.015
         row = np.array([
             float(np.mean(fft[self.edges[c]:self.edges[c + 1]]))
             for c in range(self.cols)
@@ -781,20 +748,23 @@ class GlowSquares:
         row /= (row.max() + 1e-6)
         self.buf.appendleft(row)
 
-        bw  = max(1, WIDTH  // self.cols)
-        bh  = max(4, HEIGHT // self.ROWS)
+        bw    = max(1, WIDTH  // self.cols)
+        bh    = max(4, HEIGHT // self.ROWS)
+        flash = beat * 0.35   # brightness bonus on kick
 
         for ri, r in enumerate(self.buf):
             y = ri * bh
             if y > HEIGHT:
                 break
-            age = ri / max(len(self.buf), 1)
+            age     = ri / max(len(self.buf), 1)
+            # Newest rows get the beat flash; it decays with age
+            row_boost = flash * max(0.0, 1.0 - age * 6)
             for ci, e in enumerate(r):
                 if e < 0.02:
                     continue
                 x   = ci * bw
                 hue = (self.hue + ci / self.cols * 0.75) % 1.0
-                lit = (1 - age * 0.7) * (0.2 + e * 0.8)
+                lit = (1 - age * 0.7) * (0.2 + e * 0.8) + row_boost
                 pygame.draw.rect(surf, hsl(hue, l=min(lit, 0.95)),
                                  (x, y, bw - 1, bh - 1))
 
@@ -803,7 +773,7 @@ class GlowSquares:
 
 MODES = [
     ("Spiral",      Spiral),
-    ("Tentacles",   Tentacles),
+    ("Plasma",      Plasma),
     ("Cube",        Cube),
     ("Spectrum",    Bars),
     ("Particles",   Particles),
