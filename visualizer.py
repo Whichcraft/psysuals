@@ -144,7 +144,10 @@ class Cube:
 
     def __init__(self):
         self.rx = self.ry = self.rz = 0.0
-        self.hue = 0.0
+        self.hue     = 0.0
+        self.scale   = 1.0   # spring scale
+        self.svel    = 0.0   # scale velocity
+        self.rvx = self.rvy = self.rvz = 0.0  # rotation velocities
 
     @staticmethod
     def _Rx(a):
@@ -171,19 +174,35 @@ class Cube:
         bass = min(float(np.mean(fft[:5])),   1.0)
         mid  = min(float(np.mean(fft[5:25])), 1.0)
         high = min(float(np.mean(fft[25:])),  1.0)
-        self.rx += 0.005 + mid  * 0.055
-        self.ry += 0.007 + bass * 0.075
-        self.rz += 0.003 + high * 0.040
+
+        # Beat kicks rotation velocity; inertia carries it forward
+        self.rvx += 0.005 + mid  * 0.08 + beat * 0.12
+        self.rvy += 0.007 + bass * 0.10 + beat * 0.18
+        self.rvz += 0.003 + high * 0.06 + beat * 0.08
+        # Damping so spin settles between beats
+        self.rvx *= 0.88
+        self.rvy *= 0.88
+        self.rvz *= 0.88
+        self.rx  += self.rvx
+        self.ry  += self.rvy
+        self.rz  += self.rvz
+
+        # Spring scale: beat fires a strong upward kick; spring pulls back to 1.0
+        self.svel  += beat * 0.55          # impulse on beat
+        self.svel  += (1.0 - self.scale) * 0.25  # spring restore force
+        self.svel  *= 0.60                 # damping
+        self.scale += self.svel
+        self.scale  = max(0.3, self.scale) # don't invert
 
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
-        for scale, hue_off in ((1.0 + beat * 0.8, 0.0), (0.5 + beat * 0.3, 0.5)):
-            verts = (R @ (self.VERTS * scale).T).T
+        for base_scale, hue_off in ((self.scale, 0.0), (self.scale * 0.45, 0.5)):
+            verts = (R @ (self.VERTS * base_scale).T).T
             proj  = [self._project(v) for v in verts]
             for ei, (a, b) in enumerate(self.EDGES):
                 h     = (self.hue + hue_off + ei / len(self.EDGES)) % 1.0
-                lw    = max(1, int(2 + beat * 3)) if scale > 0.6 else 1
-                color = hsl(h, l=0.45 + beat * 0.3)
+                lw    = max(1, int(2 + self.svel * 8)) if base_scale > 0.4 else 1
+                color = hsl(h, l=0.45 + min(self.svel, 1.0) * 0.4)
                 pygame.draw.line(surf, color, proj[a], proj[b], lw)
 
 
