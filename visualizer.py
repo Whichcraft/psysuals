@@ -64,74 +64,152 @@ def hsl(h, s=1.0, l=0.5):
 # ── Visualisers ───────────────────────────────────────────────────────────────
 
 class Spiral:
-    """Logarithmic spiral arms that pulse and warp with every frequency band."""
+    """Fly through a 3-D helix vortex — arms rush toward you like the Tunnel."""
+
+    N_ARMS = 5
+    N_PTS  = 50
+    Z_FAR  = 11.0
+    Z_NEAR = 0.14
+    RADIUS = 1.1   # helix radius in world units
+    SPIN   = 1.4   # radians of rotation per unit depth
 
     def __init__(self):
-        self.angle = 0.0
-        self.hue   = 0.0
+        self.hue  = 0.0
+        self.time = 0.0
+        spacing   = (self.Z_FAR - self.Z_NEAR) / self.N_PTS
+        self.pts  = [
+            {"arm": arm, "z": self.Z_NEAR + j * spacing,
+             "pt":  self.Z_NEAR + j * spacing}
+            for arm in range(self.N_ARMS)
+            for j   in range(self.N_PTS)
+        ]
+
+    def _world_pos(self, pt, arm):
+        angle = pt * self.SPIN + arm / self.N_ARMS * math.tau
+        return (self.RADIUS * math.cos(angle),
+                self.RADIUS * math.sin(angle))
+
+    def _proj(self, wx, wy, wz):
+        fov = min(WIDTH, HEIGHT) * 0.72
+        z   = max(wz, 0.01)
+        return (int(wx * fov / z + WIDTH  / 2),
+                int(wy * fov / z + HEIGHT / 2),
+                fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        cx, cy = WIDTH // 2, HEIGHT // 2
-        self.angle += 0.008 + beat * 0.04
-        self.hue   += 0.003
-        arms   = 7
-        points = 320
-        scale  = 210 + beat * 380
+        self.hue  += 0.003
+        bass       = float(np.mean(fft[:6]))
+        dt         = 0.05 + bass * 0.09 + beat * 0.13
+        self.time += dt
 
-        for arm in range(arms):
-            offset = (arm / arms) * math.tau
-            prev   = None
-            for i in range(points):
-                t     = i / points
-                fi    = min(int(t * len(fft)), len(fft) - 1)
-                r     = t * scale + fft[fi] * 160
-                theta = t * math.pi * 10 + self.angle + offset
-                x     = cx + r * math.cos(theta)
-                y     = cy + r * math.sin(theta)
-                if prev:
-                    h     = (self.hue + t + arm / arms) % 1.0
-                    color = hsl(h, l=0.35 + fft[fi] * 0.65)
-                    pygame.draw.line(surf, color, prev, (int(x), int(y)), 2)
-                prev = (int(x), int(y))
+        for p in self.pts:
+            p["z"] -= dt
+            if p["z"] < self.Z_NEAR:
+                p["z"]  += self.Z_FAR
+                p["pt"]  = self.time + p["z"]
+
+        # Group by arm, sort far→near, draw connected segments
+        by_arm = [[] for _ in range(self.N_ARMS)]
+        for p in self.pts:
+            by_arm[p["arm"]].append(p)
+
+        for arm_idx, arm_pts in enumerate(by_arm):
+            arm_pts.sort(key=lambda p: -p["z"])
+            prev = None
+            for p in arm_pts:
+                wx, wy     = self._world_pos(p["pt"], arm_idx)
+                sx, sy, sc = self._proj(wx, wy, p["z"])
+                near_t     = max(0.0, 1.0 - p["z"] / self.Z_FAR)
+                fi         = min(int(near_t * len(fft) * 0.7), len(fft) - 1)
+                bright     = 0.12 + near_t * 0.68 + fft[fi] * 0.22
+                h          = (self.hue + arm_idx / self.N_ARMS + near_t * 0.35) % 1.0
+                color      = hsl(h, l=bright)
+                dot_r      = min(max(1, int(sc * 0.045)), 50)
+                if prev and dot_r < 50:
+                    pygame.draw.line(surf, color, prev, (sx, sy),
+                                     max(1, dot_r // 2))
+                if dot_r > 0:
+                    pygame.draw.circle(surf, color, (sx, sy), dot_r)
+                prev = (sx, sy)
 
 
 class Tentacles:
-    """Segmented arms rooted at the centre that sway and writhe with audio."""
+    """8 octopus tentacles — thick tapered arms with suckers, each driven by its
+    own frequency band.  A traveling sine wave creates organic undulation."""
 
-    N = 14
+    N_ARMS = 8
+    N_SEGS = 22
+    SEG_LEN = 36    # base segment length (pixels)
 
     def __init__(self):
         self.hue   = 0.0
         self.phase = 0.0
-        self.arms  = [
-            {"angle": (i / self.N) * math.tau,
-             "segs":  20,
-             "slen":  random.uniform(45, 85)}
-            for i in range(self.N)
-        ]
 
     def draw(self, surf, waveform, fft, beat, tick):
-        cx, cy = WIDTH // 2, HEIGHT // 2
-        self.hue   += 0.005
-        self.phase += 0.035 + beat * 0.07
-        norm = fft / (fft.max() + 1e-6)
+        self.hue   += 0.002
+        self.phase += 0.045 + beat * 0.07
+        norm  = fft / (fft.max() + 1e-6)
+        bass  = float(np.mean(norm[:5]))
 
-        for ti, arm in enumerate(self.arms):
-            slen  = arm["slen"] * (1 + beat * 1.6)
-            angle = arm["angle"] + self.phase * 0.12
+        cx = WIDTH  // 2
+        cy = HEIGHT // 2 + HEIGHT // 10   # root slightly below centre
+
+        # Central mantle (body)
+        mantle_r = int(38 + bass * 18 + beat * 12)
+        pygame.draw.circle(surf, hsl(self.hue, l=0.28), (cx, cy), mantle_r)
+        pygame.draw.circle(surf, hsl(self.hue, l=0.45), (cx, cy), mantle_r, 3)
+
+        for ai in range(self.N_ARMS):
+            # Each arm gets its own frequency band
+            b_lo   = int( ai      / self.N_ARMS * len(norm) * 0.45)
+            b_hi   = int((ai + 1) / self.N_ARMS * len(norm) * 0.45)
+            energy = float(np.mean(norm[b_lo : max(b_lo + 1, b_hi)]))
+
+            # Arms spread evenly around the body
+            base_angle = ai / self.N_ARMS * math.tau
+            seg_len    = self.SEG_LEN * (1 + energy * 0.5 + beat * 0.2)
+
             x, y  = float(cx), float(cy)
+            angle = base_angle
+            pts   = [(x, y)]   # joint positions for sucker placement
 
-            for s in range(arm["segs"]):
-                fi    = min(int(s / arm["segs"] * len(norm) * 0.35), len(norm) - 1)
-                freq  = norm[fi]
-                angle += math.sin(self.phase + s * 0.38 + ti * 0.7) * (0.22 + freq * 0.55)
-                nx    = x + math.cos(angle) * slen
-                ny    = y + math.sin(angle) * slen
-                h     = (self.hue + ti / self.N + s / arm["segs"] * 0.3) % 1.0
-                color = hsl(h, l=0.28 + freq * 0.72)
-                width = max(1, int((1 - s / arm["segs"]) * 7 * (1 + beat)))
-                pygame.draw.line(surf, color, (int(x), int(y)), (int(nx), int(ny)), width)
+            # ── draw segments ──────────────────────────────────────────────
+            for s in range(self.N_SEGS):
+                t = s / self.N_SEGS
+
+                # Traveling wave from base → tip gives organic undulation
+                wave = (math.sin(self.phase * 1.3 - s * 0.55 + ai * 1.1) *
+                        (0.28 + energy * 0.75) * (1 - t * 0.4))
+                angle += wave
+
+                eff_len = seg_len * (1 - t * 0.68)   # taper strongly
+                nx = x + math.cos(angle) * eff_len
+                ny = y + math.sin(angle) * eff_len
+
+                w   = max(1, int((1 - t) * 20 * (1 + beat * 0.35)))
+                h   = (self.hue + ai / self.N_ARMS * 0.35 + t * 0.12) % 1.0
+                col = hsl(h, l=0.22 + energy * 0.48 + beat * 0.08)
+                pygame.draw.line(surf, col,
+                                 (int(x), int(y)), (int(nx), int(ny)), w)
+                pts.append((nx, ny))
                 x, y = nx, ny
+
+            # ── suckers along arm ──────────────────────────────────────────
+            for s in range(1, len(pts) - 1, 2):
+                t   = s / self.N_SEGS
+                px, py = pts[s]
+                # Perpendicular direction (one side of arm)
+                dx  = pts[min(s+1, len(pts)-1)][0] - pts[s-1][0]
+                dy  = pts[min(s+1, len(pts)-1)][1] - pts[s-1][1]
+                ln  = math.sqrt(dx*dx + dy*dy) + 1e-6
+                ox, oy = -dy / ln, dx / ln       # outward normal
+                arm_w   = max(2, int((1 - t) * 20))
+                sr      = max(1, arm_w // 3)
+                sx = int(px + ox * arm_w * 0.55)
+                sy = int(py + oy * arm_w * 0.55)
+                pygame.draw.circle(surf, hsl((self.hue + 0.55) % 1.0, l=0.65),
+                                   (sx, sy), sr)
+                pygame.draw.circle(surf, (30, 30, 30), (sx, sy), max(1, sr - 1))
 
 
 class Cube:
