@@ -11,7 +11,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 1 | **Yantra** | Psychedelic sacred-geometry mandala — 6 concentric polygon rings (triangle→octagon) alternating rotation, web connections between rings, neon spokes, beat-driven spring pulses |
 | 2 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
 | 3 | **Plasma** | Full-screen sine-interference plasma — four overlapping wave fields create a flowing psychedelic texture; bass shifts the palette, beat flashes the whole screen |
-| 4 | **Tunnel** | First-person ride through a curving tube — rings with neon glow halos, rotating inner polygon (3–6 sides) in each ring, full rainbow sweep across depth, beat flares nearest rings |
+| 4 | **Tunnel** | First-person ride through a curving tube — neon glow rings, rotating inner polygon (3–6 sides) per ring, full rainbow sweep across depth, beat flares nearest rings and spawns triangles that fly toward the camera |
 | 5 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot with 3-fold symmetry, two-pass neon glow; beat explodes scale (0.55 impulse), jumps the hue palette, cranks head-dot radius, and draws extra glow halos |
 | 6 | **Nova** | Waveform kaleidoscope — audio waveform mapped to polar sectors with 7-fold mirror symmetry across 4 spinning layers; each layer reacts to a different band, beat explodes all outward |
 | 7 | **Spiral** | Curving 3-D helix vortex with 3-fold trefoil symmetry — 6 arms × 3 screen copies create a DNA vortex; rainbow trails fade from black to bright, beat flashes the closest tips |
