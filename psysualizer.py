@@ -115,33 +115,46 @@ class Spiral:
                 p["z"]  += self.Z_FAR
                 p["pt"]  = self.time + p["z"]
 
-        # Group by arm, sort far→near, draw connected trail segments
+        # Group by arm, sort far→near; collect screen points
         by_arm = [[] for _ in range(self.N_ARMS)]
         for p in self.pts:
             by_arm[p["arm"]].append(p)
 
+        cx0, cy0 = WIDTH // 2, HEIGHT // 2
+        # 3-fold screen symmetry — trefoil DNA vortex
+        N_SYM = 3
+
         for arm_idx, arm_pts in enumerate(by_arm):
             arm_pts.sort(key=lambda p: -p["z"])
-            prev      = None
-            prev_color = None
+            segs = []   # (sx, sy, color, dot_r, lw, near_t)
             for p in arm_pts:
                 wx, wy     = self._world_pos(p["pt"], arm_idx)
                 sx, sy, sc = self._proj(wx, wy, p["z"])
                 near_t     = max(0.0, 1.0 - p["z"] / self.Z_FAR)
-                # Hue sweeps a full rainbow from far to near + per-arm offset
-                h          = (self.hue + arm_idx / self.N_ARMS * 0.6 + near_t) % 1.0
-                # Brightness: near-zero far away, bright & saturated up close
-                bright     = near_t ** 1.8 * 0.85 + fft[min(int(near_t * len(fft) * 0.7), len(fft)-1)] * 0.15
+                h          = (self.hue + arm_idx / self.N_ARMS * 0.6 + near_t * 1.5) % 1.0
+                bright     = near_t ** 1.4 * 0.88 + fft[min(int(near_t * len(fft) * 0.7), len(fft)-1)] * 0.12
                 color      = hsl(h, l=max(0.01, bright))
                 dot_r      = min(max(1, int(sc * 0.045)), 55)
                 lw         = max(1, dot_r // 2)
-                if prev and dot_r < 55:
-                    # Draw segment with gradient: blend prev and current colour
-                    pygame.draw.line(surf, color, prev, (sx, sy), lw)
-                if dot_r > 0:
-                    pygame.draw.circle(surf, color, (sx, sy), dot_r)
-                prev       = (sx, sy)
-                prev_color = color
+                segs.append((sx, sy, color, dot_r, lw, near_t))
+
+            for sym in range(N_SYM):
+                angle = sym / N_SYM * math.tau
+                ca, sa = math.cos(angle), math.sin(angle)
+                prev = None
+                for sx, sy, color, dot_r, lw, near_t in segs:
+                    # Rotate screen point around centre
+                    rx = int(cx0 + (sx - cx0) * ca - (sy - cy0) * sa)
+                    ry = int(cy0 + (sx - cx0) * sa + (sy - cy0) * ca)
+                    if prev and dot_r < 55:
+                        pygame.draw.line(surf, color, prev, (rx, ry), lw)
+                    if dot_r > 0:
+                        pygame.draw.circle(surf, color, (rx, ry), dot_r)
+                    # Beat flash on the closest tips
+                    if near_t > 0.82 and beat > 0.4:
+                        fr = max(2, int(dot_r * (1 + beat * 0.6)))
+                        pygame.draw.circle(surf, hsl(self.hue, l=0.92), (rx, ry), fr)
+                    prev = (rx, ry)
 
 
 class Plasma:
@@ -421,26 +434,24 @@ class Tunnel:
                 fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue  += 0.003
+        self.hue  += 0.006
         bass       = float(np.mean(fft[:6]))
+        mid        = float(np.mean(fft[6:30]))
 
-        # Forward speed — bass and beat push you faster
         dt         = 0.05 + bass * 0.13 + beat * 0.28
         self.time += dt
 
-        # Move every ring toward the camera; recycle past ones to the far end
         for r in self.rings:
             r["z"] -= dt
             if r["z"] < self.Z_NEAR:
-                r["z"]  += self.Z_FAR           # wrap to far end
-                r["pt"]  = self.time + r["z"]   # new path position
+                r["z"]  += self.Z_FAR
+                r["pt"]  = self.time + r["z"]
 
-        # Sort far → near so nearer rings overdraw farther ones
         ordered = sorted(self.rings, key=lambda r: -r["z"])
 
         for i in range(len(ordered) - 1):
-            r1 = ordered[i]       # farther
-            r2 = ordered[i + 1]  # nearer
+            r1 = ordered[i]
+            r2 = ordered[i + 1]
 
             cx1, cy1 = self._path(r1["pt"])
             cx2, cy2 = self._path(r2["pt"])
@@ -453,22 +464,38 @@ class Tunnel:
 
             near_t = max(0.0, 1.0 - r1["z"] / self.Z_FAR)
             fi     = min(int(near_t * len(fft) * 0.8), len(fft) - 1)
-            h      = (self.hue + near_t * 0.5) % 1.0
-            bright = 0.08 + near_t * 0.65 + fft[fi] * 0.25
-            lw     = max(1, int(1 + beat * 2))
+            # Full rainbow sweep across depth; beat flares nearest rings
+            h      = (self.hue + near_t) % 1.0
+            bright = 0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50
+            lw     = max(1, int(1 + beat * 3 * near_t))
 
-            # Ring circle
-            pygame.draw.circle(surf, hsl(h, l=bright), (sx1, sy1), sr1, lw)
+            # Neon glow: wide dim halo then thin bright ring
+            pygame.draw.circle(surf, hsl(h, l=bright * 0.35), (sx1, sy1), sr1 + 4, lw + 3)
+            pygame.draw.circle(surf, hsl(h, l=bright),        (sx1, sy1), sr1,     lw)
 
-            # Longitudinal wall lines to the next (nearer) ring
+            # Longitudinal wall lines
             for side in range(self.N_SIDES):
                 angle = side / self.N_SIDES * math.tau
                 p1 = (sx1 + int(math.cos(angle) * sr1),
                       sy1 + int(math.sin(angle) * sr1))
                 p2 = (sx2 + int(math.cos(angle) * sr2),
                       sy2 + int(math.sin(angle) * sr2))
-                hs = (h + side / self.N_SIDES * 0.10) % 1.0
-                pygame.draw.line(surf, hsl(hs, l=bright * 0.6), p1, p2, 1)
+                hs = (h + side / self.N_SIDES * 0.25) % 1.0
+                pygame.draw.line(surf, hsl(hs, l=bright * 0.55), p1, p2, 1)
+
+            # Rotating inner polygon — 3-to-6 sides, alternating direction per ring
+            n_star  = 3 + (i % 4)
+            s_dir   = 1 if i % 2 == 0 else -1
+            s_rot   = self.time * 0.45 * s_dir + i * 0.52
+            s_r     = max(2, int(sr1 * 0.52))
+            s_h     = (h + 0.5) % 1.0
+            s_l     = min(bright * 1.1 + mid * 0.2, 0.92)
+            s_pts   = [
+                (sx1 + int(math.cos(v / n_star * math.tau + s_rot) * s_r),
+                 sy1 + int(math.sin(v / n_star * math.tau + s_rot) * s_r))
+                for v in range(n_star)
+            ]
+            pygame.draw.polygon(surf, hsl(s_h, l=s_l), s_pts, max(1, lw))
 
 
 class Lissajous:
