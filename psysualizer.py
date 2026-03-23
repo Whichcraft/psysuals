@@ -64,10 +64,12 @@ def hsl(h, s=1.0, l=0.5):
 # ── Visualisers ───────────────────────────────────────────────────────────────
 
 class Spiral:
-    """Fly through a 3-D helix vortex — arms rush toward you like the Tunnel."""
+    """Fly through a curving 3-D helix vortex — the tunnel axis drifts like Tunnel,
+    arms leave long rainbow trails that fade from black in the distance to bright
+    saturated colour up close."""
 
-    N_ARMS = 5
-    N_PTS  = 50
+    N_ARMS = 6
+    N_PTS  = 70
     Z_FAR  = 11.0
     Z_NEAR = 0.14
     RADIUS = 1.1   # helix radius in world units
@@ -84,10 +86,16 @@ class Spiral:
             for j   in range(self.N_PTS)
         ]
 
+    def _path(self, t):
+        """Curving axis offset in world space — same gentle sine curves as Tunnel."""
+        return (math.sin(t * 0.18) * 1.2,
+                math.cos(t * 0.13) * 0.9)
+
     def _world_pos(self, pt, arm):
-        angle = pt * self.SPIN + arm / self.N_ARMS * math.tau
-        return (self.RADIUS * math.cos(angle),
-                self.RADIUS * math.sin(angle))
+        angle   = pt * self.SPIN + arm / self.N_ARMS * math.tau
+        cx, cy  = self._path(pt)
+        return (cx + self.RADIUS * math.cos(angle),
+                cy + self.RADIUS * math.sin(angle))
 
     def _proj(self, wx, wy, wz):
         fov = min(WIDTH, HEIGHT) * 0.72
@@ -97,7 +105,7 @@ class Spiral:
                 fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue  += 0.003
+        self.hue  += 0.005
         bass       = float(np.mean(fft[:6]))
         dt         = 0.05 + bass * 0.09 + beat * 0.13
         self.time += dt
@@ -108,29 +116,33 @@ class Spiral:
                 p["z"]  += self.Z_FAR
                 p["pt"]  = self.time + p["z"]
 
-        # Group by arm, sort far→near, draw connected segments
+        # Group by arm, sort far→near, draw connected trail segments
         by_arm = [[] for _ in range(self.N_ARMS)]
         for p in self.pts:
             by_arm[p["arm"]].append(p)
 
         for arm_idx, arm_pts in enumerate(by_arm):
             arm_pts.sort(key=lambda p: -p["z"])
-            prev = None
+            prev      = None
+            prev_color = None
             for p in arm_pts:
                 wx, wy     = self._world_pos(p["pt"], arm_idx)
                 sx, sy, sc = self._proj(wx, wy, p["z"])
                 near_t     = max(0.0, 1.0 - p["z"] / self.Z_FAR)
-                fi         = min(int(near_t * len(fft) * 0.7), len(fft) - 1)
-                bright     = 0.12 + near_t * 0.68 + fft[fi] * 0.22
-                h          = (self.hue + arm_idx / self.N_ARMS + near_t * 0.35) % 1.0
-                color      = hsl(h, l=bright)
-                dot_r      = min(max(1, int(sc * 0.045)), 50)
-                if prev and dot_r < 50:
-                    pygame.draw.line(surf, color, prev, (sx, sy),
-                                     max(1, dot_r // 2))
+                # Hue sweeps a full rainbow from far to near + per-arm offset
+                h          = (self.hue + arm_idx / self.N_ARMS * 0.6 + near_t) % 1.0
+                # Brightness: near-zero far away, bright & saturated up close
+                bright     = near_t ** 1.8 * 0.85 + fft[min(int(near_t * len(fft) * 0.7), len(fft)-1)] * 0.15
+                color      = hsl(h, l=max(0.01, bright))
+                dot_r      = min(max(1, int(sc * 0.045)), 55)
+                lw         = max(1, dot_r // 2)
+                if prev and dot_r < 55:
+                    # Draw segment with gradient: blend prev and current colour
+                    pygame.draw.line(surf, color, prev, (sx, sy), lw)
                 if dot_r > 0:
                     pygame.draw.circle(surf, color, (sx, sy), dot_r)
-                prev = (sx, sy)
+                prev       = (sx, sy)
+                prev_color = color
 
 
 class Tentacles:

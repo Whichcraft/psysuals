@@ -8,7 +8,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 
 | # | Mode | Description |
 |---|------|-------------|
-| 1 | **Spiral** | Fly through a 3-D helix vortex — 5 spiral arms rush toward you, bass and beat control speed |
+| 1 | **Spiral** | Fly through a curving 3-D helix vortex — 6 arms with rainbow trails that fade from black in the distance to bright colour up close, axis drifts like Tunnel |
 | 2 | **Tentacles** | 8 octopus tentacles with suckers — each arm driven by its own frequency band, traveling sine wave creates organic undulation |
 | 3 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum |
 | 4 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
