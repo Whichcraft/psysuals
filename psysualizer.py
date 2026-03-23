@@ -411,6 +411,29 @@ class Nova:
             pygame.draw.circle(surf, hsl(h, l=bright * 0.28),
                                (cx, cy), max(1, int(base_r + r_off)), 1)
 
+        # ── Rotating triangles at sector boundaries ───────────────────────────
+        # Two counter-rotating triangle rings — one CW, one CCW.
+        # Each triangle points outward along a sector boundary.
+        for tri_layer, (t_rvel, t_r_frac, t_h_off) in enumerate(
+                [(0.012, 0.58, 0.25), (-0.008, 0.82, 0.55)]):
+            t_rot = self.rot[0] * t_rvel / 0.005   # reuse layer-0 angle scaled
+            t_r   = max_r * t_r_frac * (1 + self.poff[0] * 0.25)
+            t_h   = (self.hue + t_h_off) % 1.0
+            t_l   = 0.50 + bass * 0.30 + beat * 0.18
+            t_lw  = max(1, int(1 + beat * 2.5))
+            for sym in range(self.N_SYM):
+                a_mid  = sym / self.N_SYM * math.tau + t_rot
+                a_l    = a_mid - math.pi / self.N_SYM * 0.55
+                a_r    = a_mid + math.pi / self.N_SYM * 0.55
+                tip    = (int(cx + math.cos(a_mid) * t_r * 1.18),
+                          int(cy + math.sin(a_mid) * t_r * 1.18))
+                base_l = (int(cx + math.cos(a_l)  * t_r * 0.82),
+                          int(cy + math.sin(a_l)  * t_r * 0.82))
+                base_r = (int(cx + math.cos(a_r)  * t_r * 0.82),
+                          int(cy + math.sin(a_r)  * t_r * 0.82))
+                pygame.draw.polygon(surf, hsl(t_h, l=t_l),
+                                    [tip, base_l, base_r], t_lw)
+
         # Central pulse on beat
         cr = max(2, int(10 + bass * 22 + beat * 40))
         pygame.draw.circle(surf, hsl(self.hue, l=0.55 + beat * 0.35), (cx, cy), cr)
@@ -791,33 +814,57 @@ class Bubbles:
             self.pool.append(b)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue += 0.003
+        self.hue += 0.005
         bass = float(np.mean(fft[:8]))
+        mid  = float(np.mean(fft[6:30]))
         self._spawn(beat, bass)
 
         alive = []
         for b in self.pool:
-            b["x"] += b["vx"] + math.sin(tick * b["wobble"] + b["phase"]) * 0.9
-            b["y"] += b["vy"]
+            b["x"]   += b["vx"] + math.sin(tick * b["wobble"] + b["phase"]) * 0.9
+            b["y"]   += b["vy"]
+            # Hue drifts per bubble for rainbow cycling
+            b["hue"]  = (b["hue"] + 0.004) % 1.0
             if b["y"] + b["r"] < 0:
                 continue
 
             life  = max(0.0, min(1.0, b["y"] / HEIGHT))
-            r     = int(b["r"])
-            alpha = int(life * 130)
-            bsurf = pygame.Surface((r * 2 + 6, r * 2 + 6), pygame.SRCALPHA)
-            cx, cy = r + 3, r + 3
-            # Outer glow ring
-            pygame.draw.circle(bsurf, (*hsl(b["hue"], l=0.55), alpha // 2),
-                               (cx, cy), r + 2, 3)
-            # Main bubble rim
-            pygame.draw.circle(bsurf, (*hsl(b["hue"], l=0.70), alpha),
-                               (cx, cy), r, 2)
+            # Pulse radius with beat
+            r     = max(2, int(b["r"] * (1 + beat * 0.35 + mid * 0.15)))
+            pad   = r + 14
+            alpha = int(life * 160)
+            bsurf = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+            cc = pad  # local centre
+
+            # Multi-layer glow halos (outermost to innermost)
+            for g, (g_exp, g_l, g_a_mul) in enumerate(
+                    [(1.55, 0.40, 0.18), (1.28, 0.52, 0.35), (1.10, 0.65, 0.60)]):
+                gr    = max(1, int(r * g_exp))
+                galpha = int(alpha * g_a_mul)
+                pygame.draw.circle(bsurf, (*hsl(b["hue"], l=g_l), galpha),
+                                   (cc, cc), gr, max(2, gr // 5))
+
+            # Main neon rim
+            pygame.draw.circle(bsurf, (*hsl(b["hue"], l=0.78), alpha),
+                               (cc, cc), r, 2)
+            # Filled translucent core
+            pygame.draw.circle(bsurf,
+                               (*hsl((b["hue"] + 0.5) % 1.0, l=0.55),
+                                int(alpha * 0.22)),
+                               (cc, cc), max(1, r - 2))
             # Specular highlight
-            hr = max(1, r // 4)
-            pygame.draw.circle(bsurf, (255, 255, 255, alpha // 2),
-                               (cx - r // 3, cy - r // 3), hr)
-            surf.blit(bsurf, (int(b["x"]) - cx, int(b["y"]) - cy))
+            hr = max(1, r // 3)
+            pygame.draw.circle(bsurf, (255, 255, 255, int(alpha * 0.55)),
+                               (cc - r // 3, cc - r // 3), hr)
+            # Beat flash: extra bright ring
+            if beat > 0.5:
+                flash_r = max(1, int(r * 1.4))
+                pygame.draw.circle(bsurf,
+                                   (*hsl((b["hue"] + 0.25) % 1.0, l=0.88),
+                                    int(alpha * beat * 0.4)),
+                                   (cc, cc), flash_r, 2)
+
+            surf.blit(bsurf, (int(b["x"]) - cc, int(b["y"]) - cc))
             alive.append(b)
 
         self.pool = alive[-self.MAX:]
