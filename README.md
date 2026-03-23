@@ -35,7 +35,7 @@ python3 -m venv .venv
 ## Usage
 
 ```bash
-.venv/bin/python visualizer.py
+.venv/bin/python psysualizer.py
 ```
 
 ### Controls
@@ -75,7 +75,7 @@ Then press `D` in-app and select it from the list.
 
 ```
 psysuals/
-├── visualizer.py    # Main app — all visualisers and audio pipeline
+├── psysualizer.py   # Main app — all visualisers and audio pipeline
 ├── requirements.txt
 └── README.md
 ```
