@@ -5,8 +5,7 @@ Music Visualizer — Real-time audio → visuals.
 Controls:
   SPACE / click   Switch to next mode
   1-9             Jump to modes 1-9
-  0               Jump to mode 10 (Flax)
-  -               Jump to mode 11 (Waterfall)
+  0               Jump to mode 10 (Waterfall)
   F               Toggle fullscreen
   Q / ESC         Quit
 """
@@ -725,71 +724,6 @@ class Bubbles:
         self.pool = alive[-self.MAX:]
 
 
-class Flax:
-    """Flow-field strands — particle trails follow a noise-like vector field
-    modulated by the audio spectrum, creating silk/fibre-like motion."""
-
-    TARGET_N = 300
-    MAX_TRAIL = 14
-
-    def __init__(self):
-        self.hue  = 0.0
-        self.time = 0.0
-        self.pool = [self._new() for _ in range(self.TARGET_N)]
-
-    @staticmethod
-    def _new():
-        return {
-            "x":    random.uniform(0, WIDTH),
-            "y":    random.uniform(0, HEIGHT),
-            "life": random.uniform(0.4, 1.0),
-            "hoff": random.uniform(0, 0.4),
-            "trail": [],
-        }
-
-    def draw(self, surf, waveform, fft, beat, tick):
-        self.hue  += 0.003
-        # time must advance fast enough for the sine field to visibly shift
-        self.time += 0.035 + beat * 0.06
-        bass = float(np.mean(fft[:6]))
-        mid  = float(np.mean(fft[6:40]))
-
-        alive = []
-        for p in self.pool:
-            nx  = p["x"] / WIDTH
-            ny  = p["y"] / HEIGHT
-            fi  = min(int(nx * len(fft) * 0.55), len(fft) - 1)
-            # Flow angle: strongly perturbed by audio so field reacts visibly
-            angle = (math.sin(nx * 4.8 + self.time) *
-                     math.cos(ny * 3.5 + self.time * 0.7) +
-                     fft[fi] * 4.5 + mid * 2.0) * math.pi
-
-            speed = 2.5 + bass * 7 + beat * 4
-            p["trail"].append((int(p["x"]), int(p["y"])))
-            if len(p["trail"]) > self.MAX_TRAIL:
-                p["trail"].pop(0)
-
-            p["x"]    += math.cos(angle) * speed
-            p["y"]    += math.sin(angle) * speed
-            p["life"] -= 0.012
-
-            if (p["life"] > 0
-                    and -10 < p["x"] < WIDTH + 10
-                    and -10 < p["y"] < HEIGHT + 10
-                    and len(p["trail"]) > 1):
-                h = (self.hue + p["hoff"] + ny * 0.3) % 1.0
-                for j in range(1, len(p["trail"])):
-                    t     = j / len(p["trail"])
-                    color = hsl(h, l=0.15 + t * 0.70)
-                    pygame.draw.line(surf, color,
-                                     p["trail"][j - 1], p["trail"][j], 1)
-                alive.append(p)
-
-        # Refill dead / out-of-bounds particles
-        while len(alive) < self.TARGET_N:
-            alive.append(self._new())
-        self.pool = alive
-
 
 class GlowSquares:
     """Waterfall spectrogram — scrolling time-frequency display.
@@ -846,10 +780,9 @@ MODES = [
     ("Particles",   Particles),
     ("Tunnel",      Tunnel),
     ("Lissajous",   Lissajous),
-    ("Mandelbrot",   Mandelbrot),
-    ("Bubbles",      Bubbles),
-    ("Flax",         Flax),
-    ("Glow Squares", GlowSquares),
+    ("Mandelbrot",  Mandelbrot),
+    ("Bubbles",     Bubbles),
+    ("Waterfall",   GlowSquares),
 ]
 
 
@@ -984,9 +917,6 @@ def main():
                                     if active_dev in active_indices else 0)
                     elif event.key == pygame.K_0:
                         mode_idx = 9
-                        name, VisCls = MODES[mode_idx]; vis = VisCls()
-                    elif event.key == pygame.K_MINUS:
-                        mode_idx = 10
                         name, VisCls = MODES[mode_idx]; vis = VisCls()
                     else:
                         idx = event.key - pygame.K_1
