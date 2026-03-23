@@ -1,1 +1,79 @@
 # psysuals
+
+Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection.
+
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+
+## Visualisation modes
+
+| # | Mode | Description |
+|---|------|-------------|
+| 1 | **Spiral** | 7 logarithmic spiral arms that warp with every frequency band |
+| 2 | **Tentacles** | 14 segmented arms that writhe and sway with audio |
+| 3 | **Cube** | Dual rotating wireframe cubes — each axis driven by bass / mid / high |
+| 4 | **Spectrum** | 80-bar spectrum analyser with peak markers and a waveform overlay |
+| 5 | **Particles** | Coloured particles burst from the centre on every beat |
+| 6 | **Tunnel** | Receding hexagonal rings that accelerate with bass |
+| 7 | **Lissajous** | 3-D rotating Lissajous figure that morphs with audio |
+
+## Requirements
+
+- Python 3.8+
+- A working audio input device (microphone, line-in, or loopback)
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+```bash
+python visualizer.py
+```
+
+### Controls
+
+| Key / Action | Effect |
+|---|---|
+| `Space` or click | Cycle to next mode |
+| `1` – `7` | Jump directly to a mode |
+| `F` | Toggle fullscreen |
+| `Q` / `Esc` | Quit |
+
+## Listening to music (not just a microphone)
+
+By default `sounddevice` uses your system's default input device. To visualise music playing through your speakers:
+
+| OS | Method |
+|----|--------|
+| **Linux** | Set input to a PulseAudio/PipeWire monitor source: `pavucontrol` → Recording tab → set app input to *Monitor of …* |
+| **macOS** | Install [BlackHole](https://github.com/ExistentialAudio/BlackHole) or Soundflower and route output to it |
+| **Windows** | Enable *Stereo Mix* in Sound settings and set it as the default recording device |
+
+To pick a specific device by index, pass it on the command line or edit `sd.InputStream(device=N, …)` in `visualizer.py`. List available devices with:
+
+```bash
+python -c "import sounddevice; print(sounddevice.query_devices())"
+```
+
+## How it works
+
+1. `sounddevice` streams raw PCM from the input device in 1 024-sample blocks.
+2. A Hann-windowed FFT is computed each block; the spectrum is log-scaled and smoothed with an exponential moving average (α = 0.25).
+3. Beat energy is derived from the bass band (first 20 FFT bins) and normalised against a ~1-second rolling average so the visuals stay reactive at any volume.
+4. `pygame` renders each frame with a semi-transparent black overlay for motion-trail / persistence effects.
+
+## Project structure
+
+```
+psysuals/
+├── visualizer.py    # Main app — all visualisers and audio pipeline
+├── requirements.txt
+└── README.md
+```
+
+## License
+
+MIT
