@@ -64,22 +64,27 @@ def hsl(h, s=1.0, l=0.5):
 # ── Visualisers ───────────────────────────────────────────────────────────────
 
 class Spiral:
-    """Fly through a curving 3-D helix vortex — the tunnel axis drifts like Tunnel,
-    arms leave long rainbow trails that fade from black in the distance to bright
-    saturated colour up close."""
+    """Neon helix vortex — 6 arms fly toward the viewer with audio-reactive radius
+    breathing, two-pass neon glow on arm lines, and cross-ring connections between
+    arms at regular depth intervals.  Beat spring explodes the whole structure
+    outward and snaps the hue palette."""
 
-    N_ARMS = 6
-    N_PTS  = 70
-    Z_FAR  = 11.0
-    Z_NEAR = 0.14
-    RADIUS = 1.1   # helix radius in world units
-    SPIN   = 1.4   # radians of rotation per unit depth
+    N_ARMS    = 6
+    N_PTS     = 80
+    Z_FAR     = 10.0
+    Z_NEAR    = 0.12
+    RADIUS    = 1.0
+    SPIN      = 1.6
+    N_SYM     = 3
+    RING_STEP = 8   # draw a cross-ring every N depth points
 
     def __init__(self):
-        self.hue  = 0.0
-        self.time = 0.0
-        spacing   = (self.Z_FAR - self.Z_NEAR) / self.N_PTS
-        self.pts  = [
+        self.hue   = 0.0
+        self.time  = 0.0
+        self.scale = 1.0
+        self.svel  = 0.0
+        spacing    = (self.Z_FAR - self.Z_NEAR) / self.N_PTS
+        self.pts   = [
             {"arm": arm, "z": self.Z_NEAR + j * spacing,
              "pt":  self.Z_NEAR + j * spacing}
             for arm in range(self.N_ARMS)
@@ -87,75 +92,104 @@ class Spiral:
         ]
 
     def _path(self, t):
-        """Subtle sway — small enough that the camera stays inside the helix."""
-        return (math.sin(t * 0.18) * 0.25,
-                math.cos(t * 0.13) * 0.20)
-
-    def _world_pos(self, pt, arm):
-        angle   = pt * self.SPIN + arm / self.N_ARMS * math.tau
-        cx, cy  = self._path(pt)
-        return (cx + self.RADIUS * math.cos(angle),
-                cy + self.RADIUS * math.sin(angle))
+        return (math.sin(t * 0.18) * 0.25, math.cos(t * 0.13) * 0.20)
 
     def _proj(self, wx, wy, wz):
         fov = min(WIDTH, HEIGHT) * 0.72
         z   = max(wz, 0.01)
-        return (int(wx * fov / z + WIDTH  / 2),
-                int(wy * fov / z + HEIGHT / 2),
+        return (int(wx * fov / z + WIDTH  // 2),
+                int(wy * fov / z + HEIGHT // 2),
                 fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue  += 0.008
+        self.hue  += 0.007 + beat * 0.04
         bass       = float(np.mean(fft[:6]))
-        dt         = 0.04 + bass * 0.12 + beat * 0.25
+        dt         = 0.038 + bass * 0.10 + beat * 0.18
         self.time += dt
+
+        # Spring scale — beat kicks outward, restores to 1.0
+        self.svel += beat * 0.48
+        self.svel += (1.0 - self.scale) * 0.25
+        self.svel *= 0.81
+        self.scale = max(0.4, self.scale + self.svel)
 
         for p in self.pts:
             p["z"] -= dt
             if p["z"] < self.Z_NEAR:
-                p["z"]  += self.Z_FAR
-                p["pt"]  = self.time + p["z"]
+                p["z"] += self.Z_FAR
+                p["pt"] = self.time + p["z"]
 
-        # Group by arm, sort far→near; collect screen points
+        # Build per-arm screen-point lists (sorted far→near — same z order across arms)
         by_arm = [[] for _ in range(self.N_ARMS)]
         for p in self.pts:
             by_arm[p["arm"]].append(p)
 
         cx0, cy0 = WIDTH // 2, HEIGHT // 2
-        # 3-fold screen symmetry — trefoil DNA vortex
-        N_SYM = 3
 
+        arm_segs = []
         for arm_idx, arm_pts in enumerate(by_arm):
             arm_pts.sort(key=lambda p: -p["z"])
-            segs = []   # (sx, sy, color, dot_r, lw, near_t)
+            segs = []
             for p in arm_pts:
-                wx, wy     = self._world_pos(p["pt"], arm_idx)
+                near_t = max(0.0, 1.0 - p["z"] / self.Z_FAR)
+                band   = min(int(near_t * len(fft) * 0.55), len(fft) - 1)
+                r_mod  = float(fft[band]) * 1.5   # radius breathes with audio
+                angle  = p["pt"] * self.SPIN + arm_idx / self.N_ARMS * math.tau
+                pcx, pcy = self._path(p["pt"])
+                r      = (self.RADIUS + r_mod) * self.scale
+                wx     = pcx + r * math.cos(angle)
+                wy     = pcy + r * math.sin(angle)
                 sx, sy, sc = self._proj(wx, wy, p["z"])
-                near_t     = max(0.0, 1.0 - p["z"] / self.Z_FAR)
-                h          = (self.hue + arm_idx / self.N_ARMS * 0.6 + near_t * 1.5) % 1.0
-                bright     = near_t ** 1.4 * 0.88 + fft[min(int(near_t * len(fft) * 0.7), len(fft)-1)] * 0.12
-                color      = hsl(h, l=max(0.01, bright))
-                dot_r      = min(max(1, int(sc * 0.045)), 55)
-                lw         = max(1, dot_r // 2)
-                segs.append((sx, sy, color, dot_r, lw, near_t))
+                h      = (self.hue + arm_idx / self.N_ARMS * 0.5 + near_t * 1.3) % 1.0
+                bright = near_t ** 1.15
+                segs.append((sx, sy, h, bright, sc, near_t))
+            arm_segs.append(segs)
 
-            for sym in range(N_SYM):
-                angle = sym / N_SYM * math.tau
-                ca, sa = math.cos(angle), math.sin(angle)
+        for sym in range(self.N_SYM):
+            ang    = sym / self.N_SYM * math.tau
+            ca, sa = math.cos(ang), math.sin(ang)
+
+            def rot(sx, sy, _ca=ca, _sa=sa):
+                dx, dy = sx - cx0, sy - cy0
+                return (int(cx0 + dx * _ca - dy * _sa),
+                        int(cy0 + dx * _sa + dy * _ca))
+
+            # Arm lines — two-pass neon glow
+            for segs in arm_segs:
                 prev = None
-                for sx, sy, color, dot_r, lw, near_t in segs:
-                    # Rotate screen point around centre
-                    rx = int(cx0 + (sx - cx0) * ca - (sy - cy0) * sa)
-                    ry = int(cy0 + (sx - cx0) * sa + (sy - cy0) * ca)
-                    if prev and dot_r < 55:
-                        pygame.draw.line(surf, color, prev, (rx, ry), lw)
-                    if dot_r > 0:
-                        pygame.draw.circle(surf, color, (rx, ry), dot_r)
-                    # Beat flash on the closest tips
-                    if near_t > 0.82 and beat > 0.4:
-                        fr = max(2, int(dot_r * (1 + beat * 0.6)))
-                        pygame.draw.circle(surf, hsl(self.hue, l=0.92), (rx, ry), fr)
+                for sx, sy, h, bright, sc, near_t in segs:
+                    rx, ry  = rot(sx, sy)
+                    lw      = max(1, min(int(sc * 0.032), 10))
+                    c_halo  = hsl(h, l=bright * 0.22)
+                    c_core  = hsl(h, l=min(bright * 0.92 + 0.06, 0.95))
+                    if prev:
+                        pygame.draw.line(surf, c_halo, prev, (rx, ry), lw * 4 + 2)
+                        pygame.draw.line(surf, c_core, prev, (rx, ry), max(1, lw))
+                    if near_t > 0.80 and beat > 0.35:
+                        fr = max(3, int(lw * (2.0 + beat * 0.9)))
+                        pygame.draw.circle(surf, hsl(h, l=0.96), (rx, ry), fr)
                     prev = (rx, ry)
+
+            # Cross-rings — polygon connecting all arms at the same depth index
+            n = len(arm_segs[0]) if arm_segs else 0
+            for j in range(0, n, self.RING_STEP):
+                ring = []
+                for a_segs in arm_segs:
+                    if j < len(a_segs):
+                        sx, sy, h, bright, sc, near_t = a_segs[j]
+                        ring.append((rot(sx, sy), h, bright, sc))
+                if len(ring) < 3:
+                    continue
+                h_r, br_r, sc_r = ring[0][1], ring[0][2], ring[0][3]
+                lw_r    = max(1, min(int(sc_r * 0.020), 8))
+                c_halo  = hsl(h_r, l=br_r * 0.18)
+                c_core  = hsl(h_r, l=min(br_r * 0.75, 0.80))
+                pts_r   = [p[0] for p in ring]
+                for i in range(len(pts_r)):
+                    a_ = pts_r[i]
+                    b_ = pts_r[(i + 1) % len(pts_r)]
+                    pygame.draw.line(surf, c_halo, a_, b_, lw_r * 3 + 1)
+                    pygame.draw.line(surf, c_core, a_, b_, max(1, lw_r))
 
 
 class Plasma:
