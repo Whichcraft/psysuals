@@ -457,13 +457,13 @@ class Tunnel:
     def __init__(self):
         self.hue  = 0.0
         self.time = 0.0
-        # Each ring: z (depth ahead) and pt (fixed position on the tube path)
         spacing = (self.Z_FAR - self.Z_NEAR) / self.N_RINGS
         self.rings = [
             {"z": self.Z_NEAR + i * spacing,
              "pt": self.Z_NEAR + i * spacing}
             for i in range(self.N_RINGS)
         ]
+        self.tris = []   # beat-spawned triangles flying toward camera
 
     def _path(self, t):
         return (math.sin(t * 0.21) * 1.4,
@@ -483,6 +483,19 @@ class Tunnel:
 
         dt         = 0.05 + bass * 0.13 + beat * 0.28
         self.time += dt
+
+        # Spawn triangles on beat
+        if beat > 0.5:
+            for _ in range(int(1 + beat * 2.5)):
+                z = self.Z_FAR * random.uniform(0.65, 0.95)
+                self.tris.append({
+                    "z":    z,
+                    "pt":   self.time + z,
+                    "rot":  random.uniform(0, math.tau),
+                    "rvel": random.choice([-1, 1]) * random.uniform(0.04, 0.12),
+                    "size": random.uniform(0.45, 1.1),
+                    "hue":  (self.hue + random.uniform(0, 0.5)) % 1.0,
+                })
 
         for r in self.rings:
             r["z"] -= dt
@@ -539,6 +552,31 @@ class Tunnel:
                 for v in range(n_star)
             ]
             pygame.draw.polygon(surf, hsl(s_h, l=s_l), s_pts, max(1, lw))
+
+        # ── Beat-spawned triangles flying toward camera ───────────────────────
+        live = []
+        for tri in self.tris:
+            tri["z"]   -= dt
+            tri["rot"] += tri["rvel"]
+            if tri["z"] < self.Z_NEAR:
+                continue
+            tcx, tcy   = self._path(tri["pt"])
+            sx, sy, sc = self._proj(tcx, tcy, tri["z"])
+            near_t     = max(0.0, 1.0 - tri["z"] / self.Z_FAR)
+            tr         = max(3, int(tri["size"] * sc))
+            h          = (tri["hue"] + near_t * 0.4) % 1.0
+            bright     = 0.35 + near_t * 0.60
+            lw         = max(1, int(1 + near_t * 3))
+            pts = [
+                (sx + int(math.cos(tri["rot"] + v * math.tau / 3) * tr),
+                 sy + int(math.sin(tri["rot"] + v * math.tau / 3) * tr))
+                for v in range(3)
+            ]
+            # Neon glow: wide dim halo, then bright core
+            pygame.draw.polygon(surf, hsl(h, l=bright * 0.30), pts, lw + 4)
+            pygame.draw.polygon(surf, hsl(h, l=bright),         pts, lw)
+            live.append(tri)
+        self.tris = live[-80:]
 
 
 class Lissajous:
