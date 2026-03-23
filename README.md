@@ -27,6 +27,8 @@ Real-time music visualizer — listens to audio input and renders animated visua
 ## Installation
 
 ```bash
+git clone https://github.com/tstocke/psysuals.git
+cd psysuals
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```

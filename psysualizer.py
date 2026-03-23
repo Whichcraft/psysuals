@@ -154,42 +154,31 @@ class Spiral:
                 return (int(cx0 + dx * _ca - dy * _sa),
                         int(cy0 + dx * _sa + dy * _ca))
 
-            # Arm lines — two-pass neon glow
+            # Arm dots — two-pass neon glow per point
             for segs in arm_segs:
-                prev = None
                 for sx, sy, h, bright, sc, near_t in segs:
                     rx, ry  = rot(sx, sy)
-                    lw      = max(1, min(int(sc * 0.032), 10))
-                    c_halo  = hsl(h, l=bright * 0.22)
-                    c_core  = hsl(h, l=min(bright * 0.92 + 0.06, 0.95))
-                    if prev:
-                        pygame.draw.line(surf, c_halo, prev, (rx, ry), lw * 4 + 2)
-                        pygame.draw.line(surf, c_core, prev, (rx, ry), max(1, lw))
+                    r_dot   = max(1, min(int(sc * 0.028), 9))
+                    c_halo  = hsl(h, l=bright * 0.20)
+                    c_core  = hsl(h, l=min(bright * 0.90 + 0.08, 0.95))
+                    pygame.draw.circle(surf, c_halo, (rx, ry), r_dot * 3 + 1)
+                    pygame.draw.circle(surf, c_core, (rx, ry), r_dot)
                     if near_t > 0.80 and beat > 0.35:
-                        fr = max(3, int(lw * (2.0 + beat * 0.9)))
+                        fr = max(3, int(r_dot * (2.2 + beat * 0.9)))
                         pygame.draw.circle(surf, hsl(h, l=0.96), (rx, ry), fr)
-                    prev = (rx, ry)
 
-            # Cross-rings — polygon connecting all arms at the same depth index
+            # Cross-ring dots — bright dot at each arm×depth intersection
             n = len(arm_segs[0]) if arm_segs else 0
             for j in range(0, n, self.RING_STEP):
-                ring = []
                 for a_segs in arm_segs:
                     if j < len(a_segs):
                         sx, sy, h, bright, sc, near_t = a_segs[j]
-                        ring.append((rot(sx, sy), h, bright, sc))
-                if len(ring) < 3:
-                    continue
-                h_r, br_r, sc_r = ring[0][1], ring[0][2], ring[0][3]
-                lw_r    = max(1, min(int(sc_r * 0.020), 8))
-                c_halo  = hsl(h_r, l=br_r * 0.18)
-                c_core  = hsl(h_r, l=min(br_r * 0.75, 0.80))
-                pts_r   = [p[0] for p in ring]
-                for i in range(len(pts_r)):
-                    a_ = pts_r[i]
-                    b_ = pts_r[(i + 1) % len(pts_r)]
-                    pygame.draw.line(surf, c_halo, a_, b_, lw_r * 3 + 1)
-                    pygame.draw.line(surf, c_core, a_, b_, max(1, lw_r))
+                        rp      = rot(sx, sy)
+                        r_dot   = max(1, min(int(sc * 0.022), 7))
+                        c_halo  = hsl(h, l=bright * 0.35)
+                        c_core  = hsl(h, l=min(bright * 0.85 + 0.10, 0.92))
+                        pygame.draw.circle(surf, c_halo, rp, r_dot * 3)
+                        pygame.draw.circle(surf, c_core, rp, r_dot + 1)
 
 
 class Plasma:
