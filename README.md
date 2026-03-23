@@ -41,24 +41,23 @@ python3 -m venv .venv
 |---|---|
 | `Space` or click | Cycle to next mode |
 | `1` – `8` | Jump directly to a mode |
+| `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen |
 | `Q` / `Esc` | Quit |
 
-## Listening to music (not just a microphone)
+## Selecting an audio input device
 
-By default `sounddevice` uses your system's default input device. To visualise music playing through your speakers:
+Press `D` while running to open the interactive device picker. Use `↑`/`↓` to navigate the list of available input devices, `Enter` to switch, `Esc` to cancel. The active device is shown in the HUD at the top of the screen.
+
+To visualise music playing through your speakers rather than a microphone, first set up a loopback device on your OS:
 
 | OS | Method |
 |----|--------|
-| **Linux** | Set input to a PulseAudio/PipeWire monitor source: `pavucontrol` → Recording tab → set app input to *Monitor of …* |
-| **macOS** | Install [BlackHole](https://github.com/ExistentialAudio/BlackHole) or Soundflower and route output to it |
-| **Windows** | Enable *Stereo Mix* in Sound settings and set it as the default recording device |
+| **Linux** | PulseAudio/PipeWire monitor source — visible in `pavucontrol` → Recording tab as *Monitor of …* |
+| **macOS** | Install [BlackHole](https://github.com/ExistentialAudio/BlackHole) or Soundflower, then route output to it |
+| **Windows** | Enable *Stereo Mix* in Sound settings |
 
-To pick a specific device by index, pass it on the command line or edit `sd.InputStream(device=N, …)` in `visualizer.py`. List available devices with:
-
-```bash
-python -c "import sounddevice; print(sounddevice.query_devices())"
-```
+Then press `D` in-app and select it from the list.
 
 ## How it works
 

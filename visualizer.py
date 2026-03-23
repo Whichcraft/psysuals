@@ -444,6 +444,47 @@ MODES = [
 ]
 
 
+# ── Device picker ─────────────────────────────────────────────────────────────
+
+def _input_devices():
+    """Return list of (index, name) for all input-capable devices."""
+    devs = []
+    for i, d in enumerate(sd.query_devices()):
+        if d["max_input_channels"] > 0:
+            devs.append((i, d["name"]))
+    return devs
+
+
+def _draw_device_picker(screen, font, devices, selected, active_idx):
+    """Render the device-picker overlay; returns nothing."""
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 210))
+    screen.blit(overlay, (0, 0))
+
+    title = font.render("SELECT INPUT DEVICE   ↑↓ navigate   Enter confirm   Esc cancel",
+                         True, (200, 200, 200))
+    screen.blit(title, (40, 30))
+
+    row_h  = 28
+    y0     = 80
+    visn   = min(len(devices), (HEIGHT - y0 - 20) // row_h)
+    # Scroll window so `selected` is always visible
+    start  = max(0, min(selected - visn // 2, len(devices) - visn))
+
+    for i, (dev_idx, name) in enumerate(devices[start:start + visn]):
+        row   = start + i
+        y     = y0 + i * row_h
+        is_sel   = row == selected
+        is_live  = dev_idx == active_idx
+        bg_col   = (40, 80, 140) if is_sel else (0, 0, 0, 0)
+        if is_sel:
+            pygame.draw.rect(screen, bg_col, (30, y - 2, WIDTH - 60, row_h - 2))
+        marker = "► " if is_live else "  "
+        label  = f"{marker}{dev_idx:3d}  {name}"
+        color  = (255, 255, 100) if is_sel else (140, 140, 140)
+        screen.blit(font.render(label, True, color), (40, y))
+
+
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 def main():
@@ -453,76 +494,108 @@ def main():
     clock  = pygame.time.Clock()
     font   = pygame.font.SysFont("monospace", 16)
 
+    devices    = _input_devices()
+    active_dev = None          # None → sounddevice default
+    stream     = sd.InputStream(
+        samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE,
+        channels=CHANNELS, device=active_dev, callback=_audio_cb)
+    stream.start()
+
     mode_idx      = 0
     name, VisCls  = MODES[mode_idx]
     vis           = VisCls()
     fullscreen    = False
     tick          = 0
-    energy_hist   = deque(maxlen=45)   # ~1 s of beat history
+    energy_hist   = deque(maxlen=45)
+    picking       = False      # device-picker overlay open?
+    pick_sel      = 0          # highlighted row in picker
 
     fade = pygame.Surface((WIDTH, HEIGHT))
     fade.set_alpha(38)
     fade.fill((0, 0, 0))
 
-    stream = sd.InputStream(
-        samplerate=SAMPLE_RATE,
-        blocksize=BLOCK_SIZE,
-        channels=CHANNELS,
-        callback=_audio_cb,
-    )
+    hint = ("  SPACE/click: next mode  |  1-{n}: pick mode  "
+            "|  D: device  |  F: fullscreen  |  Q: quit").format(n=len(MODES))
 
-    hint = "  SPACE/click: next mode  |  1-{n}: pick mode  |  F: fullscreen  |  Q: quit".format(
-        n=len(MODES))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                stream.stop(); stream.close()
+                pygame.quit(); return
 
-    with stream:
-        while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    return
-                elif event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
+
+                # ── device picker open ────────────────────────────────────────
+                if picking:
+                    if event.key == pygame.K_ESCAPE:
+                        picking = False
+                    elif event.key == pygame.K_UP:
+                        pick_sel = max(0, pick_sel - 1)
+                    elif event.key == pygame.K_DOWN:
+                        pick_sel = min(len(devices) - 1, pick_sel + 1)
+                    elif event.key == pygame.K_RETURN:
+                        new_idx  = devices[pick_sel][0]
+                        if new_idx != active_dev:
+                            stream.stop(); stream.close()
+                            active_dev = new_idx
+                            stream = sd.InputStream(
+                                samplerate=SAMPLE_RATE, blocksize=BLOCK_SIZE,
+                                channels=CHANNELS, device=active_dev,
+                                callback=_audio_cb)
+                            stream.start()
+                        picking = False
+
+                # ── normal key handling ───────────────────────────────────────
+                else:
                     if event.key in (pygame.K_q, pygame.K_ESCAPE):
-                        pygame.quit()
-                        return
+                        stream.stop(); stream.close()
+                        pygame.quit(); return
                     elif event.key == pygame.K_SPACE:
                         mode_idx = (mode_idx + 1) % len(MODES)
-                        name, VisCls = MODES[mode_idx]
-                        vis = VisCls()
+                        name, VisCls = MODES[mode_idx]; vis = VisCls()
                     elif event.key == pygame.K_f:
                         fullscreen = not fullscreen
-                        flags = pygame.FULLSCREEN if fullscreen else 0
+                        flags  = pygame.FULLSCREEN if fullscreen else 0
                         screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+                    elif event.key == pygame.K_d:
+                        devices  = _input_devices()   # refresh list
+                        picking  = True
+                        # Pre-select currently active device
+                        active_indices = [d[0] for d in devices]
+                        pick_sel = (active_indices.index(active_dev)
+                                    if active_dev in active_indices else 0)
                     else:
                         idx = event.key - pygame.K_1
                         if 0 <= idx < len(MODES):
                             mode_idx = idx
-                            name, VisCls = MODES[mode_idx]
-                            vis = VisCls()
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    mode_idx = (mode_idx + 1) % len(MODES)
-                    name, VisCls = MODES[mode_idx]
-                    vis = VisCls()
+                            name, VisCls = MODES[mode_idx]; vis = VisCls()
 
-            waveform, fft, raw_beat = get_audio()
+            elif event.type == pygame.MOUSEBUTTONDOWN and not picking:
+                mode_idx = (mode_idx + 1) % len(MODES)
+                name, VisCls = MODES[mode_idx]; vis = VisCls()
 
-            # Beat normalisation: how much does current energy exceed recent avg?
-            energy_hist.append(raw_beat)
-            avg   = float(np.mean(energy_hist)) if energy_hist else 1e-6
-            beat  = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
+        waveform, fft, raw_beat = get_audio()
+        energy_hist.append(raw_beat)
+        avg  = float(np.mean(energy_hist)) if energy_hist else 1e-6
+        beat = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
 
-            # Trail / motion-blur effect
-            screen.blit(fade, (0, 0))
+        screen.blit(fade, (0, 0))
+        vis.draw(screen, waveform, fft, beat, tick)
 
-            vis.draw(screen, waveform, fft, beat, tick)
+        # HUD
+        dev_name = (sd.query_devices(active_dev)["name"]
+                    if active_dev is not None else "default")
+        label = font.render(
+            f"  [{mode_idx+1}/{len(MODES)}] {name}  |  🎤 {dev_name}{hint}",
+            True, (90, 90, 90))
+        screen.blit(label, (6, 6))
 
-            # HUD
-            label = font.render(
-                f"  [{mode_idx+1}/{len(MODES)}] {name}{hint}", True, (90, 90, 90))
-            screen.blit(label, (6, 6))
+        if picking:
+            _draw_device_picker(screen, font, devices, pick_sel, active_dev)
 
-            pygame.display.flip()
-            clock.tick(FPS)
-            tick += 1
+        pygame.display.flip()
+        clock.tick(FPS)
+        tick += 1
 
 
 if __name__ == "__main__":
