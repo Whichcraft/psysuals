@@ -295,33 +295,77 @@ class Particles:
 
 
 class Tunnel:
-    """Receding hexagonal rings — speed and glow driven by bass."""
+    """First-person ride through a curving tube — rings + longitudinal wall lines."""
+
+    N_RINGS = 24
+    N_SIDES = 20    # smoothness of tube cross-section
+    TUBE_R  = 2.0   # world-space tube radius
 
     def __init__(self):
-        self.hue   = 0.0
-        self.depth = 0.0
+        self.hue  = 0.0
+        self.time = 0.0
+
+    def _path(self, t):
+        """World-space tube centre at path parameter t."""
+        return (math.sin(t * 0.21) * 1.4,
+                math.cos(t * 0.16) * 1.0)
+
+    def _proj(self, wx, wy, wz):
+        fov = min(WIDTH, HEIGHT) * 0.72
+        z   = max(wz, 0.05)
+        return (int(wx * fov / z + WIDTH  / 2),
+                int(wy * fov / z + HEIGHT / 2),
+                fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue   += 0.005
-        self.depth += 0.018 + beat * 0.09
-        cx, cy = WIDTH // 2, HEIGHT // 2
-        rings  = 22
+        self.hue  += 0.003
+        bass       = float(np.mean(fft[:6]))
+        self.time += 0.020 + bass * 0.040 + beat * 0.060
 
-        for i in range(rings, 0, -1):
-            t      = i / rings
-            d      = (t + self.depth) % 1.0
-            fi     = min(int(d * len(fft)), len(fft) - 1)
-            radius = (1 - d) * max(WIDTH, HEIGHT) * 0.72 + fft[fi] * 90
-            h      = (self.hue + d * 0.4) % 1.0
-            color  = hsl(h, l=0.18 + d * 0.6 + fft[fi] * 0.3)
-            sides  = 6
-            pts    = [
-                (int(cx + radius * math.cos(k / sides * math.tau + self.depth * 0.5)),
-                 int(cy + radius * math.sin(k / sides * math.tau + self.depth * 0.5)))
-                for k in range(sides)
-            ]
-            if radius > 4:
-                pygame.draw.polygon(surf, color, pts, max(1, int(2 + beat * 3)))
+        # Build ring list far → near
+        rings = []
+        for i in range(self.N_RINGS + 1):
+            z  = 0.3 + (1 - i / self.N_RINGS) * 7.7   # far=8, near=0.3
+            cx, cy = self._path(self.time + z)
+            fi = min(int((1 - z / 8) * len(fft) * 0.8), len(fft) - 1)
+            rings.append((cx, cy, z, fi))
+
+        # Render pairs far → near
+        for i in range(len(rings) - 1):
+            cx1, cy1, z1, fi1 = rings[i]
+            cx2, cy2, z2, fi2 = rings[i + 1]
+
+            sx1, sy1, sc1 = self._proj(cx1, cy1, z1)
+            sx2, sy2, sc2 = self._proj(cx2, cy2, z2)
+
+            # Tube radius pulses slightly with audio
+            sr1 = max(1, int(self.TUBE_R * sc1 * (1 + fft[fi1] * 0.25)))
+            sr2 = max(1, int(self.TUBE_R * sc2 * (1 + fft[fi2] * 0.25)))
+
+            near_t = 1 - z1 / 8
+            h      = (self.hue + near_t * 0.45) % 1.0
+            bright = 0.10 + near_t * 0.60 + fft[fi1] * 0.28
+            lw     = max(1, int(1 + beat * 2.5))
+
+            # Ring outline
+            pygame.draw.circle(surf, hsl(h, l=bright), (sx1, sy1), sr1, lw)
+
+            # Longitudinal wall lines connecting adjacent rings
+            for side in range(self.N_SIDES):
+                angle = side / self.N_SIDES * math.tau + self.time * 0.07
+                p1 = (sx1 + int(math.cos(angle) * sr1),
+                      sy1 + int(math.sin(angle) * sr1))
+                p2 = (sx2 + int(math.cos(angle) * sr2),
+                      sy2 + int(math.sin(angle) * sr2))
+                hs = (h + side / self.N_SIDES * 0.12) % 1.0
+                pygame.draw.line(surf, hsl(hs, l=bright * 0.65), p1, p2, 1)
+
+        # Brightest nearest ring
+        if rings:
+            cx, cy, z, fi = rings[-1]
+            sx, sy, sc = self._proj(cx, cy, z)
+            sr = max(1, int(self.TUBE_R * sc * (1 + fft[fi] * 0.25)))
+            pygame.draw.circle(surf, hsl(self.hue, l=0.85), (sx, sy), sr, 2)
 
 
 class Lissajous:
