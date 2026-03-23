@@ -42,7 +42,7 @@ python3 -m venv .venv
 | `Space` or click | Cycle to next mode |
 | `1` – `8` | Jump directly to a mode |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
-| `F` | Toggle fullscreen |
+| `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `Q` / `Esc` | Quit |
 
 ## Selecting an audio input device
