@@ -1,6 +1,6 @@
 # psysuals
 
-Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection.
+Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 

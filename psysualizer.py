@@ -104,9 +104,9 @@ class Spiral:
                 fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue  += 0.005
+        self.hue  += 0.008
         bass       = float(np.mean(fft[:6]))
-        dt         = 0.05 + bass * 0.09 + beat * 0.13
+        dt         = 0.04 + bass * 0.12 + beat * 0.25
         self.time += dt
 
         for p in self.pts:
@@ -177,16 +177,16 @@ class Tentacles:
         return np.array([v[0]*c + v[2]*s, v[1], -v[0]*s + v[2]*c])
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue   += 0.002
-        self.phase += 0.045 + beat * 0.07
-        self.ry    += 0.007
+        self.hue   += 0.007
+        self.phase += 0.07 + beat * 0.32
+        self.ry    += 0.013
         norm  = fft / (fft.max() + 1e-6)
         bass  = float(np.mean(norm[:5]))
         cy_s, sy_s = math.cos(self.ry), math.sin(self.ry)
 
         # Mantle body at world origin
         mx, my, _ = self._proj(0, 0, 0)
-        mr = int(32 + bass * 16 + beat * 10)
+        mr = int(26 + bass * 22 + beat * 45)
         pygame.draw.circle(surf, hsl(self.hue, l=0.28), (mx, my), mr)
         pygame.draw.circle(surf, hsl(self.hue, l=0.45), (mx, my), mr, 2)
 
@@ -194,7 +194,7 @@ class Tentacles:
             b_lo   = int( ai      / self.N_ARMS * len(norm) * 0.45)
             b_hi   = int((ai + 1) / self.N_ARMS * len(norm) * 0.45)
             energy = float(np.mean(norm[b_lo : max(b_lo + 1, b_hi)]))
-            seg_w  = self.SEG_W * (1 + energy * 0.45 + beat * 0.18)
+            seg_w  = self.SEG_W * (1 + energy * 0.65 + beat * 0.55)
 
             d   = self._rot_y(self.dirs[ai], cy_s, sy_s)
             pos = np.zeros(3)
@@ -203,9 +203,9 @@ class Tentacles:
             for s in range(self.N_SEGS):
                 t  = s / self.N_SEGS
                 wh = (math.sin(self.phase * 1.3 - s * 0.55 + ai * 1.1) *
-                      (0.26 + energy * 0.72) * (1 - t * 0.4))
+                      (0.32 + energy * 0.95 + beat * 0.45) * (1 - t * 0.4))
                 wv = (math.sin(self.phase * 0.85 - s * 0.42 + ai * 0.75) *
-                      (0.10 + energy * 0.28) * (1 - t * 0.4))
+                      (0.14 + energy * 0.38 + beat * 0.22) * (1 - t * 0.4))
                 # Bend in 3-D: horizontal (around Y) then vertical (around X)
                 d = self._rot_y(d, math.cos(wh), math.sin(wh))
                 cxv, sxv = math.cos(wv), math.sin(wv)
@@ -217,9 +217,9 @@ class Tentacles:
                 npos = pos + d * seg_w * (1 - t * 0.68)
                 sx1, sy1, sc1 = self._proj(*pos)
                 sx2, sy2, _   = self._proj(*npos)
-                w_px = max(1, int((1 - t) * sc1 * 0.14 * (1 + beat * 0.35)))
-                hh   = (self.hue + ai / self.N_ARMS * 0.35 + t * 0.12) % 1.0
-                pygame.draw.line(surf, hsl(hh, l=0.22 + energy * 0.50 + beat * 0.08),
+                w_px = max(1, int((1 - t) * sc1 * 0.16 * (1 + beat * 0.75)))
+                hh   = (self.hue + ai / self.N_ARMS * 0.45 + t * 0.15) % 1.0
+                pygame.draw.line(surf, hsl(hh, l=0.25 + energy * 0.55 + beat * 0.22),
                                  (sx1, sy1), (sx2, sy2), w_px)
                 spts.append((sx1, sy1, w_px))
                 pos = npos
@@ -235,7 +235,7 @@ class Tentacles:
                 sr  = max(1, pw // 3)
                 ssx = int(px + ox * pw * 0.55)
                 ssy = int(py + oy * pw * 0.55)
-                pygame.draw.circle(surf, hsl((self.hue + 0.55) % 1.0, l=0.65),
+                pygame.draw.circle(surf, hsl((self.hue + 0.55) % 1.0, l=0.72 + beat * 0.20),
                                    (ssx, ssy), sr)
                 pygame.draw.circle(surf, (30, 30, 30), (ssx, ssy), max(1, sr - 1))
 
@@ -280,15 +280,15 @@ class Cube:
 
     def draw(self, surf, waveform, fft, beat, tick):
         # Slow colour fade independent of beat
-        self.fade_hue += 0.0008
+        self.fade_hue += 0.0018
         bass = min(float(np.mean(fft[:5])),   1.0)
         mid  = min(float(np.mean(fft[5:25])), 1.0)
         high = min(float(np.mean(fft[25:])),  1.0)
 
         # Slower rotation — gentler base speed, smaller beat kick
-        self.rvx += 0.002 + mid  * 0.025 + beat * 0.04
-        self.rvy += 0.003 + bass * 0.030 + beat * 0.05
-        self.rvz += 0.001 + high * 0.015 + beat * 0.02
+        self.rvx += 0.002 + mid  * 0.030 + beat * 0.08
+        self.rvy += 0.003 + bass * 0.040 + beat * 0.10
+        self.rvz += 0.001 + high * 0.020 + beat * 0.04
         # More damping → settles faster, stays slow between beats
         self.rvx *= 0.92
         self.rvy *= 0.92
@@ -298,9 +298,9 @@ class Cube:
         self.rz  += self.rvz
 
         # Gentler spring: smaller impulse, softer restore, heavier damping
-        self.svel  += beat * 0.18
-        self.svel  += (1.0 - self.scale) * 0.12
-        self.svel  *= 0.75
+        self.svel  += beat * 0.32
+        self.svel  += (1.0 - self.scale) * 0.18
+        self.svel  *= 0.68
         self.scale += self.svel
         self.scale  = max(0.5, self.scale)
 
@@ -378,7 +378,7 @@ class Particles:
                 fov / zcam)
 
     def _spawn(self, fft, beat):
-        for _ in range(int(4 + beat * 18)):
+        for _ in range(int(5 + beat * 28)):
             phi   = random.uniform(0, math.tau)
             theta = math.acos(random.uniform(-1, 1))
             sp, cp = math.sin(phi), math.cos(phi)
@@ -458,7 +458,7 @@ class Tunnel:
         bass       = float(np.mean(fft[:6]))
 
         # Forward speed — bass and beat push you faster
-        dt         = 0.06 + bass * 0.10 + beat * 0.14
+        dt         = 0.05 + bass * 0.13 + beat * 0.28
         self.time += dt
 
         # Move every ring toward the camera; recycle past ones to the far end
@@ -621,9 +621,9 @@ class Yantra:
         for i in range(self.N_RINGS):
             e = min(bands[i], 1.0)
             # Spring: beat kick pushes out, restore force pulls back
-            self.pvel[i] += beat * (0.15 + e * 0.10)
-            self.pvel[i] += -self.poff[i] * 0.20
-            self.pvel[i] *= 0.70
+            self.pvel[i] += beat * (0.24 + e * 0.12)
+            self.pvel[i] += -self.poff[i] * 0.22
+            self.pvel[i] *= 0.65
             self.poff[i] += self.pvel[i]
             # Rotation speed driven by band energy
             self.rot[i]  += self.rvel[i] * (1.0 + e * 2.8 + bass * 1.2)
@@ -698,7 +698,7 @@ class Bubbles:
         self.pool = []
 
     def _spawn(self, beat, bass):
-        for _ in range(int(1 + beat * 7 + bass * 5)):
+        for _ in range(int(2 + beat * 14 + bass * 8)):
             r = random.uniform(8, 45) * (1 + bass * 1.5)
             self.pool.append({
                 "x":      random.uniform(WIDTH * 0.05, WIDTH * 0.95),
@@ -870,13 +870,13 @@ def main():
     vis           = VisCls()
     fullscreen    = False
     tick          = 0
-    energy_hist   = deque(maxlen=45)
+    energy_hist   = deque(maxlen=30)
     picking       = False      # device-picker overlay open?
     pick_sel      = 0          # highlighted row in picker
 
     def make_fade():
         s = pygame.Surface((WIDTH, HEIGHT))
-        s.set_alpha(38)
+        s.set_alpha(28)
         s.fill((0, 0, 0))
         return s
 
