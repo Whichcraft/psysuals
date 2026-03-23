@@ -336,26 +336,38 @@ class Lissajous:
 
 
 class Mandelbrot:
-    """Animated Mandelbrot zoom — speed and colour palette driven by audio."""
+    """Animated Mandelbrot zoom — always centred on a vivid boundary region."""
 
-    # A deep spiral near the boundary of the set
-    TARGET_CX = -0.7269
-    TARGET_CY =  0.1889
+    # Curated boundary points: all confirmed to stay colourful when deep-zoomed
+    TARGETS = [
+        (-0.7435669,   0.1314023),   # Seahorse valley
+        (-0.74364085,  0.13182733),  # Deep seahorse spiral
+        (-0.7269,      0.1889),      # Classic mini-brot spiral
+        (-0.16070135,  1.0375665),   # Upper antenna filament
+        (-1.25066,     0.02012),     # Elephant valley tip
+        ( 0.37865401,  0.66940249),  # Rabbit island
+        (-0.5591870,   0.6347110),   # Dendrite arms
+    ]
     RES_W, RES_H = 320, 180
-    MAX_ITER     = 60
+    MAX_ITER     = 80
 
     def __init__(self):
-        self.hue   = 0.0
-        self.zoom  = 1.0
-        self.cx    = -0.5
-        self.cy    =  0.0
-        self._surf = pygame.Surface((self.RES_W, self.RES_H))
+        self.hue      = 0.0
+        self.zoom     = 1.0
+        self.target_i = 0
+        self.cx, self.cy = self.TARGETS[0]
+        self._surf    = pygame.Surface((self.RES_W, self.RES_H))
+
+    def _next_target(self):
+        self.target_i = (self.target_i + 1) % len(self.TARGETS)
+        self.cx, self.cy = self.TARGETS[self.target_i]
+        self.zoom = 1.0
 
     # ── Vectorised HSL → RGB (operates on 2-D numpy arrays) ──────────────────
     @staticmethod
     def _hsl_to_rgb(h, l):
         """h, l are (H, W) float arrays in [0, 1]; s is fixed at 1."""
-        c  = (1.0 - np.abs(2.0 * l - 1.0))          # chroma  (s=1)
+        c  = (1.0 - np.abs(2.0 * l - 1.0))
         h6 = h * 6.0
         x  = c * (1.0 - np.abs(h6 % 2.0 - 1.0))
         m  = l - c / 2.0
@@ -380,36 +392,28 @@ class Mandelbrot:
         y0 = np.linspace(self.cy - h/2, self.cy + h/2, self.RES_H)
         C  = x0[np.newaxis, :] + 1j * y0[:, np.newaxis]
         Z  = np.zeros_like(C)
-        M  = np.full(C.shape, self.MAX_ITER, dtype=float)
+        M  = np.full(C.shape, float(self.MAX_ITER), dtype=float)
         alive = np.ones(C.shape, dtype=bool)
 
         for i in range(self.MAX_ITER):
-            Z[alive]  = Z[alive] ** 2 + C[alive]
-            escaped   = alive & (np.abs(Z) > 2.0)
-            # Smooth colouring: fractional escape count
+            Z[alive]   = Z[alive] ** 2 + C[alive]
+            escaped    = alive & (np.abs(Z) > 2.0)
             M[escaped] = i + 1.0 - np.log2(np.log2(np.abs(Z[escaped]) + 1e-10))
             alive[escaped] = False
 
-        return M / self.MAX_ITER   # shape (RES_H, RES_W), range [0, 1]
+        return M / self.MAX_ITER   # (RES_H, RES_W) in [0, 1]
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.004
-        # Bass drives zoom speed; beat gives extra punch
         bass       = float(np.mean(fft[:6]))
         self.zoom *= 1.004 + bass * 0.012 + beat * 0.015
 
-        # Drift toward the target point
-        t  = 0.003
-        self.cx += (self.TARGET_CX - self.cx) * t
-        self.cy += (self.TARGET_CY - self.cy) * t
+        M      = self._compute()
+        inside = M >= 0.999
 
-        # Reset after deep zoom
-        if self.zoom > 5e5:
-            self.zoom = 1.0
-            self.cx, self.cy = -0.5, 0.0
-
-        M = self._compute()         # (H, W) in [0, 1]
-        inside = M >= 0.999         # points that never escaped → black
+        # If >80 % of pixels are inside the set (black) or zoom too deep → next target
+        if float(np.mean(inside)) > 0.80 or self.zoom > 8e5:
+            self._next_target()
 
         # Colour: hue shifts with music; inside set stays black
         mid   = float(np.mean(fft[6:30]))

@@ -15,7 +15,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 5 | **Particles** | Coloured particles burst from the centre on every beat |
 | 6 | **Tunnel** | Receding hexagonal rings that accelerate with bass |
 | 7 | **Lissajous** | 3-D rotating Lissajous figure that morphs with audio |
-| 8 | **Mandelbrot** | Animated zoom into the Mandelbrot set — speed and palette driven by bass |
+| 8 | **Mandelbrot** | Animated zoom through 7 curated boundary points — auto-advances when the frame goes dark, speed and palette driven by bass |
 
 ## Requirements
 
