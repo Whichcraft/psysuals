@@ -675,36 +675,38 @@ class Flax:
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.003
-        self.time += 0.007 + beat * 0.018
+        # time must advance fast enough for the sine field to visibly shift
+        self.time += 0.035 + beat * 0.06
         bass = float(np.mean(fft[:6]))
+        mid  = float(np.mean(fft[6:40]))
 
         alive = []
         for p in self.pool:
             nx  = p["x"] / WIDTH
             ny  = p["y"] / HEIGHT
-            fi  = min(int(nx * len(fft) * 0.45), len(fft) - 1)
-            # Flow angle: sine noise field perturbed by the FFT at that x position
-            angle = (math.sin(nx * 5.1 + self.time) *
-                     math.cos(ny * 3.7 + self.time * 0.6) +
-                     fft[fi] * 2.8) * math.pi
+            fi  = min(int(nx * len(fft) * 0.55), len(fft) - 1)
+            # Flow angle: strongly perturbed by audio so field reacts visibly
+            angle = (math.sin(nx * 4.8 + self.time) *
+                     math.cos(ny * 3.5 + self.time * 0.7) +
+                     fft[fi] * 4.5 + mid * 2.0) * math.pi
 
-            speed = 1.8 + bass * 5 + beat * 2.5
+            speed = 2.5 + bass * 7 + beat * 4
             p["trail"].append((int(p["x"]), int(p["y"])))
             if len(p["trail"]) > self.MAX_TRAIL:
                 p["trail"].pop(0)
 
             p["x"]    += math.cos(angle) * speed
             p["y"]    += math.sin(angle) * speed
-            p["life"] -= 0.010
+            p["life"] -= 0.012
 
             if (p["life"] > 0
                     and -10 < p["x"] < WIDTH + 10
                     and -10 < p["y"] < HEIGHT + 10
                     and len(p["trail"]) > 1):
-                h = (self.hue + p["hoff"] + ny * 0.25) % 1.0
+                h = (self.hue + p["hoff"] + ny * 0.3) % 1.0
                 for j in range(1, len(p["trail"])):
                     t     = j / len(p["trail"])
-                    color = hsl(h, l=0.15 + t * 0.65)
+                    color = hsl(h, l=0.15 + t * 0.70)
                     pygame.draw.line(surf, color,
                                      p["trail"][j - 1], p["trail"][j], 1)
                 alive.append(p)
@@ -716,37 +718,42 @@ class Flax:
 
 
 class GlowSquares:
-    """Grid of squares that bloom and pulse — each column tracks a frequency band."""
+    """Grid of squares that bloom and pulse — columns use log-spaced frequency bins."""
 
     COLS = 22
     ROWS = 13
 
     def __init__(self):
-        self.hue      = 0.0
-        self.energies = np.zeros(self.COLS * self.ROWS)
+        self.hue = 0.0
+        # Log-spaced bin edges so every column covers a unique audible range
+        n_bins     = BLOCK_SIZE // 2
+        raw        = np.geomspace(2, int(n_bins * 0.85), self.COLS + 1).astype(int)
+        self.edges = np.unique(np.clip(raw, 1, n_bins - 1))
+        self.cols  = len(self.edges) - 1          # actual column count after dedup
+        self.energies = np.zeros(self.cols * self.ROWS)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
-        sq_w = WIDTH  // self.COLS
+        sq_w = WIDTH  // self.cols
         sq_h = HEIGHT // self.ROWS
         pad  = 5
 
         for row in range(self.ROWS):
-            for col in range(self.COLS):
-                idx = row * self.COLS + col
-                fi  = min(int(col / self.COLS * len(fft) * 0.55), len(fft) - 1)
-                # Higher rows amplify higher energy for a stacked look
-                target = fft[fi] * (0.6 + row / self.ROWS * 0.8) * (1 + beat * 0.5)
+            for col in range(self.cols):
+                idx    = row * self.cols + col
+                e_fft  = float(np.mean(fft[self.edges[col]:self.edges[col + 1]]))
+                # Higher rows amplify energy for a stacked/layered look
+                target = e_fft * (0.6 + row / self.ROWS * 0.9) * (1 + beat * 0.5)
                 self.energies[idx] = self.energies[idx] * 0.75 + target * 0.25
                 e = float(self.energies[idx])
                 if e < 0.015:
                     continue
 
-                x = col * sq_w + pad
-                y = row * sq_h + pad
-                w = sq_w - pad * 2
-                h = sq_h - pad * 2
-                hue = (self.hue + col / self.COLS + row / self.ROWS * 0.25) % 1.0
+                x   = col * sq_w + pad
+                y   = row * sq_h + pad
+                w   = sq_w - pad * 2
+                h   = sq_h - pad * 2
+                hue = (self.hue + col / self.cols + row / self.ROWS * 0.25) % 1.0
 
                 # Glow layers — progressively larger & more transparent
                 for g in range(4, 0, -1):
@@ -755,10 +762,8 @@ class GlowSquares:
                     if alpha < 5:
                         continue
                     gs_surf = pygame.Surface((w + gs * 2, h + gs * 2), pygame.SRCALPHA)
-                    pygame.draw.rect(gs_surf,
-                                     (*hsl(hue, l=0.55), alpha),
-                                     (0, 0, w + gs * 2, h + gs * 2),
-                                     border_radius=4)
+                    pygame.draw.rect(gs_surf, (*hsl(hue, l=0.55), alpha),
+                                     (0, 0, w + gs * 2, h + gs * 2), border_radius=4)
                     surf.blit(gs_surf, (x - gs, y - gs))
 
                 # Core square
