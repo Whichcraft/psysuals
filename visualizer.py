@@ -297,24 +297,37 @@ class Particles:
 
 
 class Tunnel:
-    """First-person ride through a curving tube — rings + longitudinal wall lines."""
+    """First-person ride through a curving tube.
 
-    N_RINGS = 24
-    N_SIDES = 20    # smoothness of tube cross-section
-    TUBE_R  = 2.0   # world-space tube radius
+    Each ring has a fixed position on the tube path and a z-depth that
+    decreases every frame so rings physically fly toward the camera.
+    When a ring passes through (z < Z_NEAR) it is recycled to the far end.
+    """
+
+    N_RINGS = 30
+    N_SIDES = 20
+    TUBE_R  = 2.0
+    Z_FAR   = 10.0
+    Z_NEAR  = 0.18
 
     def __init__(self):
         self.hue  = 0.0
         self.time = 0.0
+        # Each ring: z (depth ahead) and pt (fixed position on the tube path)
+        spacing = (self.Z_FAR - self.Z_NEAR) / self.N_RINGS
+        self.rings = [
+            {"z": self.Z_NEAR + i * spacing,
+             "pt": self.Z_NEAR + i * spacing}
+            for i in range(self.N_RINGS)
+        ]
 
     def _path(self, t):
-        """World-space tube centre at path parameter t."""
         return (math.sin(t * 0.21) * 1.4,
                 math.cos(t * 0.16) * 1.0)
 
     def _proj(self, wx, wy, wz):
-        fov = min(WIDTH, HEIGHT) * 0.72
-        z   = max(wz, 0.05)
+        fov = min(WIDTH, HEIGHT) * 0.75
+        z   = max(wz, 0.01)
         return (int(wx * fov / z + WIDTH  / 2),
                 int(wy * fov / z + HEIGHT / 2),
                 fov / z)
@@ -322,52 +335,52 @@ class Tunnel:
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.003
         bass       = float(np.mean(fft[:6]))
-        self.time += 0.020 + bass * 0.040 + beat * 0.060
 
-        # Build ring list far → near
-        rings = []
-        for i in range(self.N_RINGS + 1):
-            z  = 0.3 + (1 - i / self.N_RINGS) * 7.7   # far=8, near=0.3
-            cx, cy = self._path(self.time + z)
-            fi = min(int((1 - z / 8) * len(fft) * 0.8), len(fft) - 1)
-            rings.append((cx, cy, z, fi))
+        # Forward speed — bass and beat push you faster
+        dt         = 0.06 + bass * 0.10 + beat * 0.14
+        self.time += dt
 
-        # Render pairs far → near
-        for i in range(len(rings) - 1):
-            cx1, cy1, z1, fi1 = rings[i]
-            cx2, cy2, z2, fi2 = rings[i + 1]
+        # Move every ring toward the camera; recycle past ones to the far end
+        for r in self.rings:
+            r["z"] -= dt
+            if r["z"] < self.Z_NEAR:
+                r["z"]  += self.Z_FAR           # wrap to far end
+                r["pt"]  = self.time + r["z"]   # new path position
 
-            sx1, sy1, sc1 = self._proj(cx1, cy1, z1)
-            sx2, sy2, sc2 = self._proj(cx2, cy2, z2)
+        # Sort far → near so nearer rings overdraw farther ones
+        ordered = sorted(self.rings, key=lambda r: -r["z"])
 
-            # Tube radius pulses slightly with audio
-            sr1 = max(1, int(self.TUBE_R * sc1 * (1 + fft[fi1] * 0.25)))
-            sr2 = max(1, int(self.TUBE_R * sc2 * (1 + fft[fi2] * 0.25)))
+        for i in range(len(ordered) - 1):
+            r1 = ordered[i]       # farther
+            r2 = ordered[i + 1]  # nearer
 
-            near_t = 1 - z1 / 8
-            h      = (self.hue + near_t * 0.45) % 1.0
-            bright = 0.10 + near_t * 0.60 + fft[fi1] * 0.28
-            lw     = max(1, int(1 + beat * 2.5))
+            cx1, cy1 = self._path(r1["pt"])
+            cx2, cy2 = self._path(r2["pt"])
 
-            # Ring outline
+            sx1, sy1, sc1 = self._proj(cx1, cy1, r1["z"])
+            sx2, sy2, sc2 = self._proj(cx2, cy2, r2["z"])
+
+            sr1 = max(1, int(self.TUBE_R * sc1))
+            sr2 = max(1, int(self.TUBE_R * sc2))
+
+            near_t = max(0.0, 1.0 - r1["z"] / self.Z_FAR)
+            fi     = min(int(near_t * len(fft) * 0.8), len(fft) - 1)
+            h      = (self.hue + near_t * 0.5) % 1.0
+            bright = 0.08 + near_t * 0.65 + fft[fi] * 0.25
+            lw     = max(1, int(1 + beat * 2))
+
+            # Ring circle
             pygame.draw.circle(surf, hsl(h, l=bright), (sx1, sy1), sr1, lw)
 
-            # Longitudinal wall lines connecting adjacent rings
+            # Longitudinal wall lines to the next (nearer) ring
             for side in range(self.N_SIDES):
-                angle = side / self.N_SIDES * math.tau + self.time * 0.07
+                angle = side / self.N_SIDES * math.tau
                 p1 = (sx1 + int(math.cos(angle) * sr1),
                       sy1 + int(math.sin(angle) * sr1))
                 p2 = (sx2 + int(math.cos(angle) * sr2),
                       sy2 + int(math.sin(angle) * sr2))
-                hs = (h + side / self.N_SIDES * 0.12) % 1.0
-                pygame.draw.line(surf, hsl(hs, l=bright * 0.65), p1, p2, 1)
-
-        # Brightest nearest ring
-        if rings:
-            cx, cy, z, fi = rings[-1]
-            sx, sy, sc = self._proj(cx, cy, z)
-            sr = max(1, int(self.TUBE_R * sc * (1 + fft[fi] * 0.25)))
-            pygame.draw.circle(surf, hsl(self.hue, l=0.85), (sx, sy), sr, 2)
+                hs = (h + side / self.N_SIDES * 0.10) % 1.0
+                pygame.draw.line(surf, hsl(hs, l=bright * 0.6), p1, p2, 1)
 
 
 class Lissajous:
