@@ -4,7 +4,9 @@ Music Visualizer — Real-time audio → visuals.
 
 Controls:
   SPACE / click   Switch to next mode
-  1-9 / 0         Jump to a specific mode (0 = mode 10, 11 onwards use SPACE)
+  1-9             Jump to modes 1-9
+  0               Jump to mode 10 (Flax)
+  -               Jump to mode 11 (Glow Squares)
   F               Toggle fullscreen
   Q / ESC         Quit
 """
@@ -820,10 +822,17 @@ def main():
                         pick_sel = (active_indices.index(active_dev)
                                     if active_dev in active_indices else 0)
                     else:
-                        idx = event.key - pygame.K_1
-                        if 0 <= idx < len(MODES):
-                            mode_idx = idx
+                        elif event.key == pygame.K_0:
+                            mode_idx = 9
                             name, VisCls = MODES[mode_idx]; vis = VisCls()
+                        elif event.key == pygame.K_MINUS:
+                            mode_idx = 10
+                            name, VisCls = MODES[mode_idx]; vis = VisCls()
+                        else:
+                            idx = event.key - pygame.K_1
+                            if 0 <= idx < len(MODES):
+                                mode_idx = idx
+                                name, VisCls = MODES[mode_idx]; vis = VisCls()
 
             elif event.type == pygame.MOUSEBUTTONDOWN and not picking:
                 mode_idx = (mode_idx + 1) % len(MODES)
