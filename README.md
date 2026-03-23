@@ -14,7 +14,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 | 4 | **Tunnel** | First-person ride through a curving tube — neon glow rings, rotating inner polygon (3–6 sides) per ring, full rainbow sweep across depth, beat flares nearest rings and spawns triangles that fly toward the camera |
 | 5 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot with 3-fold symmetry, two-pass neon glow; beat explodes scale (0.55 impulse), jumps the hue palette, cranks head-dot radius, and draws extra glow halos |
 | 6 | **Nova** | Waveform kaleidoscope — audio waveform mapped to polar sectors with 7-fold mirror symmetry across 4 spinning layers; each layer reacts to a different band, beat explodes all outward |
-| 7 | **Spiral** | Curving 3-D helix vortex with 3-fold trefoil symmetry — 6 arms × 3 screen copies create a DNA vortex; rainbow trails fade from black to bright, beat flashes the closest tips |
+| 7 | **Spiral** | Neon helix vortex — 6 arms fly toward the viewer with audio-reactive radius breathing and two-pass neon glow; cross-ring polygons connect arms at every depth interval; beat spring explodes the structure outward and jumps the palette |
 | 8 | **Bubbles** | Translucent rising bubbles filling the full screen — size and spawn rate driven by bass |
 | 9 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | 10 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
