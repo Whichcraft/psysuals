@@ -199,7 +199,7 @@ class Bars:
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
         bar_w   = WIDTH // self.N
-        indices = np.linspace(0, len(fft) // 3, self.N + 1, dtype=int)
+        indices = np.linspace(1, len(fft) // 3, self.N + 1, dtype=int)
         heights = np.array([np.mean(fft[indices[i]:indices[i+1]+1])
                             for i in range(self.N)])
         heights /= (heights.max() + 1e-6)
