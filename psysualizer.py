@@ -787,7 +787,9 @@ class Bubbles:
     MAX = 700
 
     def __init__(self):
-        self.hue  = 0.0
+        self.hue   = 0.0
+        self.pulse = 0.0   # shared spring — all bubbles swell together on beat
+        self.pvel  = 0.0
         # Pre-populate bubbles scattered across the whole screen so it fills instantly
         self.pool = [self._make(y=random.uniform(0, HEIGHT)) for _ in range(400)]
 
@@ -817,6 +819,13 @@ class Bubbles:
         self.hue += 0.005
         bass = float(np.mean(fft[:8]))
         mid  = float(np.mean(fft[6:30]))
+
+        # Global beat spring — kick hard, snap back fast
+        self.pvel += beat * 0.75
+        self.pvel += -self.pulse * 0.35
+        self.pvel *= 0.52
+        self.pulse += self.pvel
+
         self._spawn(beat, bass)
 
         alive = []
@@ -829,8 +838,8 @@ class Bubbles:
                 continue
 
             life  = max(0.0, min(1.0, b["y"] / HEIGHT))
-            # Pulse radius with beat
-            r     = max(2, int(b["r"] * (1 + beat * 0.35 + mid * 0.15)))
+            # All bubbles swell together on beat via shared spring
+            r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.15)))
             pad   = r + 14
             alpha = int(life * 160)
             bsurf = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
