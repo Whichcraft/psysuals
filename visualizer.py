@@ -821,18 +821,17 @@ def main():
                         active_indices = [d[0] for d in devices]
                         pick_sel = (active_indices.index(active_dev)
                                     if active_dev in active_indices else 0)
+                    elif event.key == pygame.K_0:
+                        mode_idx = 9
+                        name, VisCls = MODES[mode_idx]; vis = VisCls()
+                    elif event.key == pygame.K_MINUS:
+                        mode_idx = 10
+                        name, VisCls = MODES[mode_idx]; vis = VisCls()
                     else:
-                        elif event.key == pygame.K_0:
-                            mode_idx = 9
+                        idx = event.key - pygame.K_1
+                        if 0 <= idx < len(MODES):
+                            mode_idx = idx
                             name, VisCls = MODES[mode_idx]; vis = VisCls()
-                        elif event.key == pygame.K_MINUS:
-                            mode_idx = 10
-                            name, VisCls = MODES[mode_idx]; vis = VisCls()
-                        else:
-                            idx = event.key - pygame.K_1
-                            if 0 <= idx < len(MODES):
-                                mode_idx = idx
-                                name, VisCls = MODES[mode_idx]; vis = VisCls()
 
             elif event.type == pygame.MOUSEBUTTONDOWN and not picking:
                 mode_idx = (mode_idx + 1) % len(MODES)
