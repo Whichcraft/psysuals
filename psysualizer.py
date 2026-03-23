@@ -7,6 +7,7 @@ Controls:
   1-9             Jump to modes 1-9
   0               Jump to mode 10 (Waterfall)
   F               Toggle fullscreen
+  H               Toggle HUD / legend
   Q / ESC         Quit
 """
 
@@ -1050,6 +1051,7 @@ def main():
     energy_hist   = deque(maxlen=30)
     picking       = False      # device-picker overlay open?
     pick_sel      = 0          # highlighted row in picker
+    show_hud      = True       # H toggles HUD visibility
 
     def make_fade():
         s = pygame.Surface((WIDTH, HEIGHT))
@@ -1060,7 +1062,7 @@ def main():
     fade = make_fade()
 
     hint = ("  SPACE/click: next mode  |  1-{n}: pick mode  "
-            "|  D: device  |  F: fullscreen  |  Q: quit").format(n=len(MODES))
+            "|  D: device  |  F: fullscreen  |  H: hide HUD  |  Q: quit").format(n=len(MODES))
 
     while True:
         for event in pygame.event.get():
@@ -1105,6 +1107,8 @@ def main():
                         WIDTH, HEIGHT = screen.get_size()
                         fade = make_fade()
                         vis  = VisCls()   # re-init with new dimensions
+                    elif event.key == pygame.K_h:
+                        show_hud = not show_hud
                     elif event.key == pygame.K_d:
                         devices  = _input_devices()   # refresh list
                         picking  = True
@@ -1134,12 +1138,13 @@ def main():
         vis.draw(screen, waveform, fft, beat, tick)
 
         # HUD
-        dev_name = (sd.query_devices(active_dev)["name"]
-                    if active_dev is not None else "default")
-        label = font.render(
-            f"  [{mode_idx+1}/{len(MODES)}] {name}  |  🎤 {dev_name}{hint}",
-            True, (90, 90, 90))
-        screen.blit(label, (6, 6))
+        if show_hud:
+            dev_name = (sd.query_devices(active_dev)["name"]
+                        if active_dev is not None else "default")
+            label = font.render(
+                f"  [{mode_idx+1}/{len(MODES)}] {name}  |  🎤 {dev_name}{hint}",
+                True, (90, 90, 90))
+            screen.blit(label, (6, 6))
 
         if picking:
             _draw_device_picker(screen, font, devices, pick_sel, active_dev)

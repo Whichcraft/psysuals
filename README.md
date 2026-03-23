@@ -46,6 +46,7 @@ python3 -m venv .venv
 | `0` | Jump to mode 10 (Waterfall) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
+| `H` | Toggle HUD / legend visibility |
 | `Q` / `Esc` | Quit |
 
 ## Selecting an audio input device
