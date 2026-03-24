@@ -11,6 +11,8 @@ Controls:
   Q / ESC         Quit
 """
 
+__version__ = "1.0.0"
+
 import math
 import random
 import colorsys
@@ -1054,7 +1056,7 @@ def main():
 
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
-    pygame.display.set_caption("Music Visualizer")
+    pygame.display.set_caption(f"psysuals v{__version__}")
     WIDTH, HEIGHT = screen.get_size()
     clock  = pygame.time.Clock()
     font   = pygame.font.SysFont("monospace", 16)
