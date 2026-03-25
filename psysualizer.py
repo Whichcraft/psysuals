@@ -33,22 +33,24 @@ WIDTH, HEIGHT = 1280, 720
 FPS           = 60
 
 # ── Shared audio state ───────────────────────────────────────────────────────
-_lock        = threading.Lock()
-_waveform    = np.zeros(BLOCK_SIZE)
-_smooth_fft  = np.zeros(BLOCK_SIZE // 2)
-_beat_energy = 0.0
+_lock           = threading.Lock()
+_waveform       = np.zeros(BLOCK_SIZE)
+_smooth_fft     = np.zeros(BLOCK_SIZE // 2)
+_beat_energy    = 0.0
+_hanning_window = np.hanning(BLOCK_SIZE)
 
 
 def _audio_cb(indata, frames, time, status):
     global _waveform, _smooth_fft, _beat_energy
     mono     = indata[:, 0]
-    windowed = mono * np.hanning(len(mono))
-    spectrum = np.abs(np.fft.rfft(windowed))[: BLOCK_SIZE // 2]
-    spectrum = np.log1p(spectrum) / 10.0
+    spectrum = np.abs(np.fft.rfft(mono * _hanning_window))[: BLOCK_SIZE // 2]
+    np.log1p(spectrum, out=spectrum)
+    spectrum /= 10.0
     with _lock:
         _waveform    = mono.copy()
-        _smooth_fft  = _smooth_fft * 0.75 + spectrum * 0.25
-        _beat_energy = float(np.mean(_smooth_fft[:20]))  # bass band
+        _smooth_fft *= 0.75
+        _smooth_fft += spectrum * 0.25
+        _beat_energy = float(_smooth_fft[:20].mean())  # bass band
 
 
 def get_audio():
@@ -61,6 +63,26 @@ def get_audio():
 def hsl(h, s=1.0, l=0.5):
     r, g, b = colorsys.hls_to_rgb(h % 1.0, max(0.0, min(l, 1.0)), s)
     return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def _hsl_batch(h, l, s=1.0):
+    """Vectorised HSL→RGB for numpy arrays; returns uint8 array of shape (..., 3)."""
+    h  = np.asarray(h, dtype=float) % 1.0
+    l  = np.clip(np.asarray(l, dtype=float), 0.0, 1.0)
+    c  = (1.0 - np.abs(2.0 * l - 1.0)) * s
+    h6 = h * 6.0
+    x  = c * (1.0 - np.abs(h6 % 2.0 - 1.0))
+    m  = l - c / 2.0
+    i  = h6.astype(np.int32) % 6
+    z  = np.zeros_like(h)
+    r  = np.select([i==0,i==1,i==2,i==3,i==4,i==5], [c,x,z,z,x,c]) + m
+    g  = np.select([i==0,i==1,i==2,i==3,i==4,i==5], [x,c,c,x,z,z]) + m
+    b  = np.select([i==0,i==1,i==2,i==3,i==4,i==5], [z,z,x,c,c,x]) + m
+    return np.stack([
+        np.clip(r * 255, 0, 255).astype(np.uint8),
+        np.clip(g * 255, 0, 255).astype(np.uint8),
+        np.clip(b * 255, 0, 255).astype(np.uint8),
+    ], axis=-1)
 
 
 # ── Visualisers ───────────────────────────────────────────────────────────────
@@ -340,10 +362,9 @@ class Bars:
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
         bar_w   = WIDTH // self.n
-        heights = np.array([
-            np.mean(fft[self.edges[i] : self.edges[i + 1]])
-            for i in range(self.n)
-        ])
+        sums    = np.add.reduceat(fft[:self.edges[-1]], self.edges[:-1])
+        heights = sums / np.maximum(np.diff(self.edges), 1).astype(float)
+        heights = heights[:self.n]
         heights /= (heights.max() + 1e-6)
         self.peaks = np.maximum(self.peaks * 0.97, heights)
 
@@ -424,12 +445,13 @@ class Nova:
                 # Alternate sectors are time-reversed for mirror continuity
                 w_slice   = wave if sym % 2 == 0 else wave[::-1]
                 angle_off = sym * sector + self.rot[i]
-                pts = []
-                for j, w in enumerate(w_slice):
-                    theta = j / len(w_slice) * sector + angle_off
-                    r_pt  = max(2.0, base_r + r_off + float(w) * amp)
-                    pts.append((int(cx + math.cos(theta) * r_pt),
-                                int(cy + math.sin(theta) * r_pt)))
+                n_w   = len(w_slice)
+                j_arr = np.arange(n_w, dtype=float)
+                theta = j_arr / n_w * sector + angle_off
+                r_pts = np.maximum(2.0, base_r + r_off + w_slice.astype(float) * amp)
+                xs    = np.round(cx + np.cos(theta) * r_pts).astype(int)
+                ys    = np.round(cy + np.sin(theta) * r_pts).astype(int)
+                pts   = list(zip(xs.tolist(), ys.tolist()))
                 if len(pts) > 1:
                     pygame.draw.lines(surf, hsl(h, l=bright), False, pts, lw)
 
@@ -682,34 +704,51 @@ class Lissajous:
         self.rx  += self.rvx
         self.ry  += self.rvy
 
-        s   = self.scale
-        raw = [self._proj_flat(*self._rot(px * s, py * s, pz * s))
-               for px, py, pz in self.hist]
-
-        cx, cy = WIDTH // 2, HEIGHT // 2
-        n = len(raw)
+        s  = self.scale
+        n  = len(self.hist)
         if n < 2:
             return
+
+        # Vectorised rotation + projection for all trail points
+        pts_3d = np.array(self.hist) * s           # (n, 3)
+        px_a, py_a, pz_a = pts_3d[:, 0], pts_3d[:, 1], pts_3d[:, 2]
+        cx_r, sx_r = math.cos(self.rx), math.sin(self.rx)
+        cy_r, sy_r = math.cos(self.ry), math.sin(self.ry)
+        y2   = py_a * cx_r - pz_a * sx_r
+        z2   = py_a * sx_r + pz_a * cx_r
+        x3   = px_a * cy_r + z2 * sy_r
+        z3   = -px_a * sy_r + z2 * cy_r
+        fov_l  = min(WIDTH, HEIGHT) * 0.40
+        zcam   = np.maximum(z3 + 2.8, 0.05)
+        raw_x  = x3 * fov_l / zcam
+        raw_y  = y2 * fov_l / zcam
+
+        cx, cy = WIDTH // 2, HEIGHT // 2
 
         # Glow pass constants: (line-width multiplier, l_tail, l_head)
         # Beat raises the bright-core brightness
         l1_bright = min(0.90 + beat * 0.08, 0.98)
         PASSES = [(4, 0.08, 0.22), (1, 0.50, l1_bright)]
 
+        t_arr = np.arange(n, dtype=float) / n
+        lw_base = (t_arr * 4).astype(int)
+
         for sym in range(self.N_SYM):
-            a     = sym / self.N_SYM * math.tau
+            a      = sym / self.N_SYM * math.tau
             ca, sa = math.cos(a), math.sin(a)
-            pts = [(int(cx + px * ca - py * sa),
-                    int(cy + px * sa + py * ca))
-                   for px, py in raw]
+            sx_arr = np.round(cx + raw_x * ca - raw_y * sa).astype(int)
+            sy_arr = np.round(cy + raw_x * sa + raw_y * ca).astype(int)
+            pts    = list(zip(sx_arr.tolist(), sy_arr.tolist()))
 
             for lw_mul, l0, l1 in PASSES:
+                h_arr  = (self.hue + sym / self.N_SYM * 0.33 + t_arr * 0.55) % 1.0
+                l_arr  = l0 + t_arr * (l1 - l0)
+                colors = _hsl_batch(h_arr, l_arr)      # (n, 3) uint8
+                lw_arr = np.maximum(1, lw_base * lw_mul)
                 for j in range(1, n):
-                    t  = j / n
-                    h  = (self.hue + sym / self.N_SYM * 0.33 + t * 0.55) % 1.0
-                    lw = max(1, int(t * 4 * lw_mul))
-                    pygame.draw.line(surf, hsl(h, l=l0 + t * (l1 - l0)),
-                                     pts[j - 1], pts[j], lw)
+                    pygame.draw.line(surf,
+                                     (int(colors[j, 0]), int(colors[j, 1]), int(colors[j, 2])),
+                                     pts[j - 1], pts[j], int(lw_arr[j]))
 
         # Bright head dot — radius and a white flash scale with beat
         hx, hy = raw[-1]
@@ -856,6 +895,7 @@ class Bubbles:
         self.pvel  = 0.0
         # Pre-populate bubbles scattered across the whole screen so it fills instantly
         self.pool = [self._make(y=random.uniform(0, HEIGHT)) for _ in range(400)]
+        self._surf_cache: dict = {}
 
     @staticmethod
     def _make(y=None):
@@ -870,6 +910,15 @@ class Bubbles:
             "wobble": random.uniform(0.025, 0.07),
             "phase":  random.uniform(0, math.tau),
         }
+
+    def _get_bsurf(self, size):
+        """Return a cleared SRCALPHA surface of (size×size), reusing cached instances."""
+        s = self._surf_cache.get(size)
+        if s is None:
+            s = pygame.Surface((size, size), pygame.SRCALPHA)
+            self._surf_cache[size] = s
+        s.fill((0, 0, 0, 0))
+        return s
 
     def _spawn(self, beat, bass):
         for _ in range(int(2 + beat * 12 + bass * 6)):
@@ -906,7 +955,7 @@ class Bubbles:
             r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.15)))
             pad   = r + 14
             alpha = int(life * 160)
-            bsurf = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+            bsurf = self._get_bsurf(pad * 2)
             cc = pad  # local centre
 
             # Multi-layer glow halos (outermost to innermost)
@@ -964,10 +1013,9 @@ class GlowSquares:
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003 + beat * 0.015
-        row = np.array([
-            float(np.mean(fft[self.edges[c]:self.edges[c + 1]]))
-            for c in range(self.cols)
-        ])
+        sums = np.add.reduceat(fft[:self.edges[-1]], self.edges[:-1])
+        row  = sums / np.maximum(np.diff(self.edges), 1).astype(float)
+        row  = row[:self.cols]
         row /= (row.max() + 1e-6)
         self.buf.appendleft(row)
 
@@ -1068,15 +1116,17 @@ def main():
         channels=CHANNELS, device=active_dev, callback=_audio_cb)
     stream.start()
 
-    mode_idx      = 0
-    name, VisCls  = MODES[mode_idx]
-    vis           = VisCls()
-    fullscreen    = True
-    tick          = 0
-    energy_hist   = deque(maxlen=30)
-    picking       = False      # device-picker overlay open?
-    pick_sel      = 0          # highlighted row in picker
-    show_hud      = True       # H toggles HUD visibility
+    mode_idx       = 0
+    name, VisCls   = MODES[mode_idx]
+    vis            = VisCls()
+    fullscreen     = True
+    tick           = 0
+    energy_hist    = deque(maxlen=30)
+    energy_sum     = 0.0
+    dev_name_cache = {None: "default"}
+    picking        = False      # device-picker overlay open?
+    pick_sel       = 0          # highlighted row in picker
+    show_hud       = True       # H toggles HUD visibility
 
     def make_fade():
         s = pygame.Surface((WIDTH, HEIGHT))
@@ -1155,8 +1205,11 @@ def main():
                 name, VisCls = MODES[mode_idx]; vis = VisCls()
 
         waveform, fft, raw_beat = get_audio()
+        if len(energy_hist) == energy_hist.maxlen:
+            energy_sum -= energy_hist[0]
         energy_hist.append(raw_beat)
-        avg  = float(np.mean(energy_hist)) if energy_hist else 1e-6
+        energy_sum += raw_beat
+        avg  = energy_sum / len(energy_hist) if energy_hist else 1e-6
         beat = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
 
         screen.blit(fade, (0, 0))
@@ -1164,8 +1217,9 @@ def main():
 
         # HUD
         if show_hud:
-            dev_name = (sd.query_devices(active_dev)["name"]
-                        if active_dev is not None else "default")
+            if active_dev not in dev_name_cache:
+                dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
+            dev_name = dev_name_cache[active_dev]
             label = font.render(
                 f"  [{mode_idx+1}/{len(MODES)}] {name}  |  🎤 {dev_name}{hint}",
                 True, (90, 90, 90))
