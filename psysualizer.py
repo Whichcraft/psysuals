@@ -11,7 +11,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 import math
 import random
@@ -1127,6 +1127,7 @@ def main():
     picking        = False      # device-picker overlay open?
     pick_sel       = 0          # highlighted row in picker
     show_hud       = True       # H toggles HUD visibility
+    effect_gain    = 1.0        # ↑/↓ adjust beat-response intensity
 
     def make_fade():
         s = pygame.Surface((WIDTH, HEIGHT))
@@ -1136,7 +1137,7 @@ def main():
 
     fade = make_fade()
 
-    hint = ("  SPACE/click: next mode  |  1-{n}: pick mode  "
+    hint = ("  ←/→: prev/next mode  |  ↑/↓: effect intensity  |  1-{n}: pick mode  "
             "|  D: device  |  F: fullscreen  |  H: hide HUD  |  Q: quit").format(n=len(MODES))
 
     while True:
@@ -1172,9 +1173,16 @@ def main():
                     if event.key in (pygame.K_q, pygame.K_ESCAPE):
                         stream.stop(); stream.close()
                         pygame.quit(); return
-                    elif event.key == pygame.K_SPACE:
+                    elif event.key in (pygame.K_SPACE, pygame.K_RIGHT):
                         mode_idx = (mode_idx + 1) % len(MODES)
                         name, VisCls = MODES[mode_idx]; vis = VisCls()
+                    elif event.key == pygame.K_LEFT:
+                        mode_idx = (mode_idx - 1) % len(MODES)
+                        name, VisCls = MODES[mode_idx]; vis = VisCls()
+                    elif event.key == pygame.K_UP:
+                        effect_gain = min(2.0, round(effect_gain + 0.1, 1))
+                    elif event.key == pygame.K_DOWN:
+                        effect_gain = max(0.0, round(effect_gain - 0.1, 1))
                     elif event.key == pygame.K_f:
                         fullscreen = not fullscreen
                         flags  = pygame.FULLSCREEN if fullscreen else 0
@@ -1213,7 +1221,7 @@ def main():
         beat = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
 
         screen.blit(fade, (0, 0))
-        vis.draw(screen, waveform, fft, beat, tick)
+        vis.draw(screen, waveform, fft, beat * effect_gain, tick)
 
         # HUD
         if show_hud:
@@ -1221,7 +1229,7 @@ def main():
                 dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
             dev_name = dev_name_cache[active_dev]
             label = font.render(
-                f"  [{mode_idx+1}/{len(MODES)}] {name}  |  🎤 {dev_name}{hint}",
+                f"  [{mode_idx+1}/{len(MODES)}] {name}  |  intensity: {effect_gain:.1f}  |  🎤 {dev_name}{hint}",
                 True, (90, 90, 90))
             screen.blit(label, (6, 6))
 

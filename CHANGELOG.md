@@ -5,6 +5,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] — 2026-03-25
+
+### Features
+- **Arrow-key navigation** — `←`/`→` scroll through visualisation modes; `↑`/`↓` increase/decrease effect intensity (beat-response gain, 0.0–2.0, default 1.0)
+- HUD now shows current effect intensity alongside mode name and device
+
+---
+
+## [1.1.0] — 2026-03-24
+
+### Performance
+- Vectorised hot paths; ~40% reduction in per-frame Python overhead
+
+---
+
 ## [1.0.0] — 2026-03-24
 
 First stable release. Ten visualisation modes, all tuned for psytrance (138–148 BPM).

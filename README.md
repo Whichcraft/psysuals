@@ -2,7 +2,7 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-1.0.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-1.2.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
@@ -45,7 +45,8 @@ python3 -m venv .venv
 
 | Key / Action | Effect |
 |---|---|
-| `Space` or click | Cycle to next mode |
+| `←` / `→` or `Space` or click | Cycle to previous / next mode |
+| `↑` / `↓` | Increase / decrease effect intensity (0.0 – 2.0, default 1.0) |
 | `1` – `9` | Jump to modes 1–9 |
 | `0` | Jump to mode 10 (Waterfall) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
