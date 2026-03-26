@@ -288,7 +288,6 @@ class Cube:
         self.svel     = 0.0
         self.rvx = self.rvy = self.rvz = 0.0
         self.orb_angle = 0.0   # orbital phase for satellite cubes
-        self.orb_vel   = 0.012 # orbital angular velocity
 
     @staticmethod
     def _Rx(a):
@@ -701,21 +700,6 @@ class Lissajous:
         self.scale = 1.0
         self.svel  = 0.0
 
-    def _rot(self, x, y, z):
-        cx, sx = math.cos(self.rx), math.sin(self.rx)
-        cy, sy = math.cos(self.ry), math.sin(self.ry)
-        y2 =  y * cx - z * sx
-        z2 =  y * sx + z * cx
-        x3 =  x * cy + z2 * sy
-        z3 = -x * sy + z2 * cy
-        return x3, y2, z3
-
-    def _proj_flat(self, x, y, z):
-        """Return (float, float) relative to centre — no rounding yet."""
-        fov  = min(WIDTH, HEIGHT) * 0.40
-        zcam = max(z + 2.8, 0.05)
-        return x * fov / zcam, y * fov / zcam
-
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.006
         bass = float(np.mean(fft[:6]))
@@ -920,10 +904,9 @@ class Yantra:
             y2  = int(cy + math.sin(a) * outer_r)
             h   = (self.hue + s / self.N_SPOKES * 0.35 + high * 0.2) % 1.0
             lw  = max(1, int(beat * 3.75))
-            if lw:
-                pygame.draw.line(surf,
-                                 hsl(h, l=0.18 + beat * 0.75 + high * 0.18),
-                                 (cx, cy), (x2, y2), lw)
+            pygame.draw.line(surf,
+                             hsl(h, l=0.18 + beat * 0.75 + high * 0.18),
+                             (cx, cy), (x2, y2), lw)
 
         # ── Central dot (reduced — was too dominant) ──────────────────────────
         cr = max(2, int(4 + bass * 12 + beat * 10))
@@ -980,7 +963,7 @@ class Bubbles:
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.005
-        bass = float(np.mean(fft[:8]))
+        bass = float(np.mean(fft[:6]))
         mid  = float(np.mean(fft[6:30]))
 
         # Global beat spring — kick hard, snap back fast
@@ -1241,6 +1224,7 @@ def main():
                         screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
                         WIDTH, HEIGHT = screen.get_size()
                         fade = make_fade()
+                        fade_alpha = -1   # force TRAIL_ALPHA rebuild on next frame
                         vis  = VisCls()   # re-init with new dimensions
                     elif event.key == pygame.K_h:
                         show_hud = not show_hud
