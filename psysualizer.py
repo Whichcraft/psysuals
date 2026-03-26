@@ -282,11 +282,13 @@ class Cube:
 
     def __init__(self):
         self.rx = self.ry = self.rz = 0.0
-        self.hue     = 0.0
+        self.hue      = 0.0
         self.fade_hue = 0.0   # slowly drifting base hue for colour fade
-        self.scale   = 1.0
-        self.svel    = 0.0
+        self.scale    = 1.0
+        self.svel     = 0.0
         self.rvx = self.rvy = self.rvz = 0.0
+        self.orb_angle = 0.0   # orbital phase for satellite cubes
+        self.orb_vel   = 0.012 # orbital angular velocity
 
     @staticmethod
     def _Rx(a):
@@ -307,6 +309,11 @@ class Cube:
         z = v[2] + 3.8
         return (int(v[0] * fov / z + WIDTH // 2),
                 int(v[1] * fov / z + HEIGHT // 2))
+
+    def _project_off(self, v, ox, oy, oz, fov=680):
+        z = v[2] + oz + 3.8
+        return (int((v[0] + ox) * fov / z + WIDTH // 2),
+                int((v[1] + oy) * fov / z + HEIGHT // 2))
 
     def draw(self, surf, waveform, fft, beat, tick):
         # Slow colour fade independent of beat
@@ -336,15 +343,34 @@ class Cube:
 
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
+        # ── Main centre cube (large + small inner) ────────────────────────────
         for base_scale, hue_off in ((self.scale, 0.0), (self.scale * 0.45, 0.5)):
             verts = (R @ (self.VERTS * base_scale).T).T
             proj  = [self._project(v) for v in verts]
             for ei, (a, b) in enumerate(self.EDGES):
-                # Colour fades slowly across the full spectrum; edges shift slightly
                 h     = (self.fade_hue + hue_off + ei / len(self.EDGES) * 0.4) % 1.0
                 lw    = max(1, int(2 + self.svel * 4)) if base_scale > 0.4 else 1
                 color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25)
                 pygame.draw.line(surf, color, proj[a], proj[b], lw)
+
+        # ── Orbiting satellite cubes ──────────────────────────────────────────
+        # Base count 2; grows with intensity (beat already carries effect_gain)
+        n_sats    = 2 + int(min(beat, 2.0) * 2)   # 2 … 6
+        sat_scale = self.scale * 0.28
+        ORB_R     = 2.6                            # orbital radius (3-D units)
+        self.orb_angle += 0.012 + beat * 0.04
+
+        for si in range(n_sats):
+            theta = self.orb_angle + si / n_sats * math.tau
+            ox    = ORB_R * math.cos(theta)
+            oy    = ORB_R * math.sin(theta)
+            verts = (R @ (self.VERTS * sat_scale).T).T
+            proj  = [self._project_off(v, ox, oy, 0.0) for v in verts]
+            h_off = si / n_sats * 0.6
+            for ei, (a, b) in enumerate(self.EDGES):
+                h     = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0
+                color = hsl(h, l=0.38 + min(self.svel, 1.0) * 0.20)
+                pygame.draw.line(surf, color, proj[a], proj[b], 1)
 
 
 class Bars:
