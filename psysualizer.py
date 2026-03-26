@@ -799,7 +799,7 @@ class Lissajous:
                                      pts[j - 1], pts[j], int(lw_arr[j]))
 
         # Bright head dot — radius and a white flash scale with beat
-        hx, hy = raw[-1]
+        hx, hy = raw_x[-1], raw_y[-1]
         for sym in range(self.N_SYM):
             a      = sym / self.N_SYM * math.tau
             ca, sa = math.cos(a), math.sin(a)
