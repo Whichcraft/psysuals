@@ -11,7 +11,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import math
 import random
@@ -48,8 +48,8 @@ def _audio_cb(indata, frames, time, status):
     spectrum /= 10.0
     with _lock:
         _waveform    = mono.copy()
-        _smooth_fft *= 0.75
-        _smooth_fft += spectrum * 0.25
+        _smooth_fft *= 0.50
+        _smooth_fft += spectrum * 0.50
         _beat_energy = float(_smooth_fft[:20].mean())  # bass band
 
 
@@ -245,7 +245,7 @@ class Plasma:
         mid  = float(np.mean(fft[6:30]))
         high = float(np.mean(fft[30:]))
 
-        self.time += 0.045 + bass * 0.09 + beat * 0.14
+        self.time += 0.018 + bass * 0.09 + beat * 0.14
 
         # Frequency modulation — mid pushes waves tighter
         fm = 1.0 + mid * 0.7
@@ -270,6 +270,8 @@ class Plasma:
 
 class Cube:
     """Dual rotating wireframe cubes — each axis driven by a different band."""
+
+    TRAIL_ALPHA = 18   # slower fade → longer trails
 
     VERTS = np.array([
         [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
@@ -313,11 +315,11 @@ class Cube:
         mid  = min(float(np.mean(fft[5:25])), 1.0)
         high = min(float(np.mean(fft[25:])),  1.0)
 
-        # Slower rotation — gentler base speed, smaller beat kick
-        self.rvx += 0.001 + mid  * 0.012 + beat * 0.05
-        self.rvy += 0.0015 + bass * 0.015 + beat * 0.06
-        self.rvz += 0.0005 + high * 0.008 + beat * 0.025
-        # Heavy damping → stays slow, only kicks on strong beats
+        # Rotation — ~65% faster base spin, 2× beat kick
+        self.rvx += 0.00165 + mid  * 0.012 + beat * 0.10
+        self.rvy += 0.00248 + bass * 0.015 + beat * 0.12
+        self.rvz += 0.00083 + high * 0.008 + beat * 0.05
+        # Heavy damping → stays controlled, only kicks on strong beats
         self.rvx *= 0.94
         self.rvy *= 0.94
         self.rvz *= 0.94
@@ -325,8 +327,8 @@ class Cube:
         self.ry  += self.rvy
         self.rz  += self.rvz
 
-        # Gentler spring: smaller impulse, softer restore, heavier damping
-        self.svel  += beat * 0.32
+        # Scale pulse driven by both beat + bass
+        self.svel  += beat * 0.32 + bass * 0.20
         self.svel  += (1.0 - self.scale) * 0.18
         self.svel  *= 0.68
         self.scale += self.svel
@@ -357,7 +359,8 @@ class Bars:
         raw        = np.geomspace(2, int(n_bins * 0.85), 81).astype(int)
         self.edges = np.unique(np.clip(raw, 1, n_bins - 1))
         self.n     = len(self.edges) - 1   # actual bar count after dedup
-        self.peaks = np.zeros(self.n)
+        self.peaks   = np.zeros(self.n)
+        self.display = np.zeros(self.n)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.003
@@ -366,9 +369,12 @@ class Bars:
         heights = sums / np.maximum(np.diff(self.edges), 1).astype(float)
         heights = heights[:self.n]
         heights /= (heights.max() + 1e-6)
-        self.peaks = np.maximum(self.peaks * 0.97, heights)
+        # Smoothed display buffer: lerp speed scales with beat (0.25 silence → 1.0 full beat)
+        lerp = 0.25 + min(beat, 1.0) * 0.75
+        self.display = self.display * (1.0 - lerp) + heights * lerp
+        self.peaks = np.maximum(self.peaks * 0.97, self.display)
 
-        for i, h in enumerate(heights):
+        for i, h in enumerate(self.display):
             bar_h = int(h * HEIGHT * 0.82)
             peak  = int(self.peaks[i] * HEIGHT * 0.82)
             x     = i * bar_w
@@ -482,10 +488,26 @@ class Nova:
                 pygame.draw.polygon(surf, hsl(t_h, l=t_l),
                                     [tip, base_l, base_r], t_lw)
 
-        # Central pulse on beat
-        cr = max(2, int(10 + bass * 22 + beat * 40))
-        pygame.draw.circle(surf, hsl(self.hue, l=0.55 + beat * 0.35), (cx, cy), cr)
-        pygame.draw.circle(surf, (255, 255, 255), (cx, cy), max(1, cr // 4))
+        # Two counter-rotating rings of 3 triangles at the centre
+        for t_ring, (t_speed, t_r_frac, t_h_off) in enumerate(
+                [(0.025, 0.12, 0.0), (-0.017, 0.18, 0.45)]):
+            t_rot = self.time * t_speed
+            t_r   = max_r * t_r_frac * (1.0 + self.poff[0] * 0.35 + beat * 0.25)
+            t_h   = (self.hue + t_h_off) % 1.0
+            t_l   = 0.55 + bass * 0.25 + beat * 0.30
+            t_lw  = max(1, int(1 + beat * 2))
+            for sym in range(3):
+                a_mid   = sym / 3 * math.tau + t_rot
+                a_l     = a_mid - math.pi / 3 * 0.55
+                a_r     = a_mid + math.pi / 3 * 0.55
+                tip     = (int(cx + math.cos(a_mid) * t_r * 1.2),
+                           int(cy + math.sin(a_mid) * t_r * 1.2))
+                base_l  = (int(cx + math.cos(a_l)  * t_r * 0.8),
+                           int(cy + math.sin(a_l)  * t_r * 0.8))
+                base_r_ = (int(cx + math.cos(a_r)  * t_r * 0.8),
+                           int(cy + math.sin(a_r)  * t_r * 0.8))
+                pygame.draw.polygon(surf, hsl(t_h, l=t_l),
+                                    [tip, base_l, base_r_], t_lw)
 
 
 class Tunnel:
@@ -498,7 +520,7 @@ class Tunnel:
 
     N_RINGS = 30
     N_SIDES = 20
-    TUBE_R  = 2.0
+    TUBE_R  = 2.8
     Z_FAR   = 10.0
     Z_NEAR  = 0.18
 
@@ -514,8 +536,8 @@ class Tunnel:
         self.tris = []   # beat-spawned triangles flying toward camera
 
     def _path(self, t):
-        return (math.sin(t * 0.21) * 1.4,
-                math.cos(t * 0.16) * 1.0)
+        return (math.sin(t * 0.21) * 0.8,
+                math.cos(t * 0.16) * 0.6)
 
     def _proj(self, wx, wy, wz):
         fov = min(WIDTH, HEIGHT) * 0.75
@@ -529,21 +551,21 @@ class Tunnel:
         bass       = float(np.mean(fft[:6]))
         mid        = float(np.mean(fft[6:30]))
 
-        dt         = 0.05 + bass * 0.13 + beat * 0.28
+        dt         = 0.03 + bass * 0.09 + beat * 0.18
         self.time += dt
 
-        # Spawn triangles on beat
-        if beat > 0.5:
-            for _ in range(int(1 + beat * 2.5)):
-                z = self.Z_FAR * random.uniform(0.65, 0.95)
-                self.tris.append({
-                    "z":    z,
-                    "pt":   self.time + z,
-                    "rot":  random.uniform(0, math.tau),
-                    "rvel": random.choice([-1, 1]) * random.uniform(0.04, 0.12),
-                    "size": random.uniform(0.45, 1.1),
-                    "hue":  (self.hue + random.uniform(0, 0.5)) % 1.0,
-                })
+        # Spawn triangles — continuously driven by bass + beat
+        spawn_n = int(bass * 1.5 + (beat * 3.0 if beat > 0.3 else 0))
+        for _ in range(spawn_n):
+            z = self.Z_FAR * random.uniform(0.65, 0.95)
+            self.tris.append({
+                "z":    z,
+                "pt":   self.time + z,
+                "rot":  random.uniform(0, math.tau),
+                "rvel": random.choice([-1, 1]) * random.uniform(0.04, 0.12),
+                "size": random.uniform(0.45, 1.1) * (1.0 + bass * 1.5),
+                "hue":  (self.hue + random.uniform(0, 0.5)) % 1.0,
+            })
 
         for r in self.rings:
             r["z"] -= dt
@@ -624,7 +646,7 @@ class Tunnel:
             pygame.draw.polygon(surf, hsl(h, l=bright * 0.30), pts, lw + 4)
             pygame.draw.polygon(surf, hsl(h, l=bright),         pts, lw)
             live.append(tri)
-        self.tris = live[-80:]
+        self.tris = live[-120:]
 
 
 class Lissajous:
@@ -678,29 +700,29 @@ class Lissajous:
         ay = 2.0 + mid  * 1.3
         az = 5.0 + high * 1.3
 
-        self.dx += 0.001  + bass * 0.003
-        self.dz += 0.0008 + high * 0.002
+        self.dx += 0.0006 + bass * 0.002
+        self.dz += 0.0005 + high * 0.0013
 
-        self.t += 0.022 + beat * 0.06
+        self.t += 0.016 + beat * 0.04
         self.hist.append((math.sin(ax * self.t + self.dx),
                           math.sin(ay * self.t + self.dy),
                           math.sin(az * self.t + self.dz)))
 
-        # Beat scale burst — spring physics
-        self.svel  += beat * 0.55
-        self.svel  += (1.0 - self.scale) * 0.26
-        self.svel  *= 0.60
+        # Beat scale burst — calmer spring physics
+        self.svel  += beat * 0.30
+        self.svel  += (1.0 - self.scale) * 0.16
+        self.svel  *= 0.72
         self.scale += self.svel
         self.scale  = max(0.35, self.scale)
 
-        # Hue jump on beat — each kick shifts the palette
-        self.hue += beat * 0.12
+        # Hue jump on beat — reduced palette shift
+        self.hue += beat * 0.06
 
-        # 3-D rotation with stronger beat inertia
-        self.rvx += beat * 0.016 + 0.0002
-        self.rvy += beat * 0.019 + 0.0003
-        self.rvx *= 0.97
-        self.rvy *= 0.97
+        # 3-D rotation — reduced inertia
+        self.rvx += beat * 0.008 + 0.0001
+        self.rvy += beat * 0.010 + 0.00015
+        self.rvx *= 0.985
+        self.rvy *= 0.985
         self.rx  += self.rvx
         self.ry  += self.rvy
 
@@ -816,8 +838,8 @@ class Yantra:
         # ── Physics update ────────────────────────────────────────────────────
         for i in range(self.N_RINGS):
             e = min(bands[i], 1.0)
-            # Spring: beat kick pushes out, restore force pulls back
-            self.pvel[i] += beat * (0.24 + e * 0.12)
+            # Spring: beat kick pushes out, restore force pulls back (~1.5× beat reactivity)
+            self.pvel[i] += beat * (0.36 + e * 0.18)
             self.pvel[i] += -self.poff[i] * 0.22
             self.pvel[i] *= 0.65
             self.poff[i] += self.pvel[i]
@@ -851,7 +873,7 @@ class Yantra:
             e     = min(bands[i], 1.0)
             h     = (self.hue + i / self.N_RINGS * 0.55) % 1.0
             bright = 0.42 + e * 0.44
-            lw    = max(1, int(1 + e * 2.5 + beat * 1.5))
+            lw    = max(1, int(1 + e * 2.5 + beat * 2.25))
             ipts  = [(int(x), int(y)) for x, y in all_verts[i]]
             pygame.draw.polygon(surf, hsl(h, l=bright), ipts, lw)
             # Star: connect every vertex to the one two steps ahead
@@ -863,7 +885,7 @@ class Yantra:
                                      ipts[k], ipts[(k + step) % n], 1)
 
         # ── Radial spokes from centre ─────────────────────────────────────────
-        outer_r = max_r * (1.02 + beat * 0.18)
+        outer_r = max_r * (1.02 + beat * 0.27)
         for s in range(self.N_SPOKES):
             a   = s / self.N_SPOKES * math.tau + self.time * 0.22
             # Wiggle spokes with audio-driven sine
@@ -871,14 +893,14 @@ class Yantra:
             x2  = int(cx + math.cos(a) * outer_r)
             y2  = int(cy + math.sin(a) * outer_r)
             h   = (self.hue + s / self.N_SPOKES * 0.35 + high * 0.2) % 1.0
-            lw  = max(1, int(beat * 2.5))
+            lw  = max(1, int(beat * 3.75))
             if lw:
                 pygame.draw.line(surf,
-                                 hsl(h, l=0.18 + beat * 0.50 + high * 0.18),
+                                 hsl(h, l=0.18 + beat * 0.75 + high * 0.18),
                                  (cx, cy), (x2, y2), lw)
 
-        # ── Central bright circle that pulses with bass ───────────────────────
-        cr = max(2, int(8 + bass * 28 + beat * 20))
+        # ── Central dot (reduced — was too dominant) ──────────────────────────
+        cr = max(2, int(4 + bass * 12 + beat * 10))
         pygame.draw.circle(surf, hsl(self.hue, l=0.55 + beat * 0.35), (cx, cy), cr)
         pygame.draw.circle(surf, hsl((self.hue + 0.5) % 1.0, l=0.75),
                            (cx, cy), max(1, cr // 3))
@@ -894,7 +916,7 @@ class Bubbles:
         self.pulse = 0.0   # shared spring — all bubbles swell together on beat
         self.pvel  = 0.0
         # Pre-populate bubbles scattered across the whole screen so it fills instantly
-        self.pool = [self._make(y=random.uniform(0, HEIGHT)) for _ in range(400)]
+        self.pool = [self._make(y=random.uniform(0, HEIGHT)) for _ in range(200)]
         self._surf_cache: dict = {}
 
     @staticmethod
@@ -921,11 +943,13 @@ class Bubbles:
         return s
 
     def _spawn(self, beat, bass):
-        for _ in range(int(2 + beat * 12 + bass * 6)):
+        beat_sel = min(beat, 1.0)   # cap to prevent screen flooding at high intensity
+        hue_spread = 0.35 + beat_sel * 0.30   # wider hue spread at high intensity
+        for _ in range(int(2 + beat_sel * 12 + bass * 6)):
             b = self._make()
-            b["vy"]  *= (1 + beat * 0.8)
+            b["vy"]  *= (1 + beat_sel * 0.8)
             b["r"]   *= (1 + bass * 1.2)
-            b["hue"]  = (self.hue + random.uniform(0, 0.35)) % 1.0
+            b["hue"]  = (self.hue + random.uniform(0, hue_spread)) % 1.0
             self.pool.append(b)
 
     def draw(self, surf, waveform, fft, beat, tick):
@@ -978,8 +1002,8 @@ class Bubbles:
             hr = max(1, r // 3)
             pygame.draw.circle(bsurf, (255, 255, 255, int(alpha * 0.55)),
                                (cc - r // 3, cc - r // 3), hr)
-            # Beat flash: extra bright ring
-            if beat > 0.5:
+            # Beat flash: extra bright ring (only above-normal intensity)
+            if beat > 1.0:
                 flash_r = max(1, int(r * 1.4))
                 pygame.draw.circle(bsurf,
                                    (*hsl((b["hue"] + 0.25) % 1.0, l=0.88),
@@ -1031,11 +1055,10 @@ class GlowSquares:
             # Newest rows get the beat flash; it decays with age
             row_boost = flash * max(0.0, 1.0 - age * 6)
             for ci, e in enumerate(r):
-                if e < 0.02:
-                    continue
                 x   = ci * bw
                 hue = (self.hue + ci / self.cols * 0.75) % 1.0
                 lit = (1 - age * 0.7) * (0.2 + e * 0.8) + row_boost
+                lit = max(0.10, lit)   # minimum lightness floor — no black tiles
                 pygame.draw.rect(surf, hsl(hue, l=min(lit, 0.95)),
                                  (x, y, bw - 1, bh - 1))
 
@@ -1121,7 +1144,7 @@ def main():
     vis            = VisCls()
     fullscreen     = True
     tick           = 0
-    energy_hist    = deque(maxlen=30)
+    energy_hist    = deque(maxlen=15)
     energy_sum     = 0.0
     dev_name_cache = {None: "default"}
     picking        = False      # device-picker overlay open?
@@ -1129,13 +1152,14 @@ def main():
     show_hud       = True       # H toggles HUD visibility
     effect_gain    = 1.0        # ↑/↓ adjust beat-response intensity
 
-    def make_fade():
+    def make_fade(alpha=28):
         s = pygame.Surface((WIDTH, HEIGHT))
-        s.set_alpha(28)
+        s.set_alpha(alpha)
         s.fill((0, 0, 0))
         return s
 
-    fade = make_fade()
+    fade      = make_fade()
+    fade_alpha = 28
 
     hint = ("  ←/→: prev/next mode  |  ↑/↓: effect intensity  |  1-{n}: pick mode  "
             "|  D: device  |  F: fullscreen  |  H: hide HUD  |  Q: quit").format(n=len(MODES))
@@ -1176,9 +1200,11 @@ def main():
                     elif event.key in (pygame.K_SPACE, pygame.K_RIGHT):
                         mode_idx = (mode_idx + 1) % len(MODES)
                         name, VisCls = MODES[mode_idx]; vis = VisCls()
+                        fade_alpha = -1   # force fade rebuild on next frame
                     elif event.key == pygame.K_LEFT:
                         mode_idx = (mode_idx - 1) % len(MODES)
                         name, VisCls = MODES[mode_idx]; vis = VisCls()
+                        fade_alpha = -1
                     elif event.key == pygame.K_UP:
                         effect_gain = min(2.0, round(effect_gain + 0.1, 1))
                     elif event.key == pygame.K_DOWN:
@@ -1202,15 +1228,18 @@ def main():
                     elif event.key == pygame.K_0:
                         mode_idx = 9
                         name, VisCls = MODES[mode_idx]; vis = VisCls()
+                        fade_alpha = -1
                     else:
                         idx = event.key - pygame.K_1
                         if 0 <= idx < len(MODES):
                             mode_idx = idx
                             name, VisCls = MODES[mode_idx]; vis = VisCls()
+                            fade_alpha = -1
 
             elif event.type == pygame.MOUSEBUTTONDOWN and not picking:
                 mode_idx = (mode_idx + 1) % len(MODES)
                 name, VisCls = MODES[mode_idx]; vis = VisCls()
+                fade_alpha = -1
 
         waveform, fft, raw_beat = get_audio()
         if len(energy_hist) == energy_hist.maxlen:
@@ -1220,6 +1249,10 @@ def main():
         avg  = energy_sum / len(energy_hist) if energy_hist else 1e-6
         beat = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
 
+        new_alpha = getattr(vis, 'TRAIL_ALPHA', 28)
+        if new_alpha != fade_alpha:
+            fade_alpha = new_alpha
+            fade = make_fade(fade_alpha)
         screen.blit(fade, (0, 0))
         vis.draw(screen, waveform, fft, beat * effect_gain, tick)
 

@@ -5,6 +5,27 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-03-26
+
+Backport of tuning improvements from the AndroSaver fork.
+
+### Audio engine
+- FFT smoothing: 0.75 → 0.50 for faster audio reaction
+- Energy history window: 30 → 15 frames for snappier beat detection
+
+### Mode tuning
+- **Yantra** — ~1.5× beat reactivity on ring pulse, brightness, spoke reach, and opacity; centre dot substantially reduced
+- **Cube** — 2× beat reactivity on rotation; base spin ~65% faster; scale pulse driven by both beat + bass; longer trails (slower fade)
+- **Plasma** — idle time increment reduced ~60% for a slower, calmer default
+- **Tunnel** — default speed/reactivity reduced; path swing reduced; tube radius increased so viewer stays inside; triangle burst larger on bass hits; spawn count now continuous (bass + beat); triangle cap 80 → 120
+- **Lissajous** — across-the-board reactivity reduction: trace speed, phase drift, frequency drift, scale burst, rotation inertia, hue jump
+- **Nova** — replaced oversized centre circle with two counter-rotating rings of 3 triangles each; beat energy redistributed to rings and brightness
+- **Bubbles** — initial pool 400 → 200; beat spawn capped at 1.0 to prevent flooding; extra neon rings only appear at beat > 1.0; wider hue spread at high intensity
+- **Spectrum** — smoothed display buffer added; lerp speed scales 0.25 (silence) → 1.0 (full beat)
+- **Waterfall** — minimum lightness floor (no black tiles); removed low-energy skip (all bins always rendered)
+
+---
+
 ## [1.2.0] — 2026-03-25
 
 ### Features
