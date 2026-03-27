@@ -5,6 +5,7 @@ Real-time music visualizer — listens to audio input and renders animated visua
 ![Version](https://img.shields.io/badge/version-1.3.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
+See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
 
 ## Visualisation modes
 
