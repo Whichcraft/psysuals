@@ -82,9 +82,11 @@ class Branches:
         cx = config.WIDTH  // 2
         cy = config.HEIGHT // 2
 
-        # 0.45 = half of 90 % → tree spans 90 % of the smaller screen side
-        trunk = (min(config.WIDTH, config.HEIGHT) * 0.45
-                 * (1.0 + bass * 0.80 + beat * 0.50))
+        # Cap at 0.27 × smaller-side so cumulative branch reach (×1.7)
+        # never exceeds half the smaller screen dimension → always on screen.
+        # Base 0.22 fills ~75 % at rest; cap clamps peak to ~92 %.
+        sc    = min(config.WIDTH, config.HEIGHT)
+        trunk = min(sc * 0.22 * (1.0 + bass * 0.70 + beat * 0.45), sc * 0.27)
 
         # Extra arms on strong beats (up to +5)
         n_arms = self.BASE_ARMS + int(min(beat, 2.5) * 2.2)
