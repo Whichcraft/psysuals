@@ -5,6 +5,82 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.0] — 2026-04-01
+
+### Three spectacular new effects
+
+This is a landmark release. psysuals 2.0.0 ships three completely new visual effects that push the reactive experience to another level — each one a different flavour of audio-driven madness, each one impossible to look away from.
+
+#### TriFlux (key `3`)
+The wall is alive. An equilateral triangle mosaic fills the screen with wireframe tiles, their edges blazing with per-angle rainbow colour. On every bass kick, up to three tiles explode to the foreground — growing up to 8× their size, spinning, bouncing off screen edges — before springing back into perfect grid alignment. Two independent rainbow sweep waves wash across the whole wall at constantly changing angles. Every tile glows. Everything reacts. The grid breathes.
+
+Technical highlights: per-tile spring physics (scale + rotation + centroid position), vertex-level screen-edge bounce with velocity reflection, dual sweep layers at staggered positions and independent angles, interior-only activation with 1.5-tile-width margin, guaranteed 2.5–6 s active lifetime per tile, vertex coordinate clamping for SDL stability.
+
+#### Branches (←/→)
+Six neon lightning arms fractal-split from screen centre to depth 6, generating 64+ electric tips per arm. Every branch angle jitters live to the mid frequencies — the whole tree writhes with the music. Bass drives trunk length; strong beats fire extra arms and flood the screen with a brightness burst. The structure rotates slowly, never settling.
+
+Technical highlights: depth-6 recursive branching with Y-fork at trunk level, separate draw length for trunk segment (15% of length) while children receive full extent so the tree fills the screen, mid-driven per-branch angle jitter using overlapping sine functions, beat-flash decay envelope.
+
+#### Corridor (key `6`)
+A first-person ride through a neon rainbow tunnel of rounded-rectangle frames rushing toward the camera. The path curves sinusoidally. Beat flares the nearest frames and erupts a shower of sparks that streak toward you on their own independent trail layer — sparks always burn above the geometry, never buried behind it.
+
+Technical highlights: two-surface compositing (corridor layer fade α=28, spark layer fade α=10, blitted with `BLEND_ADD` for additive glow), perspective-correct rounded-rect frames, per-frame FFT bin brightness mapping.
+
+### All changes
+- **TriFlux**: activation on bass beat (`beat > 0.2 AND bass > 0.25`), max 3 simultaneous active tiles, random lifetime 2.5–6 s, spring-back grid alignment, bounce physics, dual rainbow sweeps
+- **TriFlux**: vertex SDL clamp ±16383, scale cap 12.0, `ACTIVE_LIFE_MIN` raised to 150 frames to guarantee 1 s of fully-expanded big-phase
+- **Mode order**: TriFlux on key `3`; Plasma moved to ←/→ only
+- **EFFECTS.md**: complete rewrite with correct section order and full TriFlux parameter table
+- **File**: `effects/attractor.py` → `effects/triflux.py`
+
+---
+
+## [1.6.5] — 2026-04-01
+
+### Changes
+- **TriFlux** — effect renamed from TriWall to TriFlux everywhere (class file `triflux.py`, mode name, docs)
+- **TriFlux** — activation now bass-beat triggered (`beat > 0.2 AND bass > 0.25`); max simultaneous active tiles raised 2 → 3
+- **TriFlux** — active lifetime is now random per activation: 1–6 s (`ACTIVE_LIFE_MIN=60`, `ACTIVE_LIFE_MAX=360`)
+- **TriFlux** — `MIN_LIFE` set to 60 frames (1 s); beats that fire while slots are full extend existing tiles' remaining life to at least `MIN_LIFE`
+- **TriFlux** — vertex coordinates clamped to ±16383 (SDL safe range) to prevent `TypeError: points must be number pairs` on extreme scale values; active tile scale capped at 12.0
+- **TriFlux** — two independent rainbow sweeps (vel 3.2 and 4.1 px/frame, staggered start) so at least one is crossing the screen at all times
+- **Mode order** — TriFlux on key `3`; Plasma moved to ←/→ only
+- **Docs** — EFFECTS.md fully rewritten with correct section order, updated TriFlux parameter table, all mode numbers corrected; README and project structure updated
+
+---
+
+## [1.6.4] — 2026-04-01
+
+### Changes
+- **TriFlux** — active tiles now bounce off screen edges: centroid velocity is reflected and the tile is pushed back inside when any vertex crosses a boundary; no vertex ever leaves the screen
+- **TriFlux** — rainbow sweep draw order fixed: sweep glow now renders before tile fill and rainbow edges so edges always show on top; sweep brightness raised
+
+---
+
+## [1.6.3] — 2026-04-01
+
+### Changes
+- **Effects order** — TriFlux moved to slot 3 (`3` key); Plasma moved to ←/→ only
+
+---
+
+## [1.6.2] — 2026-04-01
+
+### Changes
+- **TriFlux** — active tiles now drift their centroid toward screen centre while alive so even large bass-pulsed tiles (up to 8.5×) never clip the screen edges; on fallback the centroid springs back to its home grid position before the tile snaps in
+- Renamed `effects/attractor.py` → `effects/triflux.py`
+
+---
+
+## [1.6.1] — 2026-04-01
+
+### Changes
+- **TriFlux** — fallen-back tiles now spring their rotation to 0° so they snap back into grid alignment
+- **TriFlux** — rainbow sweep: a glowing wave at a random angle (left-to-right, diagonal, etc.) sweeps across all triangles continuously, cycling through the rainbow; picks a new angle each pass
+- **TriFlux** — active tiles pulse harder to bass: target scale raised from `4.5 + bass×1.8` to `4.5 + bass×4.0` (up to ~8.5× on strong bass beat); spring stiffness increased for snappier response
+
+---
+
 ## [1.6.0] — 2026-04-01
 
 ### Features
