@@ -73,12 +73,8 @@ class Branches:
         cx = config.WIDTH  // 2
         cy = config.HEIGHT // 2
 
-        # Each arm starts at a fixed inner radius from centre so there are
-        # no long lines cluttering the centre of the screen.
-        inner_r = min(config.WIDTH, config.HEIGHT) * 0.10
-
-        # Branch segment length: shorter base so tips reach the same extent
-        trunk = (min(config.WIDTH, config.HEIGHT) * 0.12
+        # Short trunk so the first split happens close to centre
+        trunk = (min(config.WIDTH, config.HEIGHT) * 0.10
                  * (1.0 + bass * 0.70 + beat * 0.40))
 
         # Extra arms on strong beats (up to +3)
@@ -90,9 +86,6 @@ class Branches:
         for i in range(n_arms):
             angle   = base_rot + i / n_arms * math.tau
             arm_hue = (self.hue + i / n_arms * 0.35) % 1.0
-            # Start point is inner_r pixels out from centre along the arm angle
-            sx = cx + math.cos(angle) * inner_r
-            sy = cy + math.sin(angle) * inner_r
-            self._branch(surf, sx, sy, angle, trunk,
+            self._branch(surf, cx, cy, angle, trunk,
                          self.MAX_DEPTH, arm_hue,
                          self.time, mid, high, self.beat_flash)
