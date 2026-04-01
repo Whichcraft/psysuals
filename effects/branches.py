@@ -38,7 +38,7 @@ class Branches:
                   + math.sin(time * 3.7 + angle * 2.1) * mid * 0.25)
 
         # Trunk segment drawn short; children still get full length
-        draw_len = length * 0.075 if depth == self.MAX_DEPTH else length
+        draw_len = length * 0.03 if depth == self.MAX_DEPTH else length
         ex = x + math.cos(angle + jitter) * draw_len
         ey = y + math.sin(angle + jitter) * draw_len
 
