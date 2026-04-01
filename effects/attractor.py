@@ -11,25 +11,28 @@ from .utils import hsl
 class Attractor:
     """Triangle mosaic wall.
 
-    All triangles are wireframe with rainbow edges.  Only 4-6 tiles are
-    filled with colour at any time; the set rotates slowly.  A small pool
-    of "active" tiles pops to the front (drawn last, scaled up), spins and
-    pulses to the music, then eases back into the wall.
+    All triangles are wireframe with rainbow edges.  4-6 tiles are filled
+    at any time.  On beats, a tile pops to the FRONT at 4-5× size, pulses
+    with bass, then after a fixed lifetime springs back into the grid.
+    Active tiles are drawn last (always on top) with a solid fill so
+    nothing shows through from behind.
     """
 
     TRAIL_ALPHA  = 28
     N_COLS       = 14
-    GAP          = 0.88   # normal draw size (leaves a visible border)
-    N_FILLED     = 5      # how many tiles have a colour fill at once
-    N_ACTIVE_MAX = 2      # max simultaneously active/front tiles
+    GAP          = 0.88
+    N_FILLED     = 5
+    N_ACTIVE_MAX = 2
+    ACTIVE_LIFE  = 200   # frames before tile starts falling back (~3 s at 60 fps)
 
     def __init__(self):
         self.hue        = 0.0
         self.tiles      = []
-        self.filled_ids = []   # indices of currently filled tiles
-        self.active_ids = []   # indices of currently active/front tiles
+        self.filled_ids = []
+        self.active_ids = []
         self._built     = False
-        self._swap_cd   = 0    # countdown to next filled-tile swap
+        self._swap_cd   = 0
+        self._auto_cd   = random.randint(180, 300)  # frames until next auto-activation
 
     # ------------------------------------------------------------------
     def _build_grid(self):
@@ -54,9 +57,9 @@ class Attractor:
                 ]
                 self.tiles.append(self._make_tile(dn))
 
-        # Seed initial filled set from on-screen tiles
-        on_screen = [i for i, t in enumerate(self.tiles) if self._on_screen(t)]
-        self.filled_ids = random.sample(on_screen, min(self.N_FILLED, len(on_screen)))
+        # Seed filled set — allow any tile whose centroid is near the screen
+        visible = self._visible_indices()
+        self.filled_ids = random.sample(visible, min(self.N_FILLED, len(visible)))
         self._built = True
 
     def _make_tile(self, verts):
@@ -67,16 +70,33 @@ class Attractor:
             "cx": cx,  "cy": cy,
             "hue":     random.random(),
             "hvel":    random.uniform(-0.0006, 0.0006),
-            "bright":  random.uniform(0.18, 0.42),
+            "bright":  random.uniform(0.20, 0.50),
             "rot":     0.0,
             "rot_vel": 0.0,
-            "scale":   1.0,          # 1.0 = resting; >1 = popped to front
+            "scale":   1.0,
             "svel":    0.0,
+            "life":    0,      # frames remaining as active; 0 = not active / falling back
         }
 
-    def _on_screen(self, tile):
+    def _visible_indices(self):
+        """Tiles whose centroid is within a half-tile margin of the screen."""
         W, H = config.WIDTH, config.HEIGHT
-        return 0 <= tile["cx"] < W and 0 <= tile["cy"] < H
+        tw = W / self.N_COLS
+        m  = tw
+        return [i for i, t in enumerate(self.tiles)
+                if -m <= t["cx"] < W + m and -m <= t["cy"] < H + m]
+
+    def _interior_indices(self):
+        """Tiles whose centroid is comfortably inside the screen (not edge tiles)."""
+        W, H  = config.WIDTH, config.HEIGHT
+        tw    = W / self.N_COLS
+        margin = tw * 1.5   # stay at least 1.5 tile-widths from each edge
+        return [i for i, t in enumerate(self.tiles)
+                if margin <= t["cx"] < W - margin and margin <= t["cy"] < H - margin]
+
+    def _any_on_screen(self, tile):
+        W, H = config.WIDTH, config.HEIGHT
+        return any(0 <= vx < W and 0 <= vy < H for vx, vy in tile["verts"])
 
     def _screen_verts(self, tile):
         cx, cy  = tile["cx"], tile["cy"]
@@ -88,10 +108,8 @@ class Attractor:
                 for vx, vy in tile["verts"]]
 
     def _rainbow_edges(self, surf, pts, lw=1):
-        """Draw each edge with its own rainbow hue based on its angle."""
         for i in range(3):
-            a = pts[i]
-            b = pts[(i + 1) % 3]
+            a = pts[i];  b = pts[(i + 1) % 3]
             angle = math.atan2(b[1] - a[1], b[0] - a[0])
             h = (self.hue * 2 + angle / math.tau + 0.5) % 1.0
             pygame.draw.line(surf, hsl(h, l=0.75), a, b, lw)
@@ -104,27 +122,39 @@ class Attractor:
         self.hue += 0.003
         bass = float(np.mean(fft[:6]))
         high = float(np.mean(fft[30:]))
-        mid  = float(np.mean(fft[6:30]))
 
-        # Slowly rotate which tiles are filled (swap one every ~90 frames)
+        # Slowly rotate filled set
         self._swap_cd -= 1
         if self._swap_cd <= 0:
             self._swap_cd = random.randint(70, 120)
-            on_screen = [i for i, t in enumerate(self.tiles) if self._on_screen(t)]
-            candidates = [i for i in on_screen if i not in self.filled_ids]
-            if candidates:
+            vis       = self._visible_indices()
+            candidates = [i for i in vis if i not in self.filled_ids]
+            if candidates and self.filled_ids:
                 self.filled_ids[random.randrange(len(self.filled_ids))] = random.choice(candidates)
 
-        # On beat, activate a tile to pop to front — keep pool small
+        # On beat, pop a new interior tile to front
         if beat > 0.5 and len(self.active_ids) < self.N_ACTIVE_MAX:
-            on_screen = [i for i, t in enumerate(self.tiles) if self._on_screen(t)]
-            candidates = [i for i in on_screen if i not in self.active_ids]
+            candidates = [i for i in self._interior_indices() if i not in self.active_ids]
             if candidates:
                 idx = random.choice(candidates)
                 self.active_ids.append(idx)
                 t = self.tiles[idx]
-                t["svel"]    = 0.6 + beat * 0.4       # burst toward front
-                t["rot_vel"] = random.choice([-1, 1]) * (0.06 + mid * 0.08)
+                t["life"]    = self.ACTIVE_LIFE
+                t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
+
+        # Periodically auto-activate 1-2 interior tiles regardless of beat
+        self._auto_cd -= 1
+        if self._auto_cd <= 0:
+            self._auto_cd = random.randint(180, 320)
+            n_new = random.randint(1, 2)
+            candidates = [i for i in self._interior_indices() if i not in self.active_ids]
+            random.shuffle(candidates)
+            for idx in candidates[:n_new]:
+                if len(self.active_ids) < self.N_ACTIVE_MAX + 2:  # allow up to +2 extra
+                    self.active_ids.append(idx)
+                    t = self.tiles[idx]
+                    t["life"]    = self.ACTIVE_LIFE
+                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.03, 0.08)
 
         W, H = config.WIDTH, config.HEIGHT
 
@@ -135,54 +165,66 @@ class Attractor:
 
             tile["hue"] = (tile["hue"] + tile["hvel"] + 0.00015) % 1.0
 
-            # Ease scale back to 1.0
-            tile["scale"] += (1.0 - tile["scale"]) * 0.08
+            # Spring back to scale=1.0 (in case it was previously active)
+            tile["svel"]  += (1.0 - tile["scale"]) * 0.15
+            tile["svel"]  *= 0.75
+            tile["scale"] += tile["svel"]
+            tile["rot"]   += tile["rot_vel"]
+            tile["rot_vel"] *= 0.88
 
             pts = self._screen_verts(tile)
             if all(p[0] < 0 or p[0] >= W or p[1] < 0 or p[1] >= H for p in pts):
                 continue
 
-            # Filled tiles: colour fill
             if i in self.filled_ids:
                 h      = (tile["hue"] + self.hue) % 1.0
-                bright = min(tile["bright"] + bass * 0.22, 0.75)
+                bright = min(tile["bright"] + bass * 0.20, 0.72)
                 pygame.draw.polygon(surf, hsl(h, l=bright), pts)
 
-            # All tiles: rainbow wireframe
             self._rainbow_edges(surf, pts)
 
-        # ── Pass 2: active tiles — drawn on top, popped to front ────────────
+        # ── Pass 2: active tiles — on top, way bigger, bass-pulsing ─────────
         finished = []
         for i in self.active_ids:
             tile = self.tiles[i]
             tile["hue"] = (tile["hue"] + tile["hvel"] + 0.00015) % 1.0
 
-            # Spring toward scale 1.0 once the burst decays
-            tile["svel"]  += (1.0 - tile["scale"]) * 0.12
-            tile["svel"]  *= 0.80
-            tile["scale"] += tile["svel"]
-            tile["scale"]  = max(0.5, tile["scale"])
+            if tile["life"] > 0:
+                # Still alive: hold at large scale, pulse with bass
+                tile["life"] -= 1
+                target         = 4.5 + bass * 1.8     # 4.5-6x normal, breathing with bass
+                tile["svel"]  += (target - tile["scale"]) * 0.18
+                tile["svel"]  *= 0.72
+                tile["scale"] += tile["svel"]
+                tile["rot"]   += tile["rot_vel"]
+                # Bass reinforces spin
+                tile["rot_vel"] += bass * 0.012 * math.copysign(1, tile["rot_vel"] or 1)
+                tile["rot_vel"] *= 0.96
+            else:
+                # Life expired: spring back to rest
+                tile["svel"]  += (1.0 - tile["scale"]) * 0.12
+                tile["svel"]  *= 0.78
+                tile["scale"] += tile["svel"]
+                tile["rot"]   += tile["rot_vel"]
+                tile["rot_vel"] *= 0.90
 
-            tile["rot"]     += tile["rot_vel"]
-            tile["rot_vel"] *= 0.94
-            # Pulse rotation with bass
-            tile["rot_vel"] += bass * 0.015 * math.copysign(1, tile["rot_vel"] or 1)
+                if abs(tile["scale"] - 1.0) < 0.03 and abs(tile["rot_vel"]) < 0.004:
+                    tile["scale"]   = 1.0
+                    tile["rot_vel"] = 0.0
+                    tile["svel"]    = 0.0
+                    finished.append(i)
 
             pts = self._screen_verts(tile)
 
             h      = (tile["hue"] + self.hue) % 1.0
-            bright = min(tile["bright"] + bass * 0.35 + 0.20, 0.90)
+            bright = min(tile["bright"] + bass * 0.40 + 0.25, 0.92)
 
-            # Glow halo
-            pygame.draw.polygon(surf, hsl(h, l=bright * 0.35), pts)
-            pygame.draw.polygon(surf, hsl(h, l=bright),         pts)
-            self._rainbow_edges(surf, pts, lw=2)
-
-            # Return to pool when close to resting
-            if abs(tile["scale"] - 1.0) < 0.02 and abs(tile["rot_vel"]) < 0.005:
-                tile["scale"] = 1.0
-                tile["rot_vel"] = 0.0
-                finished.append(i)
+            # Solid black backing so nothing bleeds through
+            pygame.draw.polygon(surf, (0, 0, 0), pts)
+            # Colour fill
+            pygame.draw.polygon(surf, hsl(h, l=bright), pts)
+            # Bold rainbow edges on top
+            self._rainbow_edges(surf, pts, lw=3)
 
         for i in finished:
             self.active_ids.remove(i)
