@@ -24,7 +24,7 @@ class Attractor:
     N_FILLED     = 5
     N_ACTIVE_MAX = 2
     ACTIVE_LIFE  = 360   # frames before tile starts falling back (~6 s at 60 fps)
-    MIN_LIFE     = 180   # minimum frames a tile stays enlarged before falling back
+    MIN_LIFE     = 60    # minimum frames a tile stays enlarged before falling back (~1 s at 60 fps)
 
     def __init__(self):
         self.hue        = 0.0
