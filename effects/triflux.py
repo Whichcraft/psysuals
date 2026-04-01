@@ -111,8 +111,9 @@ class Attractor:
         s       = self.GAP * tile["scale"]
         cos_r   = math.cos(tile["rot"])
         sin_r   = math.sin(tile["rot"])
-        return [(int(cx + ((vx - cx) * s) * cos_r - ((vy - cy) * s) * sin_r),
-                 int(cy + ((vx - cx) * s) * sin_r + ((vy - cy) * s) * cos_r))
+        _C = 16383  # safe pygame/SDL coordinate limit
+        return [(max(-_C, min(_C, int(cx + ((vx - cx) * s) * cos_r - ((vy - cy) * s) * sin_r))),
+                 max(-_C, min(_C, int(cy + ((vx - cx) * s) * sin_r + ((vy - cy) * s) * cos_r))))
                 for vx, vy in tile["verts"]]
 
     def _rainbow_edges(self, surf, pts, lw=1):
@@ -228,7 +229,7 @@ class Attractor:
                 target         = 4.5 + bass * 4.0     # up to ~8.5x on strong bass beat
                 tile["svel"]  += (target - tile["scale"]) * 0.22
                 tile["svel"]  *= 0.70
-                tile["scale"] += tile["svel"]
+                tile["scale"]  = min(tile["scale"] + tile["svel"], 12.0)
                 tile["rot"]   += tile["rot_vel"]
                 # Bass reinforces spin
                 tile["rot_vel"] += bass * 0.016 * math.copysign(1, tile["rot_vel"] or 1)
