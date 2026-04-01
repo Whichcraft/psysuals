@@ -2,10 +2,21 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-1.6.5-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.0.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.0.0 — three stunning new effects
+
+### TriFlux
+The wall is alive. An equilateral triangle mosaic fills the screen with wireframe tiles, their edges blazing with per-angle rainbow colour. On every bass kick up to three tiles explode to the foreground — growing up to 8× their size, spinning, pulsing with the music, bouncing off screen edges — before springing back into perfect grid alignment. Two independent rainbow sweep waves constantly wash across the whole wall at shifting angles, bathing every tile in flowing colour. Nothing sits still. Everything reacts.
+
+### Branches
+Six neon lightning arms fire from the centre of the screen and fractal-split to depth 6, growing 64+ electric tips per arm. Every single branch angle jitters live to the mid frequencies — the whole tree writhes organically with the music. Bass drives the trunk length; strong beats fire extra arms and flood the screen with a brightness burst. The entire structure rotates slowly, never repeating the same shape twice.
+
+### Corridor
+A first-person ride through a glowing neon tunnel of rainbow rounded-rectangle frames that rush toward you and stretch to infinity. The path curves sinusoidally, pulling you through sweeping bends. Beat flares the nearest frames white-hot and erupts a shower of glowing sparks that streak toward the camera on their own independent trail layer — sparks always burn above the geometry, never buried behind it.
 
 ## Visualisation modes
 
