@@ -2,7 +2,7 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-1.3.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-1.4.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
@@ -16,11 +16,12 @@ See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their p
 | 3 | **Plasma** | Full-screen sine-interference plasma — four overlapping wave fields create a flowing psychedelic texture; bass shifts the palette, beat flashes the whole screen |
 | 4 | **Tunnel** | First-person ride through a curving tube — neon glow rings, rotating inner polygon (3–6 sides) per ring, full rainbow sweep across depth, beat flares nearest rings and spawns triangles that fly toward the camera |
 | 5 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot with 3-fold symmetry, two-pass neon glow; beat explodes scale (0.55 impulse), jumps the hue palette, cranks head-dot radius, and draws extra glow halos |
-| 6 | **Nova** | Waveform kaleidoscope — audio waveform mapped to polar sectors with 7-fold mirror symmetry across 4 spinning layers; each layer reacts to a different band, beat explodes all outward |
-| 7 | **Spiral** | Neon helix vortex — 6 arms fly toward the viewer with audio-reactive radius breathing and two-pass neon glow; cross-ring polygons connect arms at every depth interval; beat spring explodes the structure outward and jumps the palette |
-| 8 | **Bubbles** | Translucent rising bubbles filling the full screen — size and spawn rate driven by bass |
-| 9 | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
-| 10 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
+| 6 | **Corridor** | First-person ride through a neon rainbow corridor — concentric rounded-rectangle frames fly toward the camera with a full rainbow sweep across depth; beat flares nearest frames and spawns glowing sparks |
+| 7 | **Nova** | Waveform kaleidoscope — audio waveform mapped to polar sectors with 7-fold mirror symmetry across 4 spinning layers; each layer reacts to a different band, beat explodes all outward |
+| 8 | **Spiral** | Neon helix vortex — 6 arms fly toward the viewer with audio-reactive radius breathing and two-pass neon glow; cross-ring polygons connect arms at every depth interval; beat spring explodes the structure outward and jumps the palette |
+| 9 | **Bubbles** | Translucent rising bubbles filling the full screen — size and spawn rate driven by bass |
+| 10 | **Spectrum** (`0`) | Log-spaced spectrum analyser with peak markers and a waveform overlay |
+| 11 | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge (arrow-key navigation) |
 
 ## Requirements
 
@@ -80,10 +81,29 @@ Then press `D` in-app and select it from the list.
 
 ```
 psysuals/
-├── psysualizer.py   # Main app — all visualisers and audio pipeline
+├── psysualizer.py       # Entry point — audio pipeline and main loop
+├── config.py            # Shared mutable state (WIDTH, HEIGHT, FPS, audio constants)
+├── effects/
+│   ├── __init__.py      # MODES list and package re-exports
+│   ├── utils.py         # Shared colour helpers: hsl(), _hsl_batch()
+│   ├── yantra.py        # Yantra effect
+│   ├── cube.py          # Cube effect
+│   ├── plasma.py        # Plasma effect
+│   ├── tunnel.py        # Tunnel effect
+│   ├── lissajous.py     # Lissajous effect
+│   ├── corridor.py      # Corridor effect
+│   ├── nova.py          # Nova effect
+│   ├── spiral.py        # Spiral effect
+│   ├── bubbles.py       # Bubbles effect
+│   ├── spectrum.py      # Spectrum (Bars) effect
+│   └── waterfall.py     # Waterfall effect
+├── ARCHITECTURE.md      # Code structure and extension guide
+├── EFFECTS.md           # Full parameter reference for all effects
 ├── requirements.txt
 └── README.md
 ```
+
+To add a new effect: create `effects/youreffect.py` with a class implementing `draw(surf, waveform, fft, beat, tick)`, then add it to `MODES` in `effects/__init__.py`.
 
 ## License
 

@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — 2026-04-01
+
+### Features
+- **Corridor** (mode 6) — first-person neon rainbow corridor; concentric rounded-rectangle frames fly toward the camera with a full rainbow sweep across depth; beat flares nearest frames and spawns glowing sparks; path curves gently over time
+
+### Refactor
+- Modularised codebase: `psysualizer.py` reduced from 1383 → 245 lines; each effect moved to its own file under `effects/`; shared colour helpers extracted to `effects/utils.py`; display constants live in `config.py`
+- Added `ARCHITECTURE.md` documenting code structure and the effect extension pattern
+
+---
+
 ## [1.3.0] — 2026-03-26
 
 Backport of tuning improvements from the AndroSaver fork.
