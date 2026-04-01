@@ -15,7 +15,7 @@ from .waterfall import GlowSquares
 MODES = [
     ("Yantra",      Yantra),      # 1
     ("Cube",        Cube),        # 2
-    ("TriWall",     Attractor),   # 3
+    ("TriFlux",     Attractor),   # 3
     ("Lissajous",   Lissajous),   # 4
     ("Tunnel",      Tunnel),      # 5
     ("Corridor",    Corridor),    # 6

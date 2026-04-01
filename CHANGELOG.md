@@ -5,25 +5,39 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.5] — 2026-04-01
+
+### Changes
+- **TriFlux** — effect renamed from TriWall to TriFlux everywhere (class file `triflux.py`, mode name, docs)
+- **TriFlux** — activation now bass-beat triggered (`beat > 0.2 AND bass > 0.25`); max simultaneous active tiles raised 2 → 3
+- **TriFlux** — active lifetime is now random per activation: 1–6 s (`ACTIVE_LIFE_MIN=60`, `ACTIVE_LIFE_MAX=360`)
+- **TriFlux** — `MIN_LIFE` set to 60 frames (1 s); beats that fire while slots are full extend existing tiles' remaining life to at least `MIN_LIFE`
+- **TriFlux** — vertex coordinates clamped to ±16383 (SDL safe range) to prevent `TypeError: points must be number pairs` on extreme scale values; active tile scale capped at 12.0
+- **TriFlux** — two independent rainbow sweeps (vel 3.2 and 4.1 px/frame, staggered start) so at least one is crossing the screen at all times
+- **Mode order** — TriFlux on key `3`; Plasma moved to ←/→ only
+- **Docs** — EFFECTS.md fully rewritten with correct section order, updated TriFlux parameter table, all mode numbers corrected; README and project structure updated
+
+---
+
 ## [1.6.4] — 2026-04-01
 
 ### Changes
-- **TriWall** — active tiles now bounce off screen edges: centroid velocity is reflected and the tile is pushed back inside when any vertex crosses a boundary; no vertex ever leaves the screen
-- **TriWall** — rainbow sweep draw order fixed: sweep glow now renders before tile fill and rainbow edges so edges always show on top; sweep brightness raised
+- **TriFlux** — active tiles now bounce off screen edges: centroid velocity is reflected and the tile is pushed back inside when any vertex crosses a boundary; no vertex ever leaves the screen
+- **TriFlux** — rainbow sweep draw order fixed: sweep glow now renders before tile fill and rainbow edges so edges always show on top; sweep brightness raised
 
 ---
 
 ## [1.6.3] — 2026-04-01
 
 ### Changes
-- **Effects order** — TriWall moved to slot 3 (`3` key); Plasma moved to ←/→ only
+- **Effects order** — TriFlux moved to slot 3 (`3` key); Plasma moved to ←/→ only
 
 ---
 
 ## [1.6.2] — 2026-04-01
 
 ### Changes
-- **TriWall** — active tiles now drift their centroid toward screen centre while alive so even large bass-pulsed tiles (up to 8.5×) never clip the screen edges; on fallback the centroid springs back to its home grid position before the tile snaps in
+- **TriFlux** — active tiles now drift their centroid toward screen centre while alive so even large bass-pulsed tiles (up to 8.5×) never clip the screen edges; on fallback the centroid springs back to its home grid position before the tile snaps in
 - Renamed `effects/attractor.py` → `effects/triflux.py`
 
 ---
@@ -31,9 +45,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [1.6.1] — 2026-04-01
 
 ### Changes
-- **TriWall** — fallen-back tiles now spring their rotation to 0° so they snap back into grid alignment
-- **TriWall** — rainbow sweep: a glowing wave at a random angle (left-to-right, diagonal, etc.) sweeps across all triangles continuously, cycling through the rainbow; picks a new angle each pass
-- **TriWall** — active tiles pulse harder to bass: target scale raised from `4.5 + bass×1.8` to `4.5 + bass×4.0` (up to ~8.5× on strong bass beat); spring stiffness increased for snappier response
+- **TriFlux** — fallen-back tiles now spring their rotation to 0° so they snap back into grid alignment
+- **TriFlux** — rainbow sweep: a glowing wave at a random angle (left-to-right, diagonal, etc.) sweeps across all triangles continuously, cycling through the rainbow; picks a new angle each pass
+- **TriFlux** — active tiles pulse harder to bass: target scale raised from `4.5 + bass×1.8` to `4.5 + bass×4.0` (up to ~8.5× on strong bass beat); spring stiffness increased for snappier response
 
 ---
 

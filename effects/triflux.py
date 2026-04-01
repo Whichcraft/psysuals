@@ -24,7 +24,7 @@ class Attractor:
     N_FILLED     = 5
     N_ACTIVE_MAX = 3
     ACTIVE_LIFE_MIN = 60   # 1 s — guaranteed minimum time big and in foreground
-    ACTIVE_LIFE_MAX = 240  # 4 s — maximum random lifetime
+    ACTIVE_LIFE_MAX = 360  # 6 s — maximum random lifetime
     MIN_LIFE        = 60   # minimum remaining life when extended by a beat
 
     def __init__(self):
