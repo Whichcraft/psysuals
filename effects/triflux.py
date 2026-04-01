@@ -42,7 +42,7 @@ class Attractor:
             {"pos": 600.0, "angle": random.uniform(0, math.tau), "vel": 4.1},
         ]
         self._sweep_width = 90.0         # half-width of each sweep band
-        self._sweep_diag  = 0.0          # set on build
+        self._sweep_diag  = 0.0          # set on build (screen diagonal)
 
     # ------------------------------------------------------------------
     def _build_grid(self):
@@ -73,6 +73,17 @@ class Attractor:
         self._built = True
         # Screen diagonal for sweep wrap-around
         self._sweep_diag = math.hypot(config.WIDTH, config.HEIGHT)
+        # Initialise sweep positions at the true screen edge for each angle
+        for idx, sw in enumerate(self._sweeps):
+            mn, mx = self._sweep_edge_range(sw["angle"])
+            sw["pos"] = mn - self._sweep_width + idx * (mx - mn + self._sweep_width) * 0.5
+
+    def _sweep_edge_range(self, angle):
+        """Return (min_proj, max_proj) of screen corners onto sweep direction."""
+        W, H = config.WIDTH, config.HEIGHT
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        projs = [x * cos_a + y * sin_a for x, y in ((0,0),(W,0),(0,H),(W,H))]
+        return min(projs), max(projs)
 
     def _make_tile(self, verts):
         cx = sum(v[0] for v in verts) / 3
@@ -184,9 +195,11 @@ class Attractor:
         # ── Advance both sweeps ──────────────────────────────────────────────
         for sw in self._sweeps:
             sw["pos"] += sw["vel"]
-            if sw["pos"] > self._sweep_diag + self._sweep_width:
-                sw["pos"]   = -self._sweep_width
+            mn, mx = self._sweep_edge_range(sw["angle"])
+            if sw["pos"] > mx + self._sweep_width:
                 sw["angle"] = random.uniform(0, math.tau)
+                mn2, _ = self._sweep_edge_range(sw["angle"])
+                sw["pos"] = mn2 - self._sweep_width
 
         # ── Pass 1: all non-active tiles ────────────────────────────────────
         for i, tile in enumerate(self.tiles):
