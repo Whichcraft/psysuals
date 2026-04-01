@@ -48,22 +48,27 @@ class Attractor:
     def _build_grid(self):
         tw = config.WIDTH  / self.N_COLS
         th = tw * math.sqrt(3) / 2
-        n_rows = int(config.HEIGHT / th) + 2
+        # Start one tile outside each edge so no clipped triangles appear at borders
+        n_cols_ext = self.N_COLS + 2   # one extra column each side
+        n_rows = int(config.HEIGHT / th) + 3  # one extra row each side
+        x0 = -tw
+        y0 = -th
 
         for r in range(n_rows):
-            y_top = r * th
+            y_top = y0 + r * th
             y_bot = y_top + th
-            for k in range(self.N_COLS + 1):
+            for k in range(n_cols_ext + 1):
+                x = x0 + k * tw
                 up = [
-                    (k * tw + tw / 2, y_top),
-                    (k * tw,          y_bot),
-                    ((k + 1) * tw,    y_bot),
+                    (x + tw / 2, y_top),
+                    (x,          y_bot),
+                    (x + tw,     y_bot),
                 ]
                 self.tiles.append(self._make_tile(up))
                 dn = [
-                    (k * tw + tw / 2,       y_top),
-                    ((k + 1) * tw + tw / 2, y_top),
-                    ((k + 1) * tw,          y_bot),
+                    (x + tw / 2,       y_top),
+                    (x + tw + tw / 2,  y_top),
+                    (x + tw,           y_bot),
                 ]
                 self.tiles.append(self._make_tile(dn))
 
