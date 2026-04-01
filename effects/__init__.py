@@ -7,7 +7,7 @@ from .corridor  import Corridor
 from .nova      import Nova
 from .spiral    import Spiral
 from .bubbles   import Bubbles
-from .attractor import Attractor
+from .triflux  import Attractor
 from .branches  import Branches
 from .spectrum  import Bars
 from .waterfall import GlowSquares

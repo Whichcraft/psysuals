@@ -149,6 +149,7 @@ class Attractor:
                 t = self.tiles[idx]
                 t["life"]    = self.ACTIVE_LIFE
                 t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
+                t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
 
         # Periodically auto-activate 1-2 interior tiles regardless of beat
         self._auto_cd -= 1
@@ -163,6 +164,7 @@ class Attractor:
                     t = self.tiles[idx]
                     t["life"]    = self.ACTIVE_LIFE
                     t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.03, 0.08)
+                    t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
 
         W, H = config.WIDTH, config.HEIGHT
 
@@ -228,20 +230,33 @@ class Attractor:
                 # Bass reinforces spin
                 tile["rot_vel"] += bass * 0.016 * math.copysign(1, tile["rot_vel"] or 1)
                 tile["rot_vel"] *= 0.96
+                # Drift centroid toward screen centre so large tile stays on screen
+                tile["cx"] += (W / 2 - tile["cx"]) * 0.018
+                tile["cy"] += (H / 2 - tile["cy"]) * 0.018
             else:
-                # Life expired: spring back to rest (scale → 1.0, rot → 0.0)
+                # Life expired: spring back to rest (scale → 1.0, rot → 0.0, pos → home)
                 tile["svel"]    += (1.0 - tile["scale"]) * 0.12
                 tile["svel"]    *= 0.78
                 tile["scale"]   += tile["svel"]
                 tile["rot_vel"] += (0.0 - tile["rot"]) * 0.06
                 tile["rot_vel"] *= 0.85
                 tile["rot"]     += tile["rot_vel"]
+                # Spring centroid back to its home grid position
+                home_cx = tile.get("home_cx", tile["cx"])
+                home_cy = tile.get("home_cy", tile["cy"])
+                tile["cx"] += (home_cx - tile["cx"]) * 0.10
+                tile["cy"] += (home_cy - tile["cy"]) * 0.10
 
-                if abs(tile["scale"] - 1.0) < 0.03 and abs(tile["rot"]) < 0.02 and abs(tile["rot_vel"]) < 0.003:
+                if (abs(tile["scale"] - 1.0) < 0.03 and abs(tile["rot"]) < 0.02
+                        and abs(tile["rot_vel"]) < 0.003
+                        and abs(tile["cx"] - home_cx) < 1.0
+                        and abs(tile["cy"] - home_cy) < 1.0):
                     tile["scale"]   = 1.0
                     tile["rot"]     = 0.0
                     tile["rot_vel"] = 0.0
                     tile["svel"]    = 0.0
+                    tile["cx"]      = home_cx
+                    tile["cy"]      = home_cy
                     finished.append(i)
 
             pts = self._screen_verts(tile)

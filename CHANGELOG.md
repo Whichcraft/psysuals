@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.2] — 2026-04-01
+
+### Changes
+- **TriWall** — active tiles now drift their centroid toward screen centre while alive so even large bass-pulsed tiles (up to 8.5×) never clip the screen edges; on fallback the centroid springs back to its home grid position before the tile snaps in
+- Renamed `effects/attractor.py` → `effects/triflux.py`
+
+---
+
 ## [1.6.1] — 2026-04-01
 
 ### Changes
