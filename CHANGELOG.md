@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.4] — 2026-04-01
+
+### Changes
+- **TriWall** — active tiles now bounce off screen edges: centroid velocity is reflected and the tile is pushed back inside when any vertex crosses a boundary; no vertex ever leaves the screen
+- **TriWall** — rainbow sweep draw order fixed: sweep glow now renders before tile fill and rainbow edges so edges always show on top; sweep brightness raised
+
+---
+
 ## [1.6.3] — 2026-04-01
 
 ### Changes

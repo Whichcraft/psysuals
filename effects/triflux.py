@@ -150,6 +150,7 @@ class Attractor:
                 t["life"]    = self.ACTIVE_LIFE
                 t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
                 t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
+                t["cvx"] = 0.0;         t["cvy"] = 0.0
 
         # Periodically auto-activate 1-2 interior tiles regardless of beat
         self._auto_cd -= 1
@@ -165,6 +166,7 @@ class Attractor:
                     t["life"]    = self.ACTIVE_LIFE
                     t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.03, 0.08)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
+                    t["cvx"] = 0.0;         t["cvy"] = 0.0
 
         W, H = config.WIDTH, config.HEIGHT
 
@@ -197,6 +199,15 @@ class Attractor:
             if all(p[0] < 0 or p[0] >= W or p[1] < 0 or p[1] >= H for p in pts):
                 continue
 
+            # Sweep glow — drawn first so tile fill and edges render on top
+            d    = tile["cx"] * sw_cos + tile["cy"] * sw_sin
+            dist = abs(d - self._sweep_pos)
+            if dist < self._sweep_width:
+                sw_t     = 1.0 - dist / self._sweep_width   # 1.0 at centre, 0 at edge
+                sweep_h  = (self.hue + d / self._sweep_diag) % 1.0
+                sweep_br = 0.20 + sw_t * 0.55
+                pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
+
             if i in self.filled_ids:
                 h      = (tile["hue"] + self.hue) % 1.0
                 bright = min(tile["bright"] + bass * 0.20, 0.72)
@@ -204,22 +215,14 @@ class Attractor:
 
             self._rainbow_edges(surf, pts)
 
-            # Sweep glow
-            d = tile["cx"] * sw_cos + tile["cy"] * sw_sin
-            dist = abs(d - self._sweep_pos)
-            if dist < self._sweep_width:
-                t = 1.0 - dist / self._sweep_width      # 1.0 at centre, 0 at edge
-                sweep_h  = (self.hue + d / self._sweep_diag + 0.5) % 1.0
-                sweep_br = 0.15 + t * 0.45
-                pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
-
         # ── Pass 2: active tiles — on top, way bigger, bass-pulsing ─────────
         finished = []
         for i in self.active_ids:
             tile = self.tiles[i]
             tile["hue"] = (tile["hue"] + tile["hvel"] + 0.00015) % 1.0
 
-            if tile["life"] > 0:
+            alive = tile["life"] > 0
+            if alive:
                 # Still alive: hold at large scale, pulse hard with bass
                 tile["life"] -= 1
                 target         = 4.5 + bass * 4.0     # up to ~8.5x on strong bass beat
@@ -230,9 +233,11 @@ class Attractor:
                 # Bass reinforces spin
                 tile["rot_vel"] += bass * 0.016 * math.copysign(1, tile["rot_vel"] or 1)
                 tile["rot_vel"] *= 0.96
-                # Drift centroid toward screen centre so large tile stays on screen
-                tile["cx"] += (W / 2 - tile["cx"]) * 0.018
-                tile["cy"] += (H / 2 - tile["cy"]) * 0.018
+                # Move centroid with velocity, then let bounce handle edges
+                tile["cx"] += tile.get("cvx", 0.0)
+                tile["cy"] += tile.get("cvy", 0.0)
+                tile["cvx"] = tile.get("cvx", 0.0) * 0.97
+                tile["cvy"] = tile.get("cvy", 0.0) * 0.97
             else:
                 # Life expired: spring back to rest (scale → 1.0, rot → 0.0, pos → home)
                 tile["svel"]    += (1.0 - tile["scale"]) * 0.12
@@ -241,7 +246,9 @@ class Attractor:
                 tile["rot_vel"] += (0.0 - tile["rot"]) * 0.06
                 tile["rot_vel"] *= 0.85
                 tile["rot"]     += tile["rot_vel"]
-                # Spring centroid back to its home grid position
+                # Decay centroid velocity and spring back to home grid position
+                tile["cvx"] = tile.get("cvx", 0.0) * 0.80
+                tile["cvy"] = tile.get("cvy", 0.0) * 0.80
                 home_cx = tile.get("home_cx", tile["cx"])
                 home_cy = tile.get("home_cy", tile["cy"])
                 tile["cx"] += (home_cx - tile["cx"]) * 0.10
@@ -260,6 +267,29 @@ class Attractor:
                     finished.append(i)
 
             pts = self._screen_verts(tile)
+
+            # ── Bounce off screen edges (active phase only) ──────────────────
+            if alive:
+                min_x = min(p[0] for p in pts)
+                max_x = max(p[0] for p in pts)
+                min_y = min(p[1] for p in pts)
+                max_y = max(p[1] for p in pts)
+                if min_x < 0:
+                    tile["cvx"]  = abs(tile.get("cvx", 0.0)) * 0.8 + 1.5
+                    tile["cx"]  -= min_x          # push back inside
+                    pts = self._screen_verts(tile)
+                elif max_x > W:
+                    tile["cvx"]  = -(abs(tile.get("cvx", 0.0)) * 0.8 + 1.5)
+                    tile["cx"]  -= (max_x - W)
+                    pts = self._screen_verts(tile)
+                if min_y < 0:
+                    tile["cvy"]  = abs(tile.get("cvy", 0.0)) * 0.8 + 1.5
+                    tile["cy"]  -= min_y
+                    pts = self._screen_verts(tile)
+                elif max_y > H:
+                    tile["cvy"]  = -(abs(tile.get("cvy", 0.0)) * 0.8 + 1.5)
+                    tile["cy"]  -= (max_y - H)
+                    pts = self._screen_verts(tile)
 
             h      = (tile["hue"] + self.hue) % 1.0
             bright = min(tile["bright"] + bass * 0.40 + 0.25, 0.92)
