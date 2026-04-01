@@ -89,7 +89,7 @@ Dual rotating wireframe cubes (main + inner at 45% scale) with 2 orbiting satell
 | Scale spring kick | `beat * 0.32 + bass * 0.20` | — |
 | Scale restore | `(1.0 – scale) * 0.18` | — |
 | Scale damping | `0.68` | — |
-| Minimum scale | `0.5` | — |
+| Scale range | `0.5 – 1.25` | Capped so high intensity bumps but never grows large |
 | Edge width | `max(1, int(2 + svel * 4))` px | Scale-velocity driven |
 
 ### Audio Reactions
