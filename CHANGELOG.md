@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-04-01
+
+### Features
+- **Attractor** (mode 10) — Lorenz strange attractor; single particle traces the chaotic butterfly trajectory on a dedicated slow-fade surface (alpha 4) so the full double-wing accumulates over time; bass warps sigma, beat kicks rho, slow Y-axis rotation gives 3-D depth
+- **Branches** (mode 11) — recursive fractal lightning tree; 6 arms from centre split to depth 6 (64+ tips); mid frequencies jitter every branch angle live; bass drives trunk length; beat fires extra arms with a brightness burst
+- Spectrum and Waterfall shifted to modes 12/13; number key `0` removed (use ←/→ for modes 10+)
+- All docs updated: EFFECTS.md, README.md
+
+---
+
 ## [1.5.0] — 2026-04-01
 
 ### Version bump

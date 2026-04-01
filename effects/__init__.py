@@ -1,13 +1,15 @@
-from .yantra   import Yantra
-from .cube     import Cube
-from .plasma   import Plasma
-from .tunnel   import Tunnel
+from .yantra    import Yantra
+from .cube      import Cube
+from .plasma    import Plasma
+from .tunnel    import Tunnel
 from .lissajous import Lissajous
-from .corridor import Corridor
-from .nova     import Nova
-from .spiral   import Spiral
-from .bubbles  import Bubbles
-from .spectrum import Bars
+from .corridor  import Corridor
+from .nova      import Nova
+from .spiral    import Spiral
+from .bubbles   import Bubbles
+from .attractor import Attractor
+from .branches  import Branches
+from .spectrum  import Bars
 from .waterfall import GlowSquares
 
 MODES = [
@@ -20,6 +22,8 @@ MODES = [
     ("Nova",        Nova),        # 7
     ("Spiral",      Spiral),      # 8
     ("Bubbles",     Bubbles),     # 9
-    ("Spectrum",    Bars),        # 0
-    ("Waterfall",   GlowSquares), # arrow-key navigation only
+    ("Attractor",   Attractor),   # ←/→ only
+    ("Branches",    Branches),    # ←/→ only
+    ("Spectrum",    Bars),        # ←/→ only
+    ("Waterfall",   GlowSquares), # ←/→ only
 ]
