@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.1] — 2026-04-01
+
+### Fixes
+- **Corridor** — sparks now always stay inside the tunnel; `ox`/`oy` offsets are bounded to corridor half-extents and spark path centre tracks the corridor frame at the same depth
+- **Corridor** — frames and sparks are now depth-sorted together (back-to-front) so near frames can no longer paint over nearer sparks
+
+---
+
 ## [1.4.0] — 2026-04-01
 
 ### Features
