@@ -25,17 +25,17 @@ All effects share a common audio pipeline. Each effect responds to the same audi
 |---|-----|------|-------------|
 | 1 | `1` | Yantra | Sacred geometry mandala with concentric polygon rings |
 | 2 | `2` | Cube | Rotating wireframe cubes with orbiting satellites |
-| 3 | `3` | Plasma | Full-screen sine-interference psychedelic texture |
+| 3 | `3` | TriFlux | Equilateral triangle mosaic — rainbow wireframe wall with bass-reactive tiles that pop forward, bounce, and sweep with colour |
 | 4 | `4` | Lissajous | 3-D Lissajous knot with 3-fold symmetry |
 | 5 | `5` | Tunnel | First-person ride through a curving tube |
 | 6 | `6` | Corridor | Neon rainbow corridor — rounded-rectangle frames flying toward camera |
 | 7 | `7` | Nova | Waveform kaleidoscope with 7-fold mirror symmetry |
 | 8 | `8` | Spiral | Neon helix vortex with 6 arms flying toward viewer |
 | 9 | `9` | Bubbles | Translucent rising bubbles, size driven by bass |
-| 10 | ←/→ only | Attractor | Lorenz strange attractor — chaotic butterfly, live parameter modulation |
-| 11 | ←/→ only | Branches | Recursive fractal lightning tree — 6 arms, depth 6, audio-jittered angles |
-| 12 | ←/→ only | Spectrum | Classic spectrum bars with peak markers and waveform overlay |
-| 13 | ←/→ only | Waterfall | Scrolling spectrogram (time-frequency display) |
+| — | ←/→ only | Plasma | Full-screen sine-interference psychedelic texture |
+| — | ←/→ only | Branches | Recursive fractal lightning tree — 6 arms, depth 6, audio-jittered angles |
+| — | ←/→ only | Spectrum | Classic spectrum bars with peak markers and waveform overlay |
+| — | ←/→ only | Waterfall | Scrolling spectrogram (time-frequency display) |
 
 ---
 
@@ -68,16 +68,16 @@ Psychedelic sacred-geometry mandala. Six concentric polygon rings (triangle thro
 
 ## 2. Cube
 
-Dual rotating wireframe cubes (main + inner at 45% scale) with orbiting satellite cubes. Satellite count scales with beat intensity (2–6 cubes). Two-pass neon glow on edges.
+Dual rotating wireframe cubes (main + inner at 45% scale) with 2 orbiting satellite cubes. Satellite count is fixed; satellites have their own slow independent rotation. Two-pass neon glow on edges.
 
 ### Parameters
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
 | `TRAIL_ALPHA` | `18` | Fade speed; lower = longer trails |
-| Satellite count | `2 + int(min(beat, 2.0) * 2)` | Range 2–6 |
+| Satellite count | `2` (fixed) | Independent slow rotation |
 | Orbital radius | `2.6` 3-D units | — |
-| Satellite scale | `main_scale * 0.28` | — |
+| Satellite scale | `min(main_scale * 0.28, 0.55)` | Capped to prevent overflow |
 | Inner cube scale | `main_scale * 0.45` | — |
 | FOV | `680` units | — |
 | Rotation damping | `0.94` | Per axis |
@@ -94,41 +94,51 @@ Dual rotating wireframe cubes (main + inner at 45% scale) with orbiting satellit
 - **Bass** → Y-axis spin, scale kick
 - **Mid** → X-axis spin
 - **High** → Z-axis spin
-- **Beat** → all axes, satellite count, scale burst
+- **Beat** → all axes, scale burst
 
 ---
 
-## 3. Plasma
+## 3. TriFlux
 
-Full-screen psychedelic texture from four overlapping sine wave fields. Rendered at ¼ resolution and upscaled for performance. Hue and brightness continuously shift with audio.
+Equilateral triangle mosaic wall. All triangles are wireframe with per-edge rainbow colours. A subset of 4–6 tiles are filled. On bass beats, an interior tile pops to the foreground at up to 8× size, spins, pulses to bass, and bounces off screen edges — then springs back into grid alignment. Two independent rainbow sweep waves cross the wall at random angles continuously.
 
 ### Parameters
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| `RES_DIV` | `4` | Render resolution divisor (performance) |
-| Wave fields | 4 | Perpendicular + diagonal + radial |
-| Frequency modulation (`fm`) | `1.0 + mid * 0.7` | Mid-band driven |
-| Time speed | `0.018 + bass * 0.09 + beat * 0.14` per frame | — |
-| Brightness base | `0.28` | — |
-| Brightness wave contribution | `wave * 0.22` | — |
-| Beat brightness flash | `beat * 0.22` | — |
-| High-freq brightness boost | `high * 0.08` | — |
-| Brightness range | `[0.0, 0.95]` | Clipped |
-| Hue modulation | `wave * 0.55 + 0.5 + hue_base + bass * 0.35` | — |
-| Hue drift | `0.005` per frame | — |
+| `N_COLS` | `14` | Grid columns |
+| `GAP` | `0.88` | Inter-tile gap (scale factor applied to all geometry) |
+| `N_FILLED` | `5` | Permanently filled background tiles |
+| `N_ACTIVE_MAX` | `3` | Max tiles simultaneously enlarged in foreground |
+| `ACTIVE_LIFE_MIN` | `60` frames | Minimum active lifetime (~1 s at 60 fps) |
+| `ACTIVE_LIFE_MAX` | `240` frames | Maximum active lifetime (~4 s at 60 fps) |
+| `MIN_LIFE` | `60` frames | Minimum remaining life when extended by a beat pulse |
+| Active scale target | `4.5 + bass * 4.0` | Up to ~8.5× on strong bass — capped at 12.0 |
+| Scale spring stiffness | `0.22` | — |
+| Scale spring damping | `0.70` | — |
+| Fallback scale spring | stiffness `0.12`, damping `0.78` | Springs back to 1.0 |
+| Rotation spring (fallback) | stiffness `0.06`, damping `0.85` | Springs rot → 0° |
+| Centroid bounce friction | `0.97` per frame | `cvx`/`cvy` velocity decay |
+| Bounce reflection | `abs(v) * 0.8 + 1.5` | Velocity magnitude on edge hit |
+| Interior margin | `1.5 × tile_width` from each edge | Only interior tiles activate |
+| Filled-set swap | every `70–120` frames | One filled tile replaced randomly |
+| Auto-activate | every `180–320` frames | 1–2 interior tiles activate without a beat |
+| Sweep 1 velocity | `3.2` px/frame | — |
+| Sweep 2 velocity | `4.1` px/frame | Staggered start so one is always on screen |
+| Sweep band half-width | `90` px | — |
+| Sweep brightness at centre | `0.20 + 0.55 = 0.75` | Falloff to 0.20 at edge |
+| Vertex coordinate clamp | `±16383` | SDL/pygame safe range |
 
-### Wave Fields
-1. `sin(X * fm + t)`
-2. `sin(Y * fm * 0.8 + t * 1.4)`
-3. `sin((X * 0.6 + Y * 0.8) * fm + t * 0.9)`
-4. `sin(R * fm * 0.5 – t * 1.2)` (radial)
+### Activation Trigger
+A tile is activated when `beat > 0.2 AND bass > 0.25` (bass-beat detection) and fewer than `N_ACTIVE_MAX` tiles are already active. If all slots are full the existing tiles' remaining life is extended to at least `MIN_LIFE` frames instead.
+
+### Rainbow Edge Hue
+Each edge hue is computed from the edge's screen angle: `h = (global_hue * 2 + atan2(dy, dx) / τ + 0.5) % 1.0`, so the wireframe colours shift continuously with the edge direction and global hue drift.
 
 ### Audio Reactions
-- **Bass** → time speed, hue shift
-- **Mid** → wave frequency density
-- **High** → brightness boost
-- **Beat** → time speed burst, brightness flash
+- **Bass** → active tile scale target (pulses up to 8×), spin reinforcement
+- **Beat + bass** → new tile activation or life extension
+- **Bass level** → background filled-tile brightness
 
 ---
 
@@ -170,7 +180,7 @@ Full-screen psychedelic texture from four overlapping sine wave fields. Rendered
 
 ## 5. Tunnel
 
-First-person ride through a sinusoidal curving tube. 30 rings of 20-sided polygons recede into the distance. Beat spawns incoming triangles that rotate as they fly toward the camera. Inner polygons rotate within each ring. Sparks are rendered on a dedicated persistent layer always composited above the tunnel geometry.
+First-person ride through a sinusoidal curving tube. 30 rings of 20-sided polygons recede into the distance. Beat spawns incoming triangles that rotate as they fly toward the camera. Inner polygons rotate within each ring.
 
 ### Parameters
 
@@ -178,31 +188,63 @@ First-person ride through a sinusoidal curving tube. 30 rings of 20-sided polygo
 |-----------|---------|-------|
 | `N_RINGS` | `30` | Depth rings |
 | `N_SIDES` | `20` | Polygon segments per ring |
-| `TUBE_R` | `2.8` 3-D units | Tube radius (expands with bass) |
+| `TUBE_R` | `2.8` 3-D units | Tube radius |
 | `Z_FAR` | `10.0` | Far clipping depth |
 | `Z_NEAR` | `0.18` | Near clipping depth |
 | FOV | `min(W, H) * 0.75` | — |
 | Tube sway X | `sin(t * 0.21) * 0.8` | — |
 | Tube sway Y | `cos(t * 0.16) * 0.6` | — |
-| Time speed | `0.03 + bass * 0.14 + beat * 0.22` per frame | — |
-| Triangle spawn rate | `int(bass * 0.6 + beat * 1.5)` per frame | Beat threshold 0.4 |
-| Triangle size | `uniform(0.5, 1.2) * (1.0 + bass * 3.0 + beat * 1.5)` | — |
-| Triangle rotation velocity | `±uniform(0.04, 0.14)` rad/frame | Random direction |
-| Triangle pool limit | `60` | — |
-| Spark trail fade alpha | `10` | Independent layer; lower = longer trails |
-| Ring brightness | `0.06 + near_t * 0.65 + fft[fi] * 0.20 + beat * near_t * 0.45 + bass * near_t * 0.40` | — |
-| Ring width | `1 + beat * 3 * near_t + bass * 3 * near_t` | — |
+| Time speed | `0.03 + bass * 0.09 + beat * 0.18` per frame | — |
+| Triangle spawn rate | `int(bass * 1.5 + beat * 3.0)` per frame | Beat threshold 0.3 |
+| Triangle size | `uniform(0.45, 1.1) * (1.0 + bass * 1.5)` | — |
+| Triangle rotation velocity | `±uniform(0.04, 0.12)` rad/frame | Random direction |
+| Triangle pool limit | `120` | — |
+| Ring brightness | `0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50` | — |
+| Ring width | `max(1, int(1 + beat * 3 * near_t))` | — |
 | Inner polygon sides | `3 + (ring_index % 4)` | 3–6 sides, alternating |
 | Inner polygon rotation | `time * 0.45 * direction` | Alternating per ring |
 
 ### Audio Reactions
-- **Bass** → time speed, tube radius, triangle size & spawn rate, ring brightness & width
+- **Bass** → time speed, triangle size & spawn rate
 - **Beat** → time speed burst, spawn burst, ring brightness & width
 - **Per-ring FFT** → individual ring brightness
 
 ---
 
-## 6. Nova
+## 6. Corridor
+
+First-person neon rainbow corridor. Concentric rounded-rectangle frames recede into a vanishing point and fly toward the camera. The path curves sinusoidally over time. Beat flares the nearest frames and spawns glowing sparks scattered within the corridor that streak toward the camera. Sparks are composited above frame geometry via an independent persistent surface.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `N_FRAMES` | `28` | Depth frames |
+| `WORLD_H` | `2.0` | Half-height in world units |
+| `ASPECT` | `1.65` | Width / height ratio |
+| `Z_FAR` | `12.0` | Far clipping depth |
+| `Z_NEAR` | `0.28` | Near clipping depth |
+| `_CORRIDOR_FADE` | `28` | Frame layer fade alpha |
+| `_SPARK_FADE` | `10` | Spark layer fade alpha — slower = longer trails |
+| FOV | `min(W, H) * 0.72` | — |
+| Path sway X | `sin(t * 0.19) * 0.5` | — |
+| Path sway Y | `cos(t * 0.14) * 0.35` | — |
+| Time speed | `0.028 + bass * 0.08 + beat * 0.16` per frame | — |
+| Spark spawn rate | `int(bass * 1.2 + beat * 4.0)` per frame | Beat threshold 0.25 |
+| Spark pool limit | `100` | — |
+| Frame corner radius | `min(half_w, half_h) // 3` | Rounded rectangle |
+| Frame brightness | `0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50` | — |
+| Glow halo inflate | `lw * 5 + 4` px | Neon glow pass |
+| Hue drift | `0.005` per frame | — |
+
+### Audio Reactions
+- **Bass** → time speed, spark spawn rate
+- **Beat** → time speed burst, frame brightness, spark spawn burst, frame line width
+- **Per-frame FFT** → individual frame brightness
+
+---
+
+## 7. Nova
 
 Waveform kaleidoscope with prime 7-fold mirror symmetry across 4 concentric spinning layers. Each layer is assigned a different frequency band. Beat explodes all layers outward simultaneously.
 
@@ -245,7 +287,7 @@ Waveform kaleidoscope with prime 7-fold mirror symmetry across 4 concentric spin
 
 ---
 
-## 7. Spiral
+## 8. Spiral
 
 Neon helix vortex. Six spiral arms fly toward the viewer with cross-ring connections between arms. Two-pass neon glow on all points. Beat springs the entire structure outward.
 
@@ -280,7 +322,7 @@ Neon helix vortex. Six spiral arms fly toward the viewer with cross-ring connect
 
 ---
 
-## 8. Bubbles
+## 9. Bubbles
 
 Translucent rising bubbles with multi-layer glow, neon rim, specular highlight, and complementary-hue filled core. Up to 700 bubbles. Beat swells all bubbles simultaneously.
 
@@ -322,7 +364,67 @@ Translucent rising bubbles with multi-layer glow, neon rim, specular highlight, 
 
 ---
 
-## 9. Spectrum
+## 10. Plasma (←/→ only)
+
+Full-screen psychedelic texture from four overlapping sine wave fields. Rendered at ¼ resolution and upscaled for performance. Hue and brightness continuously shift with audio.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `RES_DIV` | `4` | Render resolution divisor (performance) |
+| Wave fields | 4 | Perpendicular + diagonal + radial |
+| Frequency modulation (`fm`) | `1.0 + mid * 0.7` | Mid-band driven |
+| Time speed | `0.018 + bass * 0.09 + beat * 0.14` per frame | — |
+| Brightness base | `0.28` | — |
+| Brightness wave contribution | `wave * 0.22` | — |
+| Beat brightness flash | `beat * 0.22` | — |
+| High-freq brightness boost | `high * 0.08` | — |
+| Brightness range | `[0.0, 0.95]` | Clipped |
+| Hue modulation | `wave * 0.55 + 0.5 + hue_base + bass * 0.35` | — |
+| Hue drift | `0.005` per frame | — |
+
+### Wave Fields
+1. `sin(X * fm + t)`
+2. `sin(Y * fm * 0.8 + t * 1.4)`
+3. `sin((X * 0.6 + Y * 0.8) * fm + t * 0.9)`
+4. `sin(R * fm * 0.5 – t * 1.2)` (radial)
+
+### Audio Reactions
+- **Bass** → time speed, hue shift
+- **Mid** → wave frequency density
+- **High** → brightness boost
+- **Beat** → time speed burst, brightness flash
+
+---
+
+## 11. Branches (←/→ only)
+
+Recursive fractal lightning tree. Six neon arms radiate from screen centre, each splitting into two sub-branches (with an extra central fork at trunk level) down to depth 6, yielding 64+ tips per arm. The whole tree rotates slowly. Mid-band jitter makes every branch angle ripple in real-time. Beat fires additional arms and a brightness burst.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `MAX_DEPTH` | `6` | Recursion depth (64 tips per arm) |
+| `BASE_ARMS` | `6` | Resting arm count |
+| Extra arms on beat | `int(min(beat, 2.5) * 1.5)` | Up to +3 arms |
+| Trunk length | `min(W, H) * 0.18 * (1 + bass * 0.70 + beat * 0.40)` | — |
+| Branch ratio | `0.64 + high * 0.08` | Child / parent length |
+| Spread angle | `π/2.8 + mid * 0.45` rad | Split half-angle |
+| Angle jitter | `sin(t*2.3 + …) * mid * 0.55` | Mid-driven per-branch jitter |
+| Rotation speed | `time * 0.06` rad | Whole-tree slow rotation |
+| `beat_flash` | decay `* 0.75 + beat * 0.25` | Brightness burst on beat |
+
+### Audio Reactions
+- **Bass** → trunk length, animation speed
+- **Mid** → branch angle jitter (organic branching motion)
+- **High** → branch brightness, child/parent length ratio
+- **Beat** → extra arms, brightness burst, speed kick
+
+---
+
+## 12. Spectrum (←/→ only)
 
 Classic frequency spectrum bars with peak markers and scrolling waveform overlay. Log-spaced frequency bins give uniform visual weight to all decades.
 
@@ -349,7 +451,7 @@ Classic frequency spectrum bars with peak markers and scrolling waveform overlay
 
 ---
 
-## 10. Waterfall
+## 13. Waterfall (←/→ only)
 
 Scrolling spectrogram. Each frame a new frequency row is added at the top; old rows scroll down. Hue encodes frequency position; brightness encodes energy. Newest rows receive strongest beat flash.
 
@@ -376,91 +478,6 @@ Scrolling spectrogram. Each frame a new frequency row is added at the top; old r
 
 ---
 
----
-
-## 11. Corridor
-
-First-person neon rainbow corridor. Concentric rounded-rectangle frames recede into a vanishing point and fly toward the camera. The path curves sinusoidally over time. Beat flares the nearest frames and spawns glowing sparks scattered within the corridor that streak toward the camera.
-
-### Parameters
-
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| `N_FRAMES` | `28` | Depth frames |
-| `WORLD_H` | `2.0` | Half-height in world units |
-| `ASPECT` | `1.65` | Width / height ratio |
-| `Z_FAR` | `12.0` | Far clipping depth |
-| `Z_NEAR` | `0.28` | Near clipping depth |
-| FOV | `min(W, H) * 0.72` | — |
-| Path sway X | `sin(t * 0.19) * 0.5` | — |
-| Path sway Y | `cos(t * 0.14) * 0.35` | — |
-| Time speed | `0.028 + bass * 0.08 + beat * 0.16` per frame | — |
-| Spark spawn rate | `int(bass * 1.2 + beat * 4.0)` per frame | Beat threshold 0.25 |
-| Spark pool limit | `100` | — |
-| Frame corner radius | `min(half_w, half_h) // 3` | Rounded rectangle |
-| Frame brightness | `0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50` | — |
-| Glow halo inflate | `lw * 5 + 4` px | Neon glow pass |
-| Hue drift | `0.005` per frame | — |
-
-### Audio Reactions
-- **Bass** → time speed, spark spawn rate
-- **Beat** → time speed burst, frame brightness, spark spawn burst, frame line width
-- **Per-frame FFT** → individual frame brightness
-
----
-
-## 10. Attractor
-
-Lorenz strange attractor. A single particle evolves under the Lorenz ODE system (σ, ρ, β). A dedicated surface with a very slow fade (alpha 4) lets the full double-wing butterfly accumulate frame by frame. The view rotates slowly around the Y-axis. Audio deforms the attractor shape live.
-
-### Parameters
-
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| `_SIGMA0` | `10.0` | Lorenz sigma baseline |
-| `_RHO0` | `28.0` | Lorenz rho baseline |
-| `_BETA` | `8/3` | Lorenz beta (fixed) |
-| `_STEPS` | `12` | Trajectory steps per frame |
-| `_DT` | `0.007` | Integration timestep |
-| `_ATTR_FADE` | `4` | Attractor surface fade alpha — very slow |
-| Scale | `min(W, H) / 55` | Orthographic pixels-per-unit |
-| Rotation speed | `0.004 + bass * 0.012` rad/frame | Y-axis |
-| Sigma modulation | `sigma0 + bass * 5.0` | Bass expands attractor width |
-| Rho kick | `beat * 12.0`, decay `* 0.92` | Beat extends attractor depth |
-
-### Audio Reactions
-- **Bass** → sigma (wing width), rotation speed
-- **Beat** → rho kick (wing depth / bifurcation)
-- **High** → particle brightness
-
----
-
-## 11. Branches
-
-Recursive fractal lightning tree. Six neon arms radiate from screen centre, each splitting into two sub-branches (with an extra central fork at trunk level) down to depth 6, yielding 64+ tips per arm. The whole tree rotates slowly. Mid-band jitter makes every branch angle ripple in real-time. Beat fires additional arms and a brightness burst.
-
-### Parameters
-
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| `MAX_DEPTH` | `6` | Recursion depth (64 tips per arm) |
-| `BASE_ARMS` | `6` | Resting arm count |
-| Extra arms on beat | `int(min(beat, 2.5) * 1.5)` | Up to +3 arms |
-| Trunk length | `min(W, H) * 0.18 * (1 + bass * 0.70 + beat * 0.40)` | — |
-| Branch ratio | `0.64 + high * 0.08` | Child / parent length |
-| Spread angle | `π/2.8 + mid * 0.45` rad | Split half-angle |
-| Angle jitter | `sin(t*2.3 + …) * mid * 0.55` | Mid-driven per-branch jitter |
-| Rotation speed | `time * 0.06` rad | Whole-tree slow rotation |
-| `beat_flash` | decay `* 0.75 + beat * 0.25` | Brightness burst on beat |
-
-### Audio Reactions
-- **Bass** → trunk length, animation speed
-- **Mid** → branch angle jitter (organic branching motion)
-- **High** → branch brightness, child/parent length ratio
-- **Beat** → extra arms, brightness burst, speed kick
-
----
-
 ## Navigation
 
 | Key | Action |
@@ -468,4 +485,7 @@ Recursive fractal lightning tree. Six neon arms radiate from screen centre, each
 | `1` – `9` | Switch to effect 1–9 |
 | `←` / `→` | Previous / next effect (cycles all 13 modes) |
 | `↑` / `↓` | Increase / decrease effect intensity (gain 0.0–2.0) |
+| `D` | Open audio device picker |
+| `F` | Toggle fullscreen |
+| `H` | Toggle HUD / legend |
 | `Q` / `Esc` | Quit |

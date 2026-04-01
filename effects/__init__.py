@@ -7,7 +7,7 @@ from .corridor  import Corridor
 from .nova      import Nova
 from .spiral    import Spiral
 from .bubbles   import Bubbles
-from .attractor import Attractor
+from .triflux  import Attractor
 from .branches  import Branches
 from .spectrum  import Bars
 from .waterfall import GlowSquares
@@ -15,14 +15,14 @@ from .waterfall import GlowSquares
 MODES = [
     ("Yantra",      Yantra),      # 1
     ("Cube",        Cube),        # 2
-    ("Plasma",      Plasma),      # 3
+    ("TriFlux",     Attractor),   # 3
     ("Lissajous",   Lissajous),   # 4
     ("Tunnel",      Tunnel),      # 5
     ("Corridor",    Corridor),    # 6
     ("Nova",        Nova),        # 7
     ("Spiral",      Spiral),      # 8
     ("Bubbles",     Bubbles),     # 9
-    ("Attractor",   Attractor),   # ←/→ only
+    ("Plasma",      Plasma),      # ←/→ only
     ("Branches",    Branches),    # ←/→ only
     ("Spectrum",    Bars),        # ←/→ only
     ("Waterfall",   GlowSquares), # ←/→ only

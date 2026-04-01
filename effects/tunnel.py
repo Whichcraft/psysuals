@@ -14,10 +14,6 @@ class Tunnel:
     Each ring has a fixed position on the tube path and a z-depth that
     decreases every frame so rings physically fly toward the camera.
     When a ring passes through (z < Z_NEAR) it is recycled to the far end.
-
-    Sparks are rendered on a dedicated persistent surface that is always
-    composited on top of the tunnel geometry, so tunnel lines can never
-    overwrite spark trails.
     """
 
     N_RINGS = 30
@@ -26,16 +22,9 @@ class Tunnel:
     Z_FAR   = 10.0
     Z_NEAR  = 0.18
 
-    # Fade alpha for the main surface (tunnel rings)
-    TRAIL_ALPHA = 28
-    # Fade alpha for the spark layer — lower = longer trails
-    _SPARK_FADE = 10
-
     def __init__(self):
-        self.hue       = 0.0
-        self.time      = 0.0
-        self.spark_surf = None   # created on first draw (needs screen size)
-        self._spark_fade_surf = None
+        self.hue  = 0.0
+        self.time = 0.0
         spacing = (self.Z_FAR - self.Z_NEAR) / self.N_RINGS
         self.rings = [
             {"z": self.Z_NEAR + i * spacing,
@@ -55,34 +44,23 @@ class Tunnel:
                 int(wy * fov / z + config.HEIGHT / 2),
                 fov / z)
 
-    def _init_spark_surf(self):
-        self.spark_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-        self.spark_surf.fill((0, 0, 0))
-        self._spark_fade_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-        self._spark_fade_surf.set_alpha(self._SPARK_FADE)
-        self._spark_fade_surf.fill((0, 0, 0))
-
     def draw(self, surf, waveform, fft, beat, tick):
-        if self.spark_surf is None:
-            self._init_spark_surf()
-
         self.hue  += 0.006
         bass       = float(np.mean(fft[:6]))
         mid        = float(np.mean(fft[6:30]))
 
-        dt         = 0.03 + bass * 0.14 + beat * 0.22
+        dt         = 0.03 + bass * 0.09 + beat * 0.18
         self.time += dt
 
-        # Fewer sparks; size and spawn rate react strongly to bass
-        spawn_n = int(bass * 0.6 + (beat * 1.5 if beat > 0.4 else 0))
+        spawn_n = int(bass * 1.5 + (beat * 3.0 if beat > 0.3 else 0))
         for _ in range(spawn_n):
             z = self.Z_FAR * random.uniform(0.65, 0.95)
             self.tris.append({
                 "z":    z,
                 "pt":   self.time + z,
                 "rot":  random.uniform(0, math.tau),
-                "rvel": random.choice([-1, 1]) * random.uniform(0.04, 0.14),
-                "size": random.uniform(0.5, 1.2) * (1.0 + bass * 3.0 + beat * 1.5),
+                "rvel": random.choice([-1, 1]) * random.uniform(0.04, 0.12),
+                "size": random.uniform(0.45, 1.1) * (1.0 + bass * 1.5),
                 "hue":  (self.hue + random.uniform(0, 0.5)) % 1.0,
             })
 
@@ -94,7 +72,6 @@ class Tunnel:
 
         ordered = sorted(self.rings, key=lambda r: -r["z"])
 
-        # ── Draw tunnel rings onto main surf (background layer) ──────────────
         for i in range(len(ordered) - 1):
             r1 = ordered[i]
             r2 = ordered[i + 1]
@@ -105,14 +82,14 @@ class Tunnel:
             sx1, sy1, sc1 = self._proj(cx1, cy1, r1["z"])
             sx2, sy2, sc2 = self._proj(cx2, cy2, r2["z"])
 
-            sr1 = max(1, int((self.TUBE_R + bass * 0.6) * sc1))
-            sr2 = max(1, int((self.TUBE_R + bass * 0.6) * sc2))
+            sr1 = max(1, int(self.TUBE_R * sc1))
+            sr2 = max(1, int(self.TUBE_R * sc2))
 
             near_t = max(0.0, 1.0 - r1["z"] / self.Z_FAR)
             fi     = min(int(near_t * len(fft) * 0.8), len(fft) - 1)
             h      = (self.hue + near_t) % 1.0
-            bright = 0.06 + near_t * 0.65 + fft[fi] * 0.20 + beat * near_t * 0.45 + bass * near_t * 0.40
-            lw     = max(1, int(1 + beat * 3 * near_t + bass * 3 * near_t))
+            bright = 0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50
+            lw     = max(1, int(1 + beat * 3 * near_t))
 
             pygame.draw.circle(surf, hsl(h, l=bright * 0.35), (sx1, sy1), sr1 + 4, lw + 3)
             pygame.draw.circle(surf, hsl(h, l=bright),        (sx1, sy1), sr1,     lw)
@@ -139,10 +116,6 @@ class Tunnel:
             ]
             pygame.draw.polygon(surf, hsl(s_h, l=s_l), s_pts, max(1, lw))
 
-        # ── Fade the spark layer independently (longer trails) ───────────────
-        self.spark_surf.blit(self._spark_fade_surf, (0, 0))
-
-        # ── Draw sparks onto the dedicated spark surface ─────────────────────
         live = []
         for tri in self.tris:
             tri["z"]   -= dt
@@ -154,17 +127,14 @@ class Tunnel:
             near_t     = max(0.0, 1.0 - tri["z"] / self.Z_FAR)
             tr         = max(3, int(tri["size"] * sc))
             h          = (tri["hue"] + near_t * 0.4) % 1.0
-            bright     = 0.40 + near_t * 0.55 + bass * 0.30
+            bright     = 0.35 + near_t * 0.60
             lw         = max(1, int(1 + near_t * 3))
             pts = [
                 (sx + int(math.cos(tri["rot"] + v * math.tau / 3) * tr),
                  sy + int(math.sin(tri["rot"] + v * math.tau / 3) * tr))
                 for v in range(3)
             ]
-            pygame.draw.polygon(self.spark_surf, hsl(h, l=bright * 0.30), pts, lw + 4)
-            pygame.draw.polygon(self.spark_surf, hsl(h, l=bright),         pts, lw)
+            pygame.draw.polygon(surf, hsl(h, l=bright * 0.30), pts, lw + 4)
+            pygame.draw.polygon(surf, hsl(h, l=bright),         pts, lw)
             live.append(tri)
-        self.tris = live[-60:]
-
-        # ── Composite sparks on top of tunnel (additive blend keeps bg black) ─
-        surf.blit(self.spark_surf, (0, 0), special_flags=pygame.BLEND_ADD)
+        self.tris = live[-120:]
