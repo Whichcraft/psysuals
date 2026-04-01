@@ -23,8 +23,9 @@ class Attractor:
     GAP          = 0.88
     N_FILLED     = 5
     N_ACTIVE_MAX = 3
-    ACTIVE_LIFE  = 360   # frames before tile starts falling back (~6 s at 60 fps)
-    MIN_LIFE     = 60    # minimum frames a tile stays enlarged before falling back (~1 s at 60 fps)
+    ACTIVE_LIFE_MIN = 60   # 1 s — guaranteed minimum time big and in foreground
+    ACTIVE_LIFE_MAX = 240  # 4 s — maximum random lifetime
+    MIN_LIFE        = 60   # minimum remaining life when extended by a beat
 
     def __init__(self):
         self.hue        = 0.0
@@ -153,7 +154,7 @@ class Attractor:
                     idx = random.choice(candidates)
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
-                    t["life"]    = self.ACTIVE_LIFE
+                    t["life"]    = random.randint(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX)
                     t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
                     t["cvx"] = 0.0;         t["cvy"] = 0.0
@@ -173,7 +174,7 @@ class Attractor:
                 if len(self.active_ids) < self.N_ACTIVE_MAX:
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
-                    t["life"]    = self.ACTIVE_LIFE
+                    t["life"]    = random.randint(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX)
                     t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.03, 0.08)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
                     t["cvx"] = 0.0;         t["cvy"] = 0.0
