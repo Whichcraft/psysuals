@@ -11,7 +11,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.0.3"
+__version__ = "2.0.4"
 
 import threading
 from collections import deque
