@@ -74,7 +74,7 @@ class Branches:
         cy = config.HEIGHT // 2
 
         # Short trunk so the first split happens close to centre
-        trunk = (min(config.WIDTH, config.HEIGHT) * 0.10
+        trunk = (min(config.WIDTH, config.HEIGHT) * 0.02
                  * (1.0 + bass * 0.70 + beat * 0.40))
 
         # Extra arms on strong beats (up to +3)
