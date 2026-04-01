@@ -74,13 +74,15 @@ Dual rotating wireframe cubes (main + inner at 45% scale) with 2 orbiting satell
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| `TRAIL_ALPHA` | `18` | Fade speed; lower = longer trails |
+| `TRAIL_ALPHA` | `18` | Main cube fade speed; lower = longer trails |
+| `_SAT_FADE` | `16` | Satellite trail fade speed; lower = longer trails |
 | Satellite count | `2` (fixed) | Independent slow rotation |
 | Orbital radius | `2.6` 3-D units | — |
 | Satellite scale | `min(main_scale * 0.28, 0.55)` | Capped to prevent overflow |
 | Inner cube scale | `main_scale * 0.45` | — |
 | FOV | `680` units | — |
 | Rotation damping | `0.94` | Per axis |
+| Rotation velocity cap | `±0.08` rad/frame (x/y), `±0.05` (z) | Prevents runaway spin |
 | X-axis angular accel | `0.00165 + mid * 0.012 + beat * 0.10` | — |
 | Y-axis angular accel | `0.00248 + bass * 0.015 + beat * 0.12` | — |
 | Z-axis angular accel | `0.00083 + high * 0.008 + beat * 0.05` | — |
