@@ -8,9 +8,15 @@ from .utils import hsl
 
 
 class Cube:
-    """Dual rotating wireframe cubes — each axis driven by a different band."""
+    """Dual rotating wireframe cubes — each axis driven by a different band.
 
-    TRAIL_ALPHA = 18
+    Satellites are rendered on a dedicated persistent surface (faded more
+    slowly than the main surface) so they leave long trailing lines that
+    are always composited above the main cubes.
+    """
+
+    TRAIL_ALPHA  = 18
+    _SAT_FADE    = 8   # lower than TRAIL_ALPHA → longer satellite trails
 
     VERTS = np.array([
         [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
@@ -26,7 +32,9 @@ class Cube:
         self.scale    = 1.0
         self.svel     = 0.0
         self.rvx = self.rvy = self.rvz = 0.0
-        self.orb_angle = 0.0
+        self.orb_angle  = 0.0
+        self.sat_surf   = None   # created on first draw
+        self._sat_fade  = None
 
     @staticmethod
     def _Rx(a):
@@ -68,7 +76,17 @@ class Cube:
         return [(int(cx_s + v[0] * scale_s), int(cy_s + v[1] * scale_s))
                 for v in verts_3d]
 
+    def _init_sat_surf(self):
+        self.sat_surf  = pygame.Surface((config.WIDTH, config.HEIGHT))
+        self.sat_surf.fill((0, 0, 0))
+        self._sat_fade = pygame.Surface((config.WIDTH, config.HEIGHT))
+        self._sat_fade.set_alpha(self._SAT_FADE)
+        self._sat_fade.fill((0, 0, 0))
+
     def draw(self, surf, waveform, fft, beat, tick):
+        if self.sat_surf is None:
+            self._init_sat_surf()
+
         self.fade_hue += 0.0018
         bass = min(float(np.mean(fft[:5])),   1.0)
         mid  = min(float(np.mean(fft[5:25])), 1.0)
@@ -106,6 +124,9 @@ class Cube:
         ORB_R     = 2.6
         self.orb_angle += 0.012 + beat * 0.04
 
+        # Fade satellite trail surface independently (slower than main)
+        self.sat_surf.blit(self._sat_fade, (0, 0))
+
         for si in range(n_sats):
             theta = self.orb_angle + si / n_sats * math.tau
             ox    = ORB_R * math.cos(theta)
@@ -115,5 +136,9 @@ class Cube:
             h_off = si / n_sats * 0.6
             for ei, (a, b) in enumerate(self.EDGES):
                 h     = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0
-                color = hsl(h, l=0.38 + min(self.svel, 1.0) * 0.20)
-                pygame.draw.line(surf, color, proj[a], proj[b], 1)
+                # Start dim; brighten gradually with energy
+                color = hsl(h, l=0.18 + min(self.svel, 1.0) * 0.28)
+                pygame.draw.line(self.sat_surf, color, proj[a], proj[b], 1)
+
+        # Composite satellite trails on top of the main cubes
+        surf.blit(self.sat_surf, (0, 0), special_flags=pygame.BLEND_ADD)

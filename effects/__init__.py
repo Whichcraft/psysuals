@@ -14,8 +14,8 @@ MODES = [
     ("Yantra",      Yantra),      # 1
     ("Cube",        Cube),        # 2
     ("Plasma",      Plasma),      # 3
-    ("Tunnel",      Tunnel),      # 4
-    ("Lissajous",   Lissajous),   # 5
+    ("Lissajous",   Lissajous),   # 4
+    ("Tunnel",      Tunnel),      # 5
     ("Corridor",    Corridor),    # 6
     ("Nova",        Nova),        # 7
     ("Spiral",      Spiral),      # 8
