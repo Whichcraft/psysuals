@@ -100,7 +100,7 @@ Dual rotating wireframe cubes (main + inner at 45% scale) with 2 orbiting satell
 
 ## 3. TriFlux
 
-Equilateral triangle mosaic wall. All triangles are wireframe with per-edge rainbow colours. A subset of 4–6 tiles are filled. On bass beats, an interior tile pops to the foreground at up to 8× size, spins, pulses to bass, and bounces off screen edges — then springs back into grid alignment. Two independent rainbow sweep waves cross the wall at random angles continuously.
+Equilateral triangle mosaic wall. All triangles are wireframe with per-edge rainbow colours. A subset of 4–6 tiles are filled. On bass beats, an interior tile pops to the foreground at up to 8× size, spins, pulses to bass, and bounces off screen edges — then springs back into grid alignment. Two independent rainbow sweep waves cross the wall at random angles continuously. The grid extends one tile past all screen edges so no clipped triangle borders are visible. Each sweep always enters from the real screen edge (projection of screen corners onto sweep direction).
 
 ### Parameters
 
@@ -110,9 +110,9 @@ Equilateral triangle mosaic wall. All triangles are wireframe with per-edge rain
 | `GAP` | `0.88` | Inter-tile gap (scale factor applied to all geometry) |
 | `N_FILLED` | `5` | Permanently filled background tiles |
 | `N_ACTIVE_MAX` | `3` | Max tiles simultaneously enlarged in foreground |
-| `ACTIVE_LIFE_MIN` | `60` frames | Minimum active lifetime (~1 s at 60 fps) |
-| `ACTIVE_LIFE_MAX` | `240` frames | Maximum active lifetime (~4 s at 60 fps) |
-| `MIN_LIFE` | `60` frames | Minimum remaining life when extended by a beat pulse |
+| `ACTIVE_LIFE_MIN` | `150` frames | Minimum active lifetime (~2.5 s at 60 fps) |
+| `ACTIVE_LIFE_MAX` | `360` frames | Maximum active lifetime (~6 s at 60 fps) |
+| `MIN_LIFE` | `150` frames | Minimum remaining life when extended by a beat pulse |
 | Active scale target | `4.5 + bass * 4.0` | Up to ~8.5× on strong bass — capped at 12.0 |
 | Scale spring stiffness | `0.22` | — |
 | Scale spring damping | `0.70` | — |
@@ -126,8 +126,10 @@ Equilateral triangle mosaic wall. All triangles are wireframe with per-edge rain
 | Sweep 1 velocity | `3.2` px/frame | — |
 | Sweep 2 velocity | `4.1` px/frame | Staggered start so one is always on screen |
 | Sweep band half-width | `90` px | — |
+| Sweep start position | `min_proj(corners) − 90` px | Always enters from real screen edge |
 | Sweep brightness at centre | `0.20 + 0.55 = 0.75` | Falloff to 0.20 at edge |
 | Vertex coordinate clamp | `±16383` | SDL/pygame safe range |
+| Grid bleed | `1 tile` past each edge | No clipped triangles at screen border |
 
 ### Activation Trigger
 A tile is activated when `beat > 0.2 AND bass > 0.25` (bass-beat detection) and fewer than `N_ACTIVE_MAX` tiles are already active. If all slots are full the existing tiles' remaining life is extended to at least `MIN_LIFE` frames instead.
@@ -400,21 +402,23 @@ Full-screen psychedelic texture from four overlapping sine wave fields. Rendered
 
 ## 11. Branches (←/→ only)
 
-Recursive fractal lightning tree. Six neon arms radiate from screen centre, each splitting into two sub-branches (with an extra central fork at trunk level) down to depth 6, yielding 64+ tips per arm. The whole tree rotates slowly. Mid-band jitter makes every branch angle ripple in real-time. Beat fires additional arms and a brightness burst.
+Recursive fractal lightning tree. Nine neon arms radiate from screen centre, each splitting recursively (with an extra central fork at trunk and first-split levels) down to depth 7, yielding dense electric tips per arm. The trunk stub is very short (3% of arm length) so branches burst outward almost immediately from the centre. The whole tree rotates slowly. Mid-band jitter makes every branch angle ripple in real-time. Beat fires additional arms and a brightness burst. Two-pass neon glow (wide dim halo + bright core) on every segment.
 
 ### Parameters
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| `MAX_DEPTH` | `6` | Recursion depth (64 tips per arm) |
-| `BASE_ARMS` | `6` | Resting arm count |
-| Extra arms on beat | `int(min(beat, 2.5) * 1.5)` | Up to +3 arms |
-| Trunk length | `min(W, H) * 0.18 * (1 + bass * 0.70 + beat * 0.40)` | — |
-| Branch ratio | `0.64 + high * 0.08` | Child / parent length |
-| Spread angle | `π/2.8 + mid * 0.45` rad | Split half-angle |
-| Angle jitter | `sin(t*2.3 + …) * mid * 0.55` | Mid-driven per-branch jitter |
+| `MAX_DEPTH` | `7` | Recursion depth |
+| `BASE_ARMS` | `9` | Resting arm count |
+| Extra arms on beat | `int(min(beat, 2.5) * 2.2)` | Up to +5 arms |
+| Trunk draw length | `length * 0.03` | Very short stub; children get full length |
+| Trunk size | `min(sc * 0.22 * (1 + bass*0.70 + beat*0.45), sc * 0.27)` | Capped to keep branches on screen |
+| Branch ratio | `0.62 + high * 0.10` | Child / parent length |
+| Spread angle | `π/2.6 + mid * 0.55` rad | Split half-angle |
+| Angle jitter | `sin(t*2.3 + …) * mid * 0.80` | Mid-driven per-branch jitter (3 overlapping sines) |
+| Triple-fork depth | `>= MAX_DEPTH - 1` | Extra centre child at trunk + first split |
 | Rotation speed | `time * 0.06` rad | Whole-tree slow rotation |
-| `beat_flash` | decay `* 0.75 + beat * 0.25` | Brightness burst on beat |
+| `beat_flash` | decay `* 0.72 + beat * 0.28` | Brightness burst on beat |
 
 ### Audio Reactions
 - **Bass** → trunk length, animation speed
