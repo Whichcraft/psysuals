@@ -22,7 +22,7 @@ class Attractor:
     N_COLS       = 14
     GAP          = 0.88
     N_FILLED     = 5
-    N_ACTIVE_MAX = 2
+    N_ACTIVE_MAX = 3
     ACTIVE_LIFE  = 360   # frames before tile starts falling back (~6 s at 60 fps)
     MIN_LIFE     = 60    # minimum frames a tile stays enlarged before falling back (~1 s at 60 fps)
 
@@ -144,8 +144,9 @@ class Attractor:
             if candidates and self.filled_ids:
                 self.filled_ids[random.randrange(len(self.filled_ids))] = random.choice(candidates)
 
-        # On beat, pop a new interior tile to front (or extend life of existing ones)
-        if beat > 0.5:
+        # On bass beat, pop a new interior tile to front (or extend life of existing ones)
+        bass_beat = beat > 0.2 and bass > 0.25
+        if bass_beat:
             if len(self.active_ids) < self.N_ACTIVE_MAX:
                 candidates = [i for i in self._interior_indices() if i not in self.active_ids]
                 if candidates:
@@ -169,7 +170,7 @@ class Attractor:
             candidates = [i for i in self._interior_indices() if i not in self.active_ids]
             random.shuffle(candidates)
             for idx in candidates[:n_new]:
-                if len(self.active_ids) < self.N_ACTIVE_MAX + 2:  # allow up to +2 extra
+                if len(self.active_ids) < self.N_ACTIVE_MAX:
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
                     t["life"]    = self.ACTIVE_LIFE
