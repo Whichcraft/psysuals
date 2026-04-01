@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-04-01
+
+### Version bump
+- Minor version bump: consolidates recent feature additions (Tunnel spark layer, Cube satellite trails, mode reordering)
+
+---
+
 ## [1.4.3] — 2026-04-01
 
 ### Changes
