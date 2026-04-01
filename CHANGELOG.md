@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.2] — 2026-04-01
+
+### Bug fixes
+- **Cube**: inner cube rotation velocity capped at ±0.08 rad/frame (x/y) and ±0.05 (z) to prevent runaway spinning on strong beats
+- **Cube**: satellite trail length halved (`_SAT_FADE` 8 → 16)
+
+---
+
 ## [2.0.1] — 2026-04-01
 
 ### Bug fixes

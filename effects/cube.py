@@ -16,7 +16,7 @@ class Cube:
     """
 
     TRAIL_ALPHA  = 18
-    _SAT_FADE    = 8   # lower than TRAIL_ALPHA → longer satellite trails
+    _SAT_FADE    = 16  # lower than TRAIL_ALPHA → longer satellite trails
 
     VERTS = np.array([
         [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
@@ -99,9 +99,9 @@ class Cube:
         self.rvx += 0.00165 + mid  * 0.012 + beat * 0.10
         self.rvy += 0.00248 + bass * 0.015 + beat * 0.12
         self.rvz += 0.00083 + high * 0.008 + beat * 0.05
-        self.rvx *= 0.94
-        self.rvy *= 0.94
-        self.rvz *= 0.94
+        self.rvx *= 0.94; self.rvx = max(-0.08, min(0.08, self.rvx))
+        self.rvy *= 0.94; self.rvy = max(-0.08, min(0.08, self.rvy))
+        self.rvz *= 0.94; self.rvz = max(-0.05, min(0.05, self.rvz))
         self.rx  += self.rvx
         self.ry  += self.rvy
         self.rz  += self.rvz
