@@ -33,8 +33,11 @@ class Branches:
         # Per-branch angle jitter driven by mid
         jitter = (math.sin(time * 2.3 + depth * 1.7 + angle) * mid * 0.55
                   + math.cos(time * 1.1 + depth * 2.9) * mid * 0.25)
-        ex = x + math.cos(angle + jitter) * length
-        ey = y + math.sin(angle + jitter) * length
+        # Trunk segment (first from centre) is drawn short; children still use
+        # the full length so the rest of the tree fills the screen unchanged.
+        draw_len = length * 0.15 if depth == self.MAX_DEPTH else length
+        ex = x + math.cos(angle + jitter) * draw_len
+        ey = y + math.sin(angle + jitter) * draw_len
 
         # Colour: trunk = bass-warm, tips = high-cool
         depth_t = depth / self.MAX_DEPTH          # 1 at trunk, 0 at tips
@@ -74,7 +77,7 @@ class Branches:
         cy = config.HEIGHT // 2
 
         # Short trunk so the first split happens close to centre
-        trunk = (min(config.WIDTH, config.HEIGHT) * 0.02
+        trunk = (min(config.WIDTH, config.HEIGHT) * 0.18
                  * (1.0 + bass * 0.70 + beat * 0.40))
 
         # Extra arms on strong beats (up to +3)
