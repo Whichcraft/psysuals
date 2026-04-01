@@ -33,6 +33,10 @@ class Cube:
         self.svel     = 0.0
         self.rvx = self.rvy = self.rvz = 0.0
         self.orb_angle  = 0.0
+        # Satellites use their own slow rotation, independent of the main cube,
+        # so they never spin too fast or look distorted at high intensity.
+        self.sat_rx = 0.0
+        self.sat_ry = 0.0
         self.sat_surf   = None   # created on first draw
         self._sat_fade  = None
 
@@ -119,24 +123,29 @@ class Cube:
                 color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25)
                 pygame.draw.line(surf, color, proj[a], proj[b], lw)
 
-        n_sats    = 2 + int(min(beat, 2.0) * 2)
-        sat_scale = self.scale * 0.28
+        # Satellites: always 2, fixed positions 180° apart, own slow rotation.
+        # Keeping n_sats constant prevents position jumps at high intensity.
+        sat_scale = min(self.scale * 0.28, 0.55)   # cap prevents oversized cubes
         ORB_R     = 2.6
         self.orb_angle += 0.012 + beat * 0.04
+
+        # Satellites rotate slowly and independently (no tie to main cube's R)
+        self.sat_rx += 0.018
+        self.sat_ry += 0.026
+        Rs = self._Rx(self.sat_rx) @ self._Ry(self.sat_ry)
 
         # Fade satellite trail surface independently (slower than main)
         self.sat_surf.blit(self._sat_fade, (0, 0))
 
-        for si in range(n_sats):
-            theta = self.orb_angle + si / n_sats * math.tau
+        for si in range(2):
+            theta = self.orb_angle + si * math.pi   # always 180° apart
             ox    = ORB_R * math.cos(theta)
             oy    = ORB_R * math.sin(theta)
-            verts = (R @ (self.VERTS * sat_scale).T).T
+            verts = (Rs @ (self.VERTS * sat_scale).T).T
             proj  = self._project_sat(verts, ox, oy, sat_scale)
-            h_off = si / n_sats * 0.6
+            h_off = si * 0.5
             for ei, (a, b) in enumerate(self.EDGES):
                 h     = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0
-                # Start dim; brighten gradually with energy
                 color = hsl(h, l=0.18 + min(self.svel, 1.0) * 0.28)
                 pygame.draw.line(self.sat_surf, color, proj[a], proj[b], 1)
 

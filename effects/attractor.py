@@ -29,9 +29,10 @@ class Attractor:
     _DT     = 0.007
 
     def __init__(self):
-        self.hue    = 0.0
-        self.ry     = 0.0          # view rotation around Y
-        self.rho_kick = 0.0        # extra rho from beats (decays each frame)
+        self.hue      = 0.0
+        self.ry       = 0.0    # view rotation around Y
+        self.rx       = 0.0    # view rotation around X (adds 3-D tumble)
+        self.rho_kick = 0.0    # extra rho from beats (decays each frame)
         # Seed near the attractor
         self.x, self.y, self.z = 0.1, 0.0, 25.0
         self.attr_surf  = None
@@ -57,15 +58,32 @@ class Attractor:
             self.x, self.y, self.z = 0.1, 0.0, 25.0
 
     def _project(self, x3, y3, z3):
-        """Orthographic projection with Y-axis rotation."""
-        cos_y = math.cos(self.ry)
-        sin_y = math.sin(self.ry)
+        """Orthographic projection with dual-axis rotation for 3-D tumble.
+
+        Returns (sx, sy, depth) where depth is the post-rotation Z used for
+        brightness depth-cueing.  Coordinates are clamped to the screen so
+        the attractor never leaves the visible area.
+        """
+        # Rotate around Y axis
+        cos_y, sin_y = math.cos(self.ry), math.sin(self.ry)
         xr =  x3 * cos_y + z3 * sin_y
         yr =  y3
-        scale = min(config.WIDTH, config.HEIGHT) / 55.0
-        sx = int(xr * scale + config.WIDTH  / 2)
-        sy = int(yr * scale + config.HEIGHT / 2)
-        return sx, sy
+        zr = -x3 * sin_y + z3 * cos_y
+
+        # Rotate around X axis
+        cos_x, sin_x = math.cos(self.rx), math.sin(self.rx)
+        yr2 =  yr * cos_x - zr * sin_x
+        zr2 =  yr * sin_x + zr * cos_x
+
+        # Scale to fit attractor (max extent ~±35 units) within the screen
+        scale = min(config.WIDTH, config.HEIGHT) / 80.0
+        sx = int(xr  * scale + config.WIDTH  / 2)
+        sy = int(yr2 * scale + config.HEIGHT / 2)
+
+        # Hard clamp — trajectory stays fully on screen
+        sx = max(0, min(config.WIDTH  - 1, sx))
+        sy = max(0, min(config.HEIGHT - 1, sy))
+        return sx, sy, zr2
 
     def draw(self, surf, waveform, fft, beat, tick):
         if self.attr_surf is None:
@@ -80,27 +98,27 @@ class Attractor:
         self.rho_kick  = self.rho_kick * 0.92 + beat * 12.0
         rho   = self._RHO0 + self.rho_kick
 
-        # Slow rotation — speeds up on bass
+        # Dual-axis rotation: Y spins the butterfly, X tilts it — gives 3-D tumble
         self.ry += 0.004 + bass * 0.012
+        self.rx += 0.0017 + bass * 0.005   # slower X tilt
 
         # Fade the attractor surface (very slowly)
         self.attr_surf.blit(self._attr_fade, (0, 0))
 
         # Step and draw new trajectory segments
-        prev_sx, prev_sy = self._project(self.x, self.y, self.z - 25.0)
+        prev_sx, prev_sy, _ = self._project(self.x, self.y, self.z - 25.0)
         for i in range(self._STEPS):
             self._step(sigma, rho)
-            sx, sy = self._project(self.x, self.y, self.z - 25.0)
+            sx, sy, depth = self._project(self.x, self.y, self.z - 25.0)
 
-            # Colour by z position — maps wing L/R to opposite hues
-            z_norm = (self.z - 5.0) / 40.0
-            h      = (self.hue + z_norm * 0.55) % 1.0
-            bright = 0.45 + high * 0.35 + beat * 0.20
+            # Colour by z position; depth-cue brightness so far points are dimmer
+            z_norm   = (self.z - 5.0) / 40.0
+            h        = (self.hue + z_norm * 0.55) % 1.0
+            depth_t  = max(0.0, min(1.0, (depth + 30.0) / 60.0))  # 0=far, 1=near
+            bright   = 0.28 + depth_t * 0.35 + high * 0.25 + beat * 0.15
 
-            if (0 <= sx < config.WIDTH and 0 <= sy < config.HEIGHT and
-                    0 <= prev_sx < config.WIDTH and 0 <= prev_sy < config.HEIGHT):
-                pygame.draw.line(self.attr_surf, hsl(h, l=bright),
-                                 (prev_sx, prev_sy), (sx, sy), 1)
+            pygame.draw.line(self.attr_surf, hsl(h, l=bright),
+                             (prev_sx, prev_sy), (sx, sy), 1)
             prev_sx, prev_sy = sx, sy
 
         # Composite — additive blend so black background is transparent

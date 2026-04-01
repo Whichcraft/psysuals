@@ -11,13 +11,12 @@ from .utils import hsl
 class Tunnel:
     """First-person ride through a curving tube.
 
-    Each ring has a fixed position on the tube path and a z-depth that
-    decreases every frame so rings physically fly toward the camera.
-    When a ring passes through (z < Z_NEAR) it is recycled to the far end.
-
-    Sparks are rendered on a dedicated persistent surface that is always
-    composited on top of the tunnel geometry, so tunnel lines can never
-    overwrite spark trails.
+    Two persistent surfaces are managed internally:
+      tunnel_surf — tunnel geometry with its own fade
+      spark_surf  — spark triangles with a slower fade
+    psysualizer clears surf to black each frame (TRAIL_ALPHA=255), then we
+    blit tunnel_surf then spark_surf so sparks are ALWAYS above tunnel geometry
+    with zero bleed-through, regardless of fade rates.
     """
 
     N_RINGS = 30
@@ -26,16 +25,19 @@ class Tunnel:
     Z_FAR   = 10.0
     Z_NEAR  = 0.18
 
-    # Fade alpha for the main surface (tunnel rings)
-    TRAIL_ALPHA = 28
-    # Fade alpha for the spark layer — lower = longer trails
-    _SPARK_FADE = 10
+    # psysualizer uses this to set the fade overlay alpha.
+    # 255 = fully opaque black → surf is effectively cleared to black every frame.
+    TRAIL_ALPHA  = 255
+    _TUNNEL_FADE = 28   # tunnel surface fade (same feel as before)
+    _SPARK_FADE  = 10   # spark surface fade — slower = longer trails
 
     def __init__(self):
-        self.hue       = 0.0
-        self.time      = 0.0
-        self.spark_surf = None   # created on first draw (needs screen size)
-        self._spark_fade_surf = None
+        self.hue        = 0.0
+        self.time       = 0.0
+        self.tunnel_surf = None
+        self.spark_surf  = None
+        self._tfade      = None
+        self._sfade      = None
         spacing = (self.Z_FAR - self.Z_NEAR) / self.N_RINGS
         self.rings = [
             {"z": self.Z_NEAR + i * spacing,
@@ -55,16 +57,16 @@ class Tunnel:
                 int(wy * fov / z + config.HEIGHT / 2),
                 fov / z)
 
-    def _init_spark_surf(self):
-        self.spark_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-        self.spark_surf.fill((0, 0, 0))
-        self._spark_fade_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-        self._spark_fade_surf.set_alpha(self._SPARK_FADE)
-        self._spark_fade_surf.fill((0, 0, 0))
+    def _init_surfs(self):
+        W, H = config.WIDTH, config.HEIGHT
+        self.tunnel_surf = pygame.Surface((W, H)); self.tunnel_surf.fill((0, 0, 0))
+        self.spark_surf  = pygame.Surface((W, H)); self.spark_surf.fill((0, 0, 0))
+        self._tfade = pygame.Surface((W, H)); self._tfade.set_alpha(self._TUNNEL_FADE); self._tfade.fill((0, 0, 0))
+        self._sfade = pygame.Surface((W, H)); self._sfade.set_alpha(self._SPARK_FADE);  self._sfade.fill((0, 0, 0))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        if self.spark_surf is None:
-            self._init_spark_surf()
+        if self.tunnel_surf is None:
+            self._init_surfs()
 
         self.hue  += 0.006
         bass       = float(np.mean(fft[:6]))
@@ -94,7 +96,11 @@ class Tunnel:
 
         ordered = sorted(self.rings, key=lambda r: -r["z"])
 
-        # ── Draw tunnel rings onto main surf (background layer) ──────────────
+        # ── Fade both layers ─────────────────────────────────────────────────
+        self.tunnel_surf.blit(self._tfade, (0, 0))
+        self.spark_surf.blit(self._sfade, (0, 0))
+
+        # ── Draw tunnel rings onto tunnel_surf ───────────────────────────────
         for i in range(len(ordered) - 1):
             r1 = ordered[i]
             r2 = ordered[i + 1]
@@ -114,8 +120,8 @@ class Tunnel:
             bright = 0.06 + near_t * 0.65 + fft[fi] * 0.20 + beat * near_t * 0.45 + bass * near_t * 0.40
             lw     = max(1, int(1 + beat * 3 * near_t + bass * 3 * near_t))
 
-            pygame.draw.circle(surf, hsl(h, l=bright * 0.35), (sx1, sy1), sr1 + 4, lw + 3)
-            pygame.draw.circle(surf, hsl(h, l=bright),        (sx1, sy1), sr1,     lw)
+            pygame.draw.circle(self.tunnel_surf, hsl(h, l=bright * 0.35), (sx1, sy1), sr1 + 4, lw + 3)
+            pygame.draw.circle(self.tunnel_surf, hsl(h, l=bright),        (sx1, sy1), sr1,     lw)
 
             for side in range(self.N_SIDES):
                 angle = side / self.N_SIDES * math.tau
@@ -124,7 +130,7 @@ class Tunnel:
                 p2 = (sx2 + int(math.cos(angle) * sr2),
                       sy2 + int(math.sin(angle) * sr2))
                 hs = (h + side / self.N_SIDES * 0.25) % 1.0
-                pygame.draw.line(surf, hsl(hs, l=bright * 0.55), p1, p2, 1)
+                pygame.draw.line(self.tunnel_surf, hsl(hs, l=bright * 0.55), p1, p2, 1)
 
             n_star  = 3 + (i % 4)
             s_dir   = 1 if i % 2 == 0 else -1
@@ -137,12 +143,9 @@ class Tunnel:
                  sy1 + int(math.sin(v / n_star * math.tau + s_rot) * s_r))
                 for v in range(n_star)
             ]
-            pygame.draw.polygon(surf, hsl(s_h, l=s_l), s_pts, max(1, lw))
+            pygame.draw.polygon(self.tunnel_surf, hsl(s_h, l=s_l), s_pts, max(1, lw))
 
-        # ── Fade the spark layer independently (longer trails) ───────────────
-        self.spark_surf.blit(self._spark_fade_surf, (0, 0))
-
-        # ── Draw sparks onto the dedicated spark surface ─────────────────────
+        # ── Draw sparks onto spark_surf ──────────────────────────────────────
         live = []
         for tri in self.tris:
             tri["z"]   -= dt
@@ -166,5 +169,7 @@ class Tunnel:
             live.append(tri)
         self.tris = live[-60:]
 
-        # ── Composite sparks on top of tunnel (additive blend keeps bg black) ─
-        surf.blit(self.spark_surf, (0, 0), special_flags=pygame.BLEND_ADD)
+        # ── Composite: tunnel below, sparks always on top ────────────────────
+        # surf was cleared to black by psysualizer (TRAIL_ALPHA=255)
+        surf.blit(self.tunnel_surf, (0, 0))
+        surf.blit(self.spark_surf,  (0, 0), special_flags=pygame.BLEND_ADD)
