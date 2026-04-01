@@ -48,10 +48,25 @@ class Cube:
         return (int(v[0] * fov / z + config.WIDTH  // 2),
                 int(v[1] * fov / z + config.HEIGHT // 2))
 
-    def _project_off(self, v, ox, oy, oz, fov=680):
-        z = v[2] + oz + 3.8
-        return (int((v[0] + ox) * fov / z + config.WIDTH  // 2),
-                int((v[1] + oy) * fov / z + config.HEIGHT // 2))
+    def _project_sat(self, verts_3d, ox, oy, sat_scale, fov=680):
+        """Project satellite cube without distortion.
+
+        Project the orbit centre once, apply a uniform 2D scale for all
+        vertices so the cube never looks skewed, then clamp so it stays
+        fully on-screen.
+        """
+        z       = 3.8  # satellites orbit at z=0, so effective z depth = 3.8
+        scale_s = fov / z
+        cx_s    = ox * scale_s + config.WIDTH  // 2
+        cy_s    = oy * scale_s + config.HEIGHT // 2
+
+        # screen-space half-extent of the cube (vertex coords are in [-1,1])
+        extent = sat_scale * scale_s + 2  # +2 px margin
+        cx_s   = max(extent, min(config.WIDTH  - extent, cx_s))
+        cy_s   = max(extent, min(config.HEIGHT - extent, cy_s))
+
+        return [(int(cx_s + v[0] * scale_s), int(cy_s + v[1] * scale_s))
+                for v in verts_3d]
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.fade_hue += 0.0018
@@ -96,7 +111,7 @@ class Cube:
             ox    = ORB_R * math.cos(theta)
             oy    = ORB_R * math.sin(theta)
             verts = (R @ (self.VERTS * sat_scale).T).T
-            proj  = [self._project_off(v, ox, oy, 0.0) for v in verts]
+            proj  = self._project_sat(verts, ox, oy, sat_scale)
             h_off = si / n_sats * 0.6
             for ei, (a, b) in enumerate(self.EDGES):
                 h     = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0

@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.2] — 2026-04-01
+
+### Fixes
+- **Cube** — satellite cubes no longer distort; each satellite is projected from its orbit centre with a uniform screen-space scale so all edges remain square regardless of rotation
+- **Cube** — satellite cubes are clamped to stay fully within screen boundaries at all times
+
+---
+
 ## [1.4.1] — 2026-04-01
 
 ### Fixes
