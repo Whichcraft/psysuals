@@ -24,13 +24,13 @@ class Attractor:
     _RHO0   = 28.0
     _BETA   = 8.0 / 3.0
 
-    _STEPS  = 12
-    _DT     = 0.007
+    _STEPS  = 8
+    _DT     = 0.018    # larger step → segments spaced further apart
 
     # Perspective camera distance — lower = more dramatic perspective
     _CAM_Z  = 55.0
-    # Max ribbon half-width in world units (controls how "plane-like" it looks)
-    _RIB_W  = 2.2
+    # Ribbon half-width in world units — large enough to see as a distinct plane
+    _RIB_W  = 7.0
 
     def __init__(self):
         self.hue      = 0.0
