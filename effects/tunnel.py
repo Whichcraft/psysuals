@@ -52,7 +52,7 @@ class Tunnel:
         dt         = 0.03 + bass * 0.09 + beat * 0.18
         self.time += dt
 
-        spawn_n = int(bass * 1.5 + (beat * 3.0 if beat > 0.3 else 0))
+        spawn_n = int(bass * 4.0 + (beat * 6.0 if beat > 0.3 else 0))
         for _ in range(spawn_n):
             z = self.Z_FAR * random.uniform(0.65, 0.95)
             self.tris.append({
@@ -106,7 +106,7 @@ class Tunnel:
             n_star  = 3 + (i % 4)
             s_dir   = 1 if i % 2 == 0 else -1
             s_rot   = self.time * 0.45 * s_dir + i * 0.52
-            s_r     = max(2, int(sr1 * 0.52))
+            s_r     = max(2, int(sr1 * 0.24))
             s_h     = (h + 0.5) % 1.0
             s_l     = min(bright * 1.1 + mid * 0.2, 0.92)
             s_pts   = [
