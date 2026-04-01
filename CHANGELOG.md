@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.3] — 2026-04-01
+
+### Changes
+- **Tunnel** — sparks now rendered on a dedicated persistent layer (fade alpha 10) always composited above tunnel geometry; fewer sparks spawn; trails are significantly longer; bass drives tube radius, ring width, triangle size, and tunnel speed more aggressively
+- **Cube** — satellite cubes now leave long trailing lines via a dedicated persistent surface (fade alpha 8) composited with additive blend on top of the main cubes; satellites start at reduced intensity and brighten with energy
+- **Effects order** — Lissajous moved to slot 4 (`4` key), Tunnel moved to slot 5 (`5` key); all docs updated to match
+
+---
+
 ## [1.4.2] — 2026-04-01
 
 ### Fixes

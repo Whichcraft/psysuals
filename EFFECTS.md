@@ -26,8 +26,8 @@ All effects share a common audio pipeline. Each effect responds to the same audi
 | 1 | `1` | Yantra | Sacred geometry mandala with concentric polygon rings |
 | 2 | `2` | Cube | Rotating wireframe cubes with orbiting satellites |
 | 3 | `3` | Plasma | Full-screen sine-interference psychedelic texture |
-| 4 | `4` | Tunnel | First-person ride through a curving tube |
-| 5 | `5` | Lissajous | 3-D Lissajous knot with 3-fold symmetry |
+| 4 | `4` | Lissajous | 3-D Lissajous knot with 3-fold symmetry |
+| 5 | `5` | Tunnel | First-person ride through a curving tube |
 | 6 | `6` | Corridor | Neon rainbow corridor — rounded-rectangle frames flying toward camera |
 | 7 | `7` | Nova | Waveform kaleidoscope with 7-fold mirror symmetry |
 | 8 | `8` | Spiral | Neon helix vortex with 6 arms flying toward viewer |
@@ -130,39 +130,7 @@ Full-screen psychedelic texture from four overlapping sine wave fields. Rendered
 
 ---
 
-## 4. Tunnel
-
-First-person ride through a sinusoidal curving tube. 30 rings of 20-sided polygons recede into the distance. Beat spawns incoming triangles that rotate as they fly toward the camera. Inner polygons rotate within each ring.
-
-### Parameters
-
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| `N_RINGS` | `30` | Depth rings |
-| `N_SIDES` | `20` | Polygon segments per ring |
-| `TUBE_R` | `2.8` 3-D units | Tube radius |
-| `Z_FAR` | `10.0` | Far clipping depth |
-| `Z_NEAR` | `0.18` | Near clipping depth |
-| FOV | `min(W, H) * 0.75` | — |
-| Tube sway X | `sin(t * 0.21) * 0.8` | — |
-| Tube sway Y | `cos(t * 0.16) * 0.6` | — |
-| Time speed | `0.03 + bass * 0.09 + beat * 0.18` per frame | — |
-| Triangle spawn rate | `int(bass * 1.5 + beat * 3.0)` per frame | Beat threshold 0.3 |
-| Triangle size | `uniform(0.45, 1.1) * (1.0 + bass * 1.5)` | — |
-| Triangle rotation velocity | `±uniform(0.04, 0.12)` rad/frame | Random direction |
-| Triangle pool limit | `120` | — |
-| Ring brightness | `0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50` | — |
-| Inner polygon sides | `3 + (ring_index % 4)` | 3–6 sides, alternating |
-| Inner polygon rotation | `time * 0.45 * direction` | Alternating per ring |
-
-### Audio Reactions
-- **Bass** → time speed, triangle size, spawn rate
-- **Beat** → time speed burst, spawn burst, ring brightness
-- **Per-ring FFT** → individual ring brightness
-
----
-
-## 5. Lissajous
+## 4. Lissajous
 
 3-D Lissajous parametric curve forming a trefoil knot with 3-fold rotational symmetry. Trail of up to 1400 points rendered with two-pass neon glow. Scale and rotation spring on beats.
 
@@ -195,6 +163,40 @@ First-person ride through a sinusoidal curving tube. 30 rings of 20-sided polygo
 - **Mid** → Y-axis frequency
 - **High** → Z-axis frequency, phase speed
 - **Beat** → scale burst, rotation kick, head dot size, hue shift, extra glow (beat > 0.5)
+
+---
+
+## 5. Tunnel
+
+First-person ride through a sinusoidal curving tube. 30 rings of 20-sided polygons recede into the distance. Beat spawns incoming triangles that rotate as they fly toward the camera. Inner polygons rotate within each ring. Sparks are rendered on a dedicated persistent layer always composited above the tunnel geometry.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `N_RINGS` | `30` | Depth rings |
+| `N_SIDES` | `20` | Polygon segments per ring |
+| `TUBE_R` | `2.8` 3-D units | Tube radius (expands with bass) |
+| `Z_FAR` | `10.0` | Far clipping depth |
+| `Z_NEAR` | `0.18` | Near clipping depth |
+| FOV | `min(W, H) * 0.75` | — |
+| Tube sway X | `sin(t * 0.21) * 0.8` | — |
+| Tube sway Y | `cos(t * 0.16) * 0.6` | — |
+| Time speed | `0.03 + bass * 0.14 + beat * 0.22` per frame | — |
+| Triangle spawn rate | `int(bass * 0.6 + beat * 1.5)` per frame | Beat threshold 0.4 |
+| Triangle size | `uniform(0.5, 1.2) * (1.0 + bass * 3.0 + beat * 1.5)` | — |
+| Triangle rotation velocity | `±uniform(0.04, 0.14)` rad/frame | Random direction |
+| Triangle pool limit | `60` | — |
+| Spark trail fade alpha | `10` | Independent layer; lower = longer trails |
+| Ring brightness | `0.06 + near_t * 0.65 + fft[fi] * 0.20 + beat * near_t * 0.45 + bass * near_t * 0.40` | — |
+| Ring width | `1 + beat * 3 * near_t + bass * 3 * near_t` | — |
+| Inner polygon sides | `3 + (ring_index % 4)` | 3–6 sides, alternating |
+| Inner polygon rotation | `time * 0.45 * direction` | Alternating per ring |
+
+### Audio Reactions
+- **Bass** → time speed, tube radius, triangle size & spawn rate, ring brightness & width
+- **Beat** → time speed burst, spawn burst, ring brightness & width
+- **Per-ring FFT** → individual ring brightness
 
 ---
 
