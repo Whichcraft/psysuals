@@ -23,9 +23,9 @@ class Attractor:
     GAP          = 0.88
     N_FILLED     = 5
     N_ACTIVE_MAX = 3
-    ACTIVE_LIFE_MIN = 60   # 1 s — guaranteed minimum time big and in foreground
+    ACTIVE_LIFE_MIN = 150  # ~2.5 s — guaranteed minimum time big and in foreground
     ACTIVE_LIFE_MAX = 360  # 6 s — maximum random lifetime
-    MIN_LIFE        = 60   # minimum remaining life when extended by a beat
+    MIN_LIFE        = 150  # minimum remaining life when extended by a beat
 
     def __init__(self):
         self.hue        = 0.0
