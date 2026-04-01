@@ -17,15 +17,15 @@ class Yantra:
     it back — timed to the kick drum of fast BPM tracks.
     """
 
-    N_RINGS  = 6
+    N_RINGS  = 7
     N_SPOKES = 24
 
     def __init__(self):
         self.hue  = 0.0
         self.time = 0.0
-        signs = [1, -1, 1, -1, 1, -1]
+        signs = [1, -1, 1, -1, 1, -1, 1]
         self.rot  = [0.0] * self.N_RINGS
-        self.rvel = [signs[i] * (0.004 + i * 0.0018) for i in range(self.N_RINGS)]
+        self.rvel = [signs[i] * (0.010 + i * 0.0030) for i in range(self.N_RINGS)]
         self.poff = [0.0] * self.N_RINGS
         self.pvel = [0.0] * self.N_RINGS
 
@@ -47,7 +47,8 @@ class Yantra:
         mid  = float(np.mean(fft[6:30]))
         high = float(np.mean(fft[30:]))
         bands = [bass, (bass + mid) * 0.5, mid,
-                 (mid + high) * 0.5, high, (bass + high) * 0.5]
+                 (mid + high) * 0.5, high, (bass + high) * 0.5,
+                 (mid + high) * 0.5]
 
         for i in range(self.N_RINGS):
             e = min(bands[i], 1.0)
@@ -59,7 +60,7 @@ class Yantra:
 
         all_verts = []
         for i in range(self.N_RINGS):
-            base_r = max_r * (0.13 + i / (self.N_RINGS - 1) * 0.83)
+            base_r = max_r * (0.28 + i / (self.N_RINGS - 1) * 0.62)
             r      = base_r * (1.0 + self.poff[i] * 0.38)
             all_verts.append(self._ring_verts(i, r, cx, cy))
 

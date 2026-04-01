@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.3] — 2026-04-01
+
+### Changes
+- **Cube**: scale no longer grows on beat/bass; beat/bass now only drive rotation speed and edge brightness
+- **Yantra**: initial rotation speed ~2.5× faster; rings tighter (span 28–90% of max radius); 7th ring added
+- **Tunnel**: center polygon size halved (0.52 → 0.24 × ring radius); triangle spawn rate doubled for bass and beats
+- **Branches**: trunk stub halved (0.03 → 0.015 × arm length) for a denser ball-like canopy from centre
+
+---
+
 ## [2.0.2] — 2026-04-01
 
 ### Bug fixes

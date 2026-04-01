@@ -106,11 +106,9 @@ class Cube:
         self.ry  += self.rvy
         self.rz  += self.rvz
 
-        self.svel  += beat * 0.32 + bass * 0.20
-        self.svel  += (1.0 - self.scale) * 0.18
-        self.svel  *= 0.68
-        self.scale += self.svel
-        self.scale  = max(0.5, self.scale)
+        # Beat/bass drive visual energy (line width + brightness) but not scale
+        self.svel   = self.svel * 0.68 + (beat * 0.32 + bass * 0.20) * 0.68
+        self.scale  = 1.0
 
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
