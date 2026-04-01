@@ -22,7 +22,7 @@ MODES = [
     ("Nova",        Nova),        # 7
     ("Spiral",      Spiral),      # 8
     ("Bubbles",     Bubbles),     # 9
-    ("Attractor",   Attractor),   # ←/→ only
+    ("TriWall",     Attractor),   # ←/→ only
     ("Branches",    Branches),    # ←/→ only
     ("Spectrum",    Bars),        # ←/→ only
     ("Waterfall",   GlowSquares), # ←/→ only
