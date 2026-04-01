@@ -33,6 +33,12 @@ class Attractor:
         self._built     = False
         self._swap_cd   = 0
         self._auto_cd   = random.randint(180, 300)  # frames until next auto-activation
+        # Rainbow sweep state
+        self._sweep_pos   = 0.0
+        self._sweep_angle = random.uniform(0, math.tau)
+        self._sweep_vel   = 3.5          # px per frame
+        self._sweep_width = 80.0         # half-width of the sweep band
+        self._sweep_diag  = 0.0          # set on build
 
     # ------------------------------------------------------------------
     def _build_grid(self):
@@ -61,6 +67,8 @@ class Attractor:
         visible = self._visible_indices()
         self.filled_ids = random.sample(visible, min(self.N_FILLED, len(visible)))
         self._built = True
+        # Screen diagonal for sweep wrap-around
+        self._sweep_diag = math.hypot(config.WIDTH, config.HEIGHT)
 
     def _make_tile(self, verts):
         cx = sum(v[0] for v in verts) / 3
@@ -158,6 +166,16 @@ class Attractor:
 
         W, H = config.WIDTH, config.HEIGHT
 
+        # ── Advance sweep ────────────────────────────────────────────────────
+        self._sweep_pos += self._sweep_vel
+        # when sweep exits the screen, pick a new random angle and restart
+        if self._sweep_pos > self._sweep_diag + self._sweep_width:
+            self._sweep_pos   = -self._sweep_width
+            self._sweep_angle = random.uniform(0, math.tau)
+
+        sw_cos = math.cos(self._sweep_angle)
+        sw_sin = math.sin(self._sweep_angle)
+
         # ── Pass 1: all non-active tiles ────────────────────────────────────
         for i, tile in enumerate(self.tiles):
             if i in self.active_ids:
@@ -165,12 +183,13 @@ class Attractor:
 
             tile["hue"] = (tile["hue"] + tile["hvel"] + 0.00015) % 1.0
 
-            # Spring back to scale=1.0 (in case it was previously active)
-            tile["svel"]  += (1.0 - tile["scale"]) * 0.15
-            tile["svel"]  *= 0.75
-            tile["scale"] += tile["svel"]
-            tile["rot"]   += tile["rot_vel"]
+            # Spring back to scale=1.0 and rot=0.0 (in case it was previously active)
+            tile["svel"]    += (1.0 - tile["scale"]) * 0.15
+            tile["svel"]    *= 0.75
+            tile["scale"]   += tile["svel"]
+            tile["rot_vel"] += (0.0 - tile["rot"]) * 0.05
             tile["rot_vel"] *= 0.88
+            tile["rot"]     += tile["rot_vel"]
 
             pts = self._screen_verts(tile)
             if all(p[0] < 0 or p[0] >= W or p[1] < 0 or p[1] >= H for p in pts):
@@ -183,6 +202,15 @@ class Attractor:
 
             self._rainbow_edges(surf, pts)
 
+            # Sweep glow
+            d = tile["cx"] * sw_cos + tile["cy"] * sw_sin
+            dist = abs(d - self._sweep_pos)
+            if dist < self._sweep_width:
+                t = 1.0 - dist / self._sweep_width      # 1.0 at centre, 0 at edge
+                sweep_h  = (self.hue + d / self._sweep_diag + 0.5) % 1.0
+                sweep_br = 0.15 + t * 0.45
+                pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
+
         # ── Pass 2: active tiles — on top, way bigger, bass-pulsing ─────────
         finished = []
         for i in self.active_ids:
@@ -190,26 +218,28 @@ class Attractor:
             tile["hue"] = (tile["hue"] + tile["hvel"] + 0.00015) % 1.0
 
             if tile["life"] > 0:
-                # Still alive: hold at large scale, pulse with bass
+                # Still alive: hold at large scale, pulse hard with bass
                 tile["life"] -= 1
-                target         = 4.5 + bass * 1.8     # 4.5-6x normal, breathing with bass
-                tile["svel"]  += (target - tile["scale"]) * 0.18
-                tile["svel"]  *= 0.72
+                target         = 4.5 + bass * 4.0     # up to ~8.5x on strong bass beat
+                tile["svel"]  += (target - tile["scale"]) * 0.22
+                tile["svel"]  *= 0.70
                 tile["scale"] += tile["svel"]
                 tile["rot"]   += tile["rot_vel"]
                 # Bass reinforces spin
-                tile["rot_vel"] += bass * 0.012 * math.copysign(1, tile["rot_vel"] or 1)
+                tile["rot_vel"] += bass * 0.016 * math.copysign(1, tile["rot_vel"] or 1)
                 tile["rot_vel"] *= 0.96
             else:
-                # Life expired: spring back to rest
-                tile["svel"]  += (1.0 - tile["scale"]) * 0.12
-                tile["svel"]  *= 0.78
-                tile["scale"] += tile["svel"]
-                tile["rot"]   += tile["rot_vel"]
-                tile["rot_vel"] *= 0.90
+                # Life expired: spring back to rest (scale → 1.0, rot → 0.0)
+                tile["svel"]    += (1.0 - tile["scale"]) * 0.12
+                tile["svel"]    *= 0.78
+                tile["scale"]   += tile["svel"]
+                tile["rot_vel"] += (0.0 - tile["rot"]) * 0.06
+                tile["rot_vel"] *= 0.85
+                tile["rot"]     += tile["rot_vel"]
 
-                if abs(tile["scale"] - 1.0) < 0.03 and abs(tile["rot_vel"]) < 0.004:
+                if abs(tile["scale"] - 1.0) < 0.03 and abs(tile["rot"]) < 0.02 and abs(tile["rot_vel"]) < 0.003:
                     tile["scale"]   = 1.0
+                    tile["rot"]     = 0.0
                     tile["rot_vel"] = 0.0
                     tile["svel"]    = 0.0
                     finished.append(i)

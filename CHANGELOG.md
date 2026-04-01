@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.1] — 2026-04-01
+
+### Changes
+- **TriWall** — fallen-back tiles now spring their rotation to 0° so they snap back into grid alignment
+- **TriWall** — rainbow sweep: a glowing wave at a random angle (left-to-right, diagonal, etc.) sweeps across all triangles continuously, cycling through the rainbow; picks a new angle each pass
+- **TriWall** — active tiles pulse harder to bass: target scale raised from `4.5 + bass×1.8` to `4.5 + bass×4.0` (up to ~8.5× on strong bass beat); spring stiffness increased for snappier response
+
+---
+
 ## [1.6.0] — 2026-04-01
 
 ### Features
