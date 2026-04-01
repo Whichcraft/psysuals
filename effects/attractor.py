@@ -118,8 +118,8 @@ class Attractor:
         self.rho_kick = self.rho_kick * 0.92 + beat * 12.0
         rho   = self._RHO0 + self.rho_kick
 
-        self.ry += 0.004 + bass * 0.012
-        self.rx += 0.0017 + bass * 0.005
+        self.ry += 0.002 + bass * 0.006
+        self.rx += 0.0008 + bass * 0.003
 
         self.attr_surf.blit(self._attr_fade, (0, 0))
 
@@ -141,13 +141,14 @@ class Attractor:
                                      sx, sy, sc, self._RIB_W)
             if quad:
                 pts = [(int(p[0]), int(p[1])) for p in quad]
-                # Filled core
-                pygame.draw.polygon(self.attr_surf, hsl(h, l=bright), pts)
-                # Bright edge lines for a neon-panel glow
-                pygame.draw.line(self.attr_surf, hsl(h, l=min(bright + 0.20, 0.95)),
-                                 pts[0], pts[1], 1)
-                pygame.draw.line(self.attr_surf, hsl(h, l=min(bright + 0.20, 0.95)),
-                                 pts[3], pts[2], 1)
+                edge_col  = hsl(h, l=min(bright + 0.20, 0.95))
+                inner_col = hsl(h, l=bright)
+                # Leading/trailing edges (travel direction)
+                pygame.draw.line(self.attr_surf, edge_col,  pts[0], pts[1], 1)
+                pygame.draw.line(self.attr_surf, edge_col,  pts[3], pts[2], 1)
+                # Side edges (ribbon width) — slightly dimmer
+                pygame.draw.line(self.attr_surf, inner_col, pts[0], pts[3], 1)
+                pygame.draw.line(self.attr_surf, inner_col, pts[1], pts[2], 1)
 
             prev_sx, prev_sy, prev_sc = sx, sy, sc
 
