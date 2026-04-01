@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.4] — 2026-04-01
+
+### Bug fixes
+- **Cube**: restore beat scale bump — cube pulses on kick but scale is capped at 1.25× so it never grows large at high intensity; spring always restores to 1.0 between beats
+
+---
+
 ## [2.0.3] — 2026-04-01
 
 ### Changes

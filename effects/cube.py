@@ -106,9 +106,13 @@ class Cube:
         self.ry  += self.rvy
         self.rz  += self.rvz
 
-        # Beat/bass drive visual energy (line width + brightness) but not scale
-        self.svel   = self.svel * 0.68 + (beat * 0.32 + bass * 0.20) * 0.68
-        self.scale  = 1.0
+        # Beat pulses scale but spring always restores to 1.0; cap prevents
+        # accumulation at high intensity so cube bumps but never grows large.
+        self.svel  += beat * 0.32 + bass * 0.20
+        self.svel  += (1.0 - self.scale) * 0.18
+        self.svel  *= 0.68
+        self.scale += self.svel
+        self.scale  = max(0.5, min(1.25, self.scale))
 
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
