@@ -23,7 +23,8 @@ class Attractor:
     GAP          = 0.88
     N_FILLED     = 5
     N_ACTIVE_MAX = 2
-    ACTIVE_LIFE  = 200   # frames before tile starts falling back (~3 s at 60 fps)
+    ACTIVE_LIFE  = 360   # frames before tile starts falling back (~6 s at 60 fps)
+    MIN_LIFE     = 180   # minimum frames a tile stays enlarged before falling back
 
     def __init__(self):
         self.hue        = 0.0
@@ -33,11 +34,13 @@ class Attractor:
         self._built     = False
         self._swap_cd   = 0
         self._auto_cd   = random.randint(180, 300)  # frames until next auto-activation
-        # Rainbow sweep state
-        self._sweep_pos   = 0.0
-        self._sweep_angle = random.uniform(0, math.tau)
-        self._sweep_vel   = 3.5          # px per frame
-        self._sweep_width = 80.0         # half-width of the sweep band
+        # Two independent rainbow sweeps so one is nearly always on screen
+        # Second starts mid-travel so they're never both off-screen simultaneously
+        self._sweeps = [
+            {"pos": 0.0,   "angle": random.uniform(0, math.tau), "vel": 3.2},
+            {"pos": 600.0, "angle": random.uniform(0, math.tau), "vel": 4.1},
+        ]
+        self._sweep_width = 90.0         # half-width of each sweep band
         self._sweep_diag  = 0.0          # set on build
 
     # ------------------------------------------------------------------
@@ -141,17 +144,22 @@ class Attractor:
             if candidates and self.filled_ids:
                 self.filled_ids[random.randrange(len(self.filled_ids))] = random.choice(candidates)
 
-        # On beat, pop a new interior tile to front
-        if beat > 0.5 and len(self.active_ids) < self.N_ACTIVE_MAX:
-            candidates = [i for i in self._interior_indices() if i not in self.active_ids]
-            if candidates:
-                idx = random.choice(candidates)
-                self.active_ids.append(idx)
-                t = self.tiles[idx]
-                t["life"]    = self.ACTIVE_LIFE
-                t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
-                t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
-                t["cvx"] = 0.0;         t["cvy"] = 0.0
+        # On beat, pop a new interior tile to front (or extend life of existing ones)
+        if beat > 0.5:
+            if len(self.active_ids) < self.N_ACTIVE_MAX:
+                candidates = [i for i in self._interior_indices() if i not in self.active_ids]
+                if candidates:
+                    idx = random.choice(candidates)
+                    self.active_ids.append(idx)
+                    t = self.tiles[idx]
+                    t["life"]    = self.ACTIVE_LIFE
+                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
+                    t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
+                    t["cvx"] = 0.0;         t["cvy"] = 0.0
+            else:
+                # Slots full — extend life of existing active tiles so they don't fall back yet
+                for idx in self.active_ids:
+                    self.tiles[idx]["life"] = max(self.tiles[idx]["life"], self.MIN_LIFE)
 
         # Periodically auto-activate 1-2 interior tiles regardless of beat
         self._auto_cd -= 1
@@ -171,15 +179,12 @@ class Attractor:
 
         W, H = config.WIDTH, config.HEIGHT
 
-        # ── Advance sweep ────────────────────────────────────────────────────
-        self._sweep_pos += self._sweep_vel
-        # when sweep exits the screen, pick a new random angle and restart
-        if self._sweep_pos > self._sweep_diag + self._sweep_width:
-            self._sweep_pos   = -self._sweep_width
-            self._sweep_angle = random.uniform(0, math.tau)
-
-        sw_cos = math.cos(self._sweep_angle)
-        sw_sin = math.sin(self._sweep_angle)
+        # ── Advance both sweeps ──────────────────────────────────────────────
+        for sw in self._sweeps:
+            sw["pos"] += sw["vel"]
+            if sw["pos"] > self._sweep_diag + self._sweep_width:
+                sw["pos"]   = -self._sweep_width
+                sw["angle"] = random.uniform(0, math.tau)
 
         # ── Pass 1: all non-active tiles ────────────────────────────────────
         for i, tile in enumerate(self.tiles):
@@ -200,14 +205,17 @@ class Attractor:
             if all(p[0] < 0 or p[0] >= W or p[1] < 0 or p[1] >= H for p in pts):
                 continue
 
-            # Sweep glow — drawn first so tile fill and edges render on top
-            d    = tile["cx"] * sw_cos + tile["cy"] * sw_sin
-            dist = abs(d - self._sweep_pos)
-            if dist < self._sweep_width:
-                sw_t     = 1.0 - dist / self._sweep_width   # 1.0 at centre, 0 at edge
-                sweep_h  = (self.hue + d / self._sweep_diag) % 1.0
-                sweep_br = 0.20 + sw_t * 0.55
-                pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
+            # Sweep glows — drawn first so tile fill and edges render on top
+            for sw in self._sweeps:
+                sw_cos = math.cos(sw["angle"])
+                sw_sin = math.sin(sw["angle"])
+                d      = tile["cx"] * sw_cos + tile["cy"] * sw_sin
+                dist   = abs(d - sw["pos"])
+                if dist < self._sweep_width:
+                    sw_t    = 1.0 - dist / self._sweep_width
+                    sweep_h = (self.hue + d / self._sweep_diag) % 1.0
+                    sweep_br = 0.20 + sw_t * 0.55
+                    pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
 
             if i in self.filled_ids:
                 h      = (tile["hue"] + self.hue) % 1.0
