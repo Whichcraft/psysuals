@@ -5,6 +5,36 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.0] — 2026-04-01
+
+### Three spectacular new effects
+
+This is a landmark release. psysuals 2.0.0 ships three completely new visual effects that push the reactive experience to another level — each one a different flavour of audio-driven madness, each one impossible to look away from.
+
+#### TriFlux (key `3`)
+The wall is alive. An equilateral triangle mosaic fills the screen with wireframe tiles, their edges blazing with per-angle rainbow colour. On every bass kick, up to three tiles explode to the foreground — growing up to 8× their size, spinning, bouncing off screen edges — before springing back into perfect grid alignment. Two independent rainbow sweep waves wash across the whole wall at constantly changing angles. Every tile glows. Everything reacts. The grid breathes.
+
+Technical highlights: per-tile spring physics (scale + rotation + centroid position), vertex-level screen-edge bounce with velocity reflection, dual sweep layers at staggered positions and independent angles, interior-only activation with 1.5-tile-width margin, guaranteed 2.5–6 s active lifetime per tile, vertex coordinate clamping for SDL stability.
+
+#### Branches (←/→)
+Six neon lightning arms fractal-split from screen centre to depth 6, generating 64+ electric tips per arm. Every branch angle jitters live to the mid frequencies — the whole tree writhes with the music. Bass drives trunk length; strong beats fire extra arms and flood the screen with a brightness burst. The structure rotates slowly, never settling.
+
+Technical highlights: depth-6 recursive branching with Y-fork at trunk level, separate draw length for trunk segment (15% of length) while children receive full extent so the tree fills the screen, mid-driven per-branch angle jitter using overlapping sine functions, beat-flash decay envelope.
+
+#### Corridor (key `6`)
+A first-person ride through a neon rainbow tunnel of rounded-rectangle frames rushing toward the camera. The path curves sinusoidally. Beat flares the nearest frames and erupts a shower of sparks that streak toward you on their own independent trail layer — sparks always burn above the geometry, never buried behind it.
+
+Technical highlights: two-surface compositing (corridor layer fade α=28, spark layer fade α=10, blitted with `BLEND_ADD` for additive glow), perspective-correct rounded-rect frames, per-frame FFT bin brightness mapping.
+
+### All changes
+- **TriFlux**: activation on bass beat (`beat > 0.2 AND bass > 0.25`), max 3 simultaneous active tiles, random lifetime 2.5–6 s, spring-back grid alignment, bounce physics, dual rainbow sweeps
+- **TriFlux**: vertex SDL clamp ±16383, scale cap 12.0, `ACTIVE_LIFE_MIN` raised to 150 frames to guarantee 1 s of fully-expanded big-phase
+- **Mode order**: TriFlux on key `3`; Plasma moved to ←/→ only
+- **EFFECTS.md**: complete rewrite with correct section order and full TriFlux parameter table
+- **File**: `effects/attractor.py` → `effects/triflux.py`
+
+---
+
 ## [1.6.5] — 2026-04-01
 
 ### Changes
