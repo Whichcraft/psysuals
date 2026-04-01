@@ -32,8 +32,10 @@ All effects share a common audio pipeline. Each effect responds to the same audi
 | 7 | `7` | Nova | Waveform kaleidoscope with 7-fold mirror symmetry |
 | 8 | `8` | Spiral | Neon helix vortex with 6 arms flying toward viewer |
 | 9 | `9` | Bubbles | Translucent rising bubbles, size driven by bass |
-| 10 | `0` | Spectrum | Classic spectrum bars with peak markers and waveform overlay |
-| 11 | ←/→ only | Waterfall | Scrolling spectrogram (time-frequency display) |
+| 10 | ←/→ only | Attractor | Lorenz strange attractor — chaotic butterfly, live parameter modulation |
+| 11 | ←/→ only | Branches | Recursive fractal lightning tree — 6 arms, depth 6, audio-jittered angles |
+| 12 | ←/→ only | Spectrum | Classic spectrum bars with peak markers and waveform overlay |
+| 13 | ←/→ only | Waterfall | Scrolling spectrogram (time-frequency display) |
 
 ---
 
@@ -407,11 +409,63 @@ First-person neon rainbow corridor. Concentric rounded-rectangle frames recede i
 
 ---
 
+## 10. Attractor
+
+Lorenz strange attractor. A single particle evolves under the Lorenz ODE system (σ, ρ, β). A dedicated surface with a very slow fade (alpha 4) lets the full double-wing butterfly accumulate frame by frame. The view rotates slowly around the Y-axis. Audio deforms the attractor shape live.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `_SIGMA0` | `10.0` | Lorenz sigma baseline |
+| `_RHO0` | `28.0` | Lorenz rho baseline |
+| `_BETA` | `8/3` | Lorenz beta (fixed) |
+| `_STEPS` | `12` | Trajectory steps per frame |
+| `_DT` | `0.007` | Integration timestep |
+| `_ATTR_FADE` | `4` | Attractor surface fade alpha — very slow |
+| Scale | `min(W, H) / 55` | Orthographic pixels-per-unit |
+| Rotation speed | `0.004 + bass * 0.012` rad/frame | Y-axis |
+| Sigma modulation | `sigma0 + bass * 5.0` | Bass expands attractor width |
+| Rho kick | `beat * 12.0`, decay `* 0.92` | Beat extends attractor depth |
+
+### Audio Reactions
+- **Bass** → sigma (wing width), rotation speed
+- **Beat** → rho kick (wing depth / bifurcation)
+- **High** → particle brightness
+
+---
+
+## 11. Branches
+
+Recursive fractal lightning tree. Six neon arms radiate from screen centre, each splitting into two sub-branches (with an extra central fork at trunk level) down to depth 6, yielding 64+ tips per arm. The whole tree rotates slowly. Mid-band jitter makes every branch angle ripple in real-time. Beat fires additional arms and a brightness burst.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `MAX_DEPTH` | `6` | Recursion depth (64 tips per arm) |
+| `BASE_ARMS` | `6` | Resting arm count |
+| Extra arms on beat | `int(min(beat, 2.5) * 1.5)` | Up to +3 arms |
+| Trunk length | `min(W, H) * 0.18 * (1 + bass * 0.70 + beat * 0.40)` | — |
+| Branch ratio | `0.64 + high * 0.08` | Child / parent length |
+| Spread angle | `π/2.8 + mid * 0.45` rad | Split half-angle |
+| Angle jitter | `sin(t*2.3 + …) * mid * 0.55` | Mid-driven per-branch jitter |
+| Rotation speed | `time * 0.06` rad | Whole-tree slow rotation |
+| `beat_flash` | decay `* 0.75 + beat * 0.25` | Brightness burst on beat |
+
+### Audio Reactions
+- **Bass** → trunk length, animation speed
+- **Mid** → branch angle jitter (organic branching motion)
+- **High** → branch brightness, child/parent length ratio
+- **Beat** → extra arms, brightness burst, speed kick
+
+---
+
 ## Navigation
 
 | Key | Action |
 |-----|--------|
-| `1` – `0` | Switch effect |
-| `←` / `→` | Previous / next effect |
+| `1` – `9` | Switch to effect 1–9 |
+| `←` / `→` | Previous / next effect (cycles all 13 modes) |
 | `↑` / `↓` | Increase / decrease effect intensity (gain 0.0–2.0) |
 | `Q` / `Esc` | Quit |

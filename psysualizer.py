@@ -5,13 +5,13 @@ Music Visualizer — Real-time audio → visuals.
 Controls:
   SPACE / click   Switch to next mode
   1-9             Jump to modes 1-9
-  0               Jump to mode 10 (Spectrum)
+  1-9             Jump to modes 1-9 (use ←/→ for modes 10+)
   F               Toggle fullscreen
   H               Toggle HUD / legend
   Q / ESC         Quit
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 import threading
 from collections import deque
@@ -193,10 +193,6 @@ def main():
                         active_indices = [d[0] for d in devices]
                         pick_sel = (active_indices.index(active_dev)
                                     if active_dev in active_indices else 0)
-                    elif event.key == pygame.K_0:
-                        mode_idx = 9
-                        name, VisCls = MODES[mode_idx]; vis = VisCls()
-                        fade_alpha = -1
                     else:
                         idx = event.key - pygame.K_1
                         if 0 <= idx < len(MODES):
