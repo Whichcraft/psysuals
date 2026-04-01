@@ -2,7 +2,7 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-1.6.4-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-1.6.5-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
@@ -13,7 +13,7 @@ See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their p
 |---|------|-------------|
 | 1 | **Yantra** | Psychedelic sacred-geometry mandala — 6 concentric polygon rings (triangle→octagon) alternating rotation, web connections between rings, neon spokes, beat-driven spring pulses |
 | 2 | **Cube** | Dual wireframe cubes — slow graceful rotation, gentle spring bounce, slow colour-fade across the spectrum; orbiting satellite cubes stay undistorted and within screen bounds |
-| 3 | **TriWall** | Equilateral triangle mosaic wall — all tiles wireframe with rainbow edges; 4–6 filled at any time; on beats a tile pops to the front way bigger (up to 8× on strong bass), spins and pulses to bass, then springs back into grid alignment; a glowing rainbow sweep crosses the whole screen at random angles |
+| 3 | **TriFlux** | Equilateral triangle mosaic wall — all tiles wireframe with rainbow edges; 4–6 filled at any time; on beats a tile pops to the front way bigger (up to 8× on strong bass), spins and pulses to bass, then springs back into grid alignment; a glowing rainbow sweep crosses the whole screen at random angles |
 | 4 | **Lissajous** | Psytrance trefoil — 3-D Lissajous knot with 3-fold symmetry, two-pass neon glow; beat explodes scale (0.55 impulse), jumps the hue palette, cranks head-dot radius, and draws extra glow halos |
 | 5 | **Tunnel** | First-person ride through a curving tube — neon glow rings, rotating inner polygon (3–6 sides) per ring, full rainbow sweep across depth, beat flares nearest rings and spawns triangles that fly toward the camera; sparks always render above the tunnel geometry |
 | 6 | **Corridor** | First-person ride through a neon rainbow corridor — concentric rounded-rectangle frames fly toward the camera with a full rainbow sweep across depth; beat flares nearest frames and spawns glowing sparks |
@@ -25,7 +25,7 @@ See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their p
 | — | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | — | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
 
-Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all modes including Attractor, Branches, Spectrum, and Waterfall.
+Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all modes including Plasma, Branches, Spectrum, and Waterfall.
 
 ## Requirements
 
@@ -54,7 +54,7 @@ python3 -m venv .venv
 | `←` / `→` or `Space` or click | Cycle to previous / next mode |
 | `↑` / `↓` | Increase / decrease effect intensity (0.0 – 2.0, default 1.0) |
 | `1` – `9` | Jump to modes 1–9 |
-| `0` | Jump to mode 10 (Waterfall) |
+| `0` | Jump to mode 10 (first ←/→-only mode) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `H` | Toggle HUD / legend visibility |
@@ -92,13 +92,15 @@ psysuals/
 │   ├── utils.py         # Shared colour helpers: hsl(), _hsl_batch()
 │   ├── yantra.py        # Yantra effect
 │   ├── cube.py          # Cube effect
-│   ├── plasma.py        # Plasma effect
-│   ├── tunnel.py        # Tunnel effect
+│   ├── triflux.py       # TriFlux effect
 │   ├── lissajous.py     # Lissajous effect
+│   ├── tunnel.py        # Tunnel effect
 │   ├── corridor.py      # Corridor effect
 │   ├── nova.py          # Nova effect
 │   ├── spiral.py        # Spiral effect
 │   ├── bubbles.py       # Bubbles effect
+│   ├── plasma.py        # Plasma effect
+│   ├── branches.py      # Branches effect
 │   ├── spectrum.py      # Spectrum (Bars) effect
 │   └── waterfall.py     # Waterfall effect
 ├── ARCHITECTURE.md      # Code structure and extension guide
