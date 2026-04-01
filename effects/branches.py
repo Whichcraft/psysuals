@@ -82,7 +82,8 @@ class Branches:
         cx = config.WIDTH  // 2
         cy = config.HEIGHT // 2
 
-        trunk = (min(config.WIDTH, config.HEIGHT) * 0.42
+        # 0.45 = half of 90 % → tree spans 90 % of the smaller screen side
+        trunk = (min(config.WIDTH, config.HEIGHT) * 0.45
                  * (1.0 + bass * 0.80 + beat * 0.50))
 
         # Extra arms on strong beats (up to +5)
