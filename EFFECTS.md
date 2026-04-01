@@ -28,11 +28,12 @@ All effects share a common audio pipeline. Each effect responds to the same audi
 | 3 | `3` | Plasma | Full-screen sine-interference psychedelic texture |
 | 4 | `4` | Tunnel | First-person ride through a curving tube |
 | 5 | `5` | Lissajous | 3-D Lissajous knot with 3-fold symmetry |
-| 6 | `6` | Nova | Waveform kaleidoscope with 7-fold mirror symmetry |
-| 7 | `7` | Spiral | Neon helix vortex with 6 arms flying toward viewer |
-| 8 | `8` | Bubbles | Translucent rising bubbles, size driven by bass |
-| 9 | `9` | Spectrum | Classic spectrum bars with peak markers and waveform overlay |
-| 10 | `0` | Waterfall | Scrolling spectrogram (time-frequency display) |
+| 6 | `6` | Corridor | Neon rainbow corridor — rounded-rectangle frames flying toward camera |
+| 7 | `7` | Nova | Waveform kaleidoscope with 7-fold mirror symmetry |
+| 8 | `8` | Spiral | Neon helix vortex with 6 arms flying toward viewer |
+| 9 | `9` | Bubbles | Translucent rising bubbles, size driven by bass |
+| 10 | `0` | Spectrum | Classic spectrum bars with peak markers and waveform overlay |
+| 11 | ←/→ only | Waterfall | Scrolling spectrogram (time-frequency display) |
 
 ---
 
@@ -368,6 +369,39 @@ Scrolling spectrogram. Each frame a new frequency row is added at the top; old r
 - **Per-bin FFT** → tile brightness per column
 - **Beat** → brightness flash on newest rows, hue acceleration
 - **Time** → rows scroll downward, history fades
+
+---
+
+---
+
+## 11. Corridor
+
+First-person neon rainbow corridor. Concentric rounded-rectangle frames recede into a vanishing point and fly toward the camera. The path curves sinusoidally over time. Beat flares the nearest frames and spawns glowing sparks scattered within the corridor that streak toward the camera.
+
+### Parameters
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| `N_FRAMES` | `28` | Depth frames |
+| `WORLD_H` | `2.0` | Half-height in world units |
+| `ASPECT` | `1.65` | Width / height ratio |
+| `Z_FAR` | `12.0` | Far clipping depth |
+| `Z_NEAR` | `0.28` | Near clipping depth |
+| FOV | `min(W, H) * 0.72` | — |
+| Path sway X | `sin(t * 0.19) * 0.5` | — |
+| Path sway Y | `cos(t * 0.14) * 0.35` | — |
+| Time speed | `0.028 + bass * 0.08 + beat * 0.16` per frame | — |
+| Spark spawn rate | `int(bass * 1.2 + beat * 4.0)` per frame | Beat threshold 0.25 |
+| Spark pool limit | `100` | — |
+| Frame corner radius | `min(half_w, half_h) // 3` | Rounded rectangle |
+| Frame brightness | `0.06 + near_t * 0.70 + fft[fi] * 0.20 + beat * near_t * 0.50` | — |
+| Glow halo inflate | `lw * 5 + 4` px | Neon glow pass |
+| Hue drift | `0.005` per frame | — |
+
+### Audio Reactions
+- **Bass** → time speed, spark spawn rate
+- **Beat** → time speed burst, frame brightness, spark spawn burst, frame line width
+- **Per-frame FFT** → individual frame brightness
 
 ---
 
