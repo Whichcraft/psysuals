@@ -51,7 +51,7 @@ class Yantra:
 
         for i in range(self.N_RINGS):
             e = min(bands[i], 1.0)
-            self.pvel[i] += beat * (0.36 + e * 0.18)
+            self.pvel[i] += beat * (0.24 + e * 0.12)
             self.pvel[i] += -self.poff[i] * 0.22
             self.pvel[i] *= 0.65
             self.poff[i] += self.pvel[i]
@@ -74,14 +74,14 @@ class Yantra:
                 nearest = round(k / n_out * n_in) % n_in
                 ix, iy  = v_in[nearest]
                 pygame.draw.line(surf,
-                                 hsl(h, l=0.18 + e * 0.28),
+                                 hsl(h, l=0.30 + e * 0.20),
                                  (int(ox), int(oy)), (int(ix), int(iy)), 1)
 
         for i in range(self.N_RINGS - 1, -1, -1):
             e     = min(bands[i], 1.0)
             h     = (self.hue + i / self.N_RINGS * 0.55) % 1.0
-            bright = 0.42 + e * 0.44
-            lw    = max(1, int(1 + e * 2.5 + beat * 2.25))
+            bright = 0.52 + e * 0.32
+            lw    = max(1, int(1 + e * 1.8 + beat * 1.6))
             ipts  = [(int(x), int(y)) for x, y in all_verts[i]]
             pygame.draw.polygon(surf, hsl(h, l=bright), ipts, lw)
             n = len(ipts)
@@ -98,9 +98,9 @@ class Yantra:
             x2  = int(cx + math.cos(a) * outer_r)
             y2  = int(cy + math.sin(a) * outer_r)
             h   = (self.hue + s / self.N_SPOKES * 0.35 + high * 0.2) % 1.0
-            lw  = max(1, int(beat * 3.75))
+            lw  = max(1, int(1 + beat * 2.5))
             pygame.draw.line(surf,
-                             hsl(h, l=0.18 + beat * 0.75 + high * 0.18),
+                             hsl(h, l=0.30 + beat * 0.50 + high * 0.15),
                              (cx, cy), (x2, y2), lw)
 
         cr = max(2, int(4 + bass * 12 + beat * 10))

@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.1] — 2026-04-01
+
+### Bug fixes
+- **Branches**: trunk stub shortened to 3% of arm length so the first fork appears right at the centre; overall tree size unchanged
+- **Branches**: hard cap on trunk length (`sc × 0.27`) so branches never leave the screen
+- **TriFlux**: rainbow sweep now always enters from the real screen edge — computes the minimum projection of screen corners onto the sweep direction, never starts mid-screen
+- **TriFlux**: grid extended one tile outside all four screen edges so no clipped triangle edges are visible at the borders
+
+---
+
 ## [2.0.0] — 2026-04-01
 
 ### Three spectacular new effects
