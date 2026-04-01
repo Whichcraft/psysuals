@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.3] — 2026-04-01
+
+### Changes
+- **Effects order** — TriWall moved to slot 3 (`3` key); Plasma moved to ←/→ only
+
+---
+
 ## [1.6.2] — 2026-04-01
 
 ### Changes
