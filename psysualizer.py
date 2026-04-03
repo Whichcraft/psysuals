@@ -11,7 +11,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.0.4"
+__version__ = "2.1.0"
 
 import threading
 from collections import deque
@@ -31,18 +31,61 @@ _smooth_fft     = np.zeros(config.BLOCK_SIZE // 2)
 _beat_energy    = 0.0
 _hanning_window = np.hanning(config.BLOCK_SIZE)
 
+# Genre detection — accumulate raw spectrum for ~300 frames then classify
+_genre_weights  = np.ones(20)          # applied to bass bins for beat energy
+_detect_accum   = np.zeros(config.BLOCK_SIZE // 2)
+_detect_frames  = 0
+_DETECT_MIN     = 300                  # frames before first detection (~5 s at 60 fps)
+
+
+def _apply_genre_weights(genre):
+    w = np.ones(20)
+    if genre == "electronic":
+        w[:5]  = 1.5;  w[10:] = 0.7
+    elif genre == "rock":
+        w[2:9] = 1.3
+    elif genre == "classical":
+        w[:10] = 0.6;  w[10:] = 1.4
+    with _lock:
+        _genre_weights[:] = w
+
+
+def detect_genre():
+    """Return detected genre string once enough frames are collected, else None."""
+    global _detect_frames
+    with _lock:
+        if _detect_frames < _DETECT_MIN:
+            return None
+        avg = _detect_accum / _detect_frames
+        _detect_accum[:] = 0
+        _detect_frames = 0
+    sub_bass   = float(avg[:5].mean())
+    bass       = float(avg[:15].mean())
+    mids       = float(avg[15:100].mean())
+    sub_ratio  = sub_bass / (bass + 1e-6)
+    bass_ratio = bass / (bass + mids + 1e-6)
+    if sub_ratio > 0.55 and bass_ratio > 0.50:
+        return "electronic"
+    if bass_ratio > 0.50 and sub_ratio < 0.45:
+        return "rock"
+    if bass_ratio < 0.35:
+        return "classical"
+    return "any"
+
 
 def _audio_cb(indata, frames, time, status):
-    global _waveform, _smooth_fft, _beat_energy
+    global _waveform, _smooth_fft, _beat_energy, _detect_frames
     mono     = indata[:, 0]
     spectrum = np.abs(np.fft.rfft(mono * _hanning_window))[: config.BLOCK_SIZE // 2]
     np.log1p(spectrum, out=spectrum)
     spectrum /= 10.0
     with _lock:
-        _waveform    = mono.copy()
-        _smooth_fft *= 0.50
-        _smooth_fft += spectrum * 0.50
-        _beat_energy = float(_smooth_fft[:20].mean())
+        _waveform       = mono.copy()
+        _smooth_fft    *= 0.50
+        _smooth_fft    += spectrum * 0.50
+        _detect_accum  += spectrum
+        _detect_frames += 1
+        _beat_energy    = float((_smooth_fft[:20] * _genre_weights).mean())
 
 
 def get_audio():
@@ -119,6 +162,7 @@ def main():
     pick_sel       = 0
     show_hud       = True
     effect_gain    = 1.0
+    current_genre  = "detecting…"
 
     def make_fade(alpha=28):
         s = pygame.Surface((config.WIDTH, config.HEIGHT))
@@ -205,6 +249,11 @@ def main():
                 name, VisCls = MODES[mode_idx]; vis = VisCls()
                 fade_alpha = -1
 
+        detected = detect_genre()
+        if detected is not None:
+            current_genre = detected
+            _apply_genre_weights(detected)
+
         waveform, fft, raw_beat = get_audio()
         if len(energy_hist) == energy_hist.maxlen:
             energy_sum -= energy_hist[0]
@@ -225,7 +274,7 @@ def main():
                 dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
             dev_name = dev_name_cache[active_dev]
             label = font.render(
-                f"  [{mode_idx+1}/{len(MODES)}] {name}  |  intensity: {effect_gain:.1f}  |  🎤 {dev_name}{hint}",
+                f"  [{mode_idx+1}/{len(MODES)}] {name}  |  intensity: {effect_gain:.1f}  |  genre: {current_genre}  |  🎤 {dev_name}{hint}",
                 True, (90, 90, 90))
             screen.blit(label, (6, 6))
 
