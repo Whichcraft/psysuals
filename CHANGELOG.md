@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.5] — 2026-04-03
+
+### Added
+- **Auto genre detection** — accumulates FFT spectrum over ~300 frames and classifies into Electronic / Rock / Classical / Any; applies genre-specific bass-bin weights to beat energy; HUD shows current detected genre; re-detects every ~300 frames so it adapts as music changes
+
+---
+
 ## [2.0.4] — 2026-04-01
 
 ### Bug fixes
