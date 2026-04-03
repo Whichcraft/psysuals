@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.1.0] — 2026-04-03
+
+### Added
+- **Spaceflight** — psychedelic hyperspace tunnel: rainbow warp streaks burst from the ship's focal point, beat fires expanding neon rings, vivid planets grow from the vanishing point outward, ship maneuvers along the flight axis (jink, climb, barrel roll) with twin neon engine exhausts; ship viewed from behind with nose pointing toward the flight axis
+- **Butterflies** — three independent pairs: each solo butterfly flutters in first, its partner joins after 10–30 s and orbits lovingly; wing flapping syncs when close; sparkles on the beat; pairs vanish and respawn continuously
+
+---
+
 ## [2.0.5] — 2026-04-03
 
 ### Added
