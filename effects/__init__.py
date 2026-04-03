@@ -1,16 +1,18 @@
-from .yantra    import Yantra
-from .cube      import Cube
-from .plasma    import Plasma
-from .tunnel    import Tunnel
-from .lissajous import Lissajous
-from .corridor  import Corridor
-from .nova      import Nova
-from .spiral    import Spiral
-from .bubbles   import Bubbles
-from .triflux  import Attractor
-from .branches  import Branches
-from .spectrum  import Bars
-from .waterfall import GlowSquares
+from .yantra      import Yantra
+from .cube        import Cube
+from .plasma      import Plasma
+from .tunnel      import Tunnel
+from .lissajous   import Lissajous
+from .corridor    import Corridor
+from .nova        import Nova
+from .spiral      import Spiral
+from .bubbles     import Bubbles
+from .triflux     import Attractor
+from .branches    import Branches
+from .spaceflight import Spaceflight
+from .butterflies import Butterflies
+from .spectrum    import Bars
+from .waterfall   import GlowSquares
 
 MODES = [
     ("Yantra",      Yantra),      # 1
@@ -24,6 +26,8 @@ MODES = [
     ("Bubbles",     Bubbles),     # 9
     ("Plasma",      Plasma),      # ←/→ only
     ("Branches",    Branches),    # ←/→ only
+    ("Spaceflight", Spaceflight), # ←/→ only
+    ("Butterflies", Butterflies), # ←/→ only
     ("Spectrum",    Bars),        # ←/→ only
     ("Waterfall",   GlowSquares), # ←/→ only
 ]
