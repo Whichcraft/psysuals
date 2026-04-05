@@ -5,11 +5,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.3.0] — 2026-04-05
+
+### Changed
+- **FlowField** — replaces RxDiffusion: 4 000 particles riding a 3-layer sine/cosine noise field; rainbow trails via direct numpy pixel writes on a slow-fade surface; bass warps field intensity; beat phase-jumps all flow lines
+- **Vortex** — rewritten with fireworks: rockets launch from the bottom, arc under gravity, explode into 80–120 embers at apex; embers fall with gravity; feedback wormhole swallows all trails; beat fires extra rockets
+
+---
+
 ## [2.2.0] — 2026-04-05
 
 ### Added
-- **RxDiffusion** — Gray-Scott reaction-diffusion simulation on a 192×108 grid (4 steps/frame); feed/kill rates drift sinusoidally with bass; beat injects chemical B at a random point seeding new growth fronts; B concentration mapped to vivid shifting hues
-- **Vortex** — pixel feedback tunnel: each frame is zoom-rotated (1.003×, 0.35°/frame) and multiplied dark; neon sparks spawn at centre driven by bass; beat fires a ring of sparks and ramps zoom/rotation to 1.012×/1.8° for 45 frames
+- **FlowField** — 4 000 particles riding a 3-layer sine/cosine noise field; particles paint rainbow trails via direct numpy pixel writes on a slow-fade surface; bass warps field intensity and speed; beat fires a phase jump reshaping all flow lines instantly
+- **Vortex** — pixel feedback wormhole: each frame zoom-rotated (1.0038×, 0.42°/frame) and multiplied dark; firework rockets launch from the bottom edge, arc under gravity, explode into 80–120 embers at apex; embers fall with gravity; beat fires extra rockets and ramps zoom/rotation for 50 frames
 - **Bug fix**: `_detect_accum` added to `global` declaration in `_audio_cb` (was raising `UnboundLocalError` during genre detection)
 
 ---
