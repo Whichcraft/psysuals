@@ -9,9 +9,10 @@ from .spiral      import Spiral
 from .bubbles     import Bubbles
 from .triflux     import Attractor
 from .branches    import Branches
-from .spaceflight import Spaceflight
-from .butterflies import Butterflies
-from .spectrum    import Bars
+from .butterflies        import Butterflies
+from .reactiondiffusion  import ReactionDiffusion
+from .vortex             import Vortex
+from .spectrum           import Bars
 from .waterfall   import GlowSquares
 
 MODES = [
@@ -26,8 +27,10 @@ MODES = [
     ("Bubbles",     Bubbles),     # 9
     ("Plasma",      Plasma),      # ←/→ only
     ("Branches",    Branches),    # ←/→ only
-    ("Spaceflight", Spaceflight), # ←/→ only
-    ("Butterflies", Butterflies), # ←/→ only
-    ("Spectrum",    Bars),        # ←/→ only
-    ("Waterfall",   GlowSquares), # ←/→ only
+    ("Butterflies", Butterflies),      # ←/→ only
+    ("RxDiffusion", ReactionDiffusion), # ←/→ only
+    ("Vortex",      Vortex),           # ←/→ only
+    # ── Spectrum and Waterfall must always be the final two entries ──
+    ("Spectrum",    Bars),        # ←/→ only — always second-to-last
+    ("Waterfall",   GlowSquares), # ←/→ only — always last
 ]
