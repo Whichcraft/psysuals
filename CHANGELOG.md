@@ -5,10 +5,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.2.0] — 2026-04-05
+
+### Added
+- **RxDiffusion** — Gray-Scott reaction-diffusion simulation on a 192×108 grid (4 steps/frame); feed/kill rates drift sinusoidally with bass; beat injects chemical B at a random point seeding new growth fronts; B concentration mapped to vivid shifting hues
+- **Vortex** — pixel feedback tunnel: each frame is zoom-rotated (1.003×, 0.35°/frame) and multiplied dark; neon sparks spawn at centre driven by bass; beat fires a ring of sparks and ramps zoom/rotation to 1.012×/1.8° for 45 frames
+- **Bug fix**: `_detect_accum` added to `global` declaration in `_audio_cb` (was raising `UnboundLocalError` during genre detection)
+
+---
+
 ## [2.1.0] — 2026-04-03
 
 ### Added
-- **Spaceflight** — psychedelic hyperspace tunnel: rainbow warp streaks burst from the ship's focal point, beat fires expanding neon rings, vivid planets grow from the vanishing point outward, ship maneuvers along the flight axis (jink, climb, barrel roll) with twin neon engine exhausts; ship viewed from behind with nose pointing toward the flight axis
 - **Butterflies** — three independent pairs: each solo butterfly flutters in first, its partner joins after 10–30 s and orbits lovingly; wing flapping syncs when close; sparkles on the beat; pairs vanish and respawn continuously
 
 ---

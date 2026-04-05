@@ -2,15 +2,20 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.1.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.2.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
 
-## What's new in v2.1.0 — three new effects
+## What's new in v2.2.0 — two new effects
 
-### Spaceflight
-A lone starship soars through deep space. Three parallax star layers scroll past at different speeds; planets drift across the scene with rings and atmospheric highlights. The ship wanders with gentle autopilot curves and occasionally breaks into full looping maneuvers. Beat flares the engine and brightens the nearest stars.
+### RxDiffusion
+Two virtual chemicals diffuse and react across a grid using the Gray-Scott equations. The system naturally grows coral, worm-mazes, and spots — the exact pattern depends on feed and kill rates that drift slowly with the music. Beat injects a burst of chemical at a random point, seeding a new growth front that propagates outward in vivid neon colour.
+
+### Vortex
+Each frame the previous frame is slightly zoomed and rotated, then multiplied dark — building an infinitely falling, rotating tunnel of decaying colour. Neon sparks spawn at the centre, drift outward, and burn trails through the feedback. Beat fires a ring of sparks and doubles the zoom and rotation speed.
+
+## What's new in v2.1.0 — new effect
 
 ### Butterflies
 One butterfly starts dancing to the music — wings flapping in sync with the bass. After 10–30 seconds a second butterfly enters from the edge, drawn by invisible attraction, and begins to orbit the first. As they grow closer their wing-flapping syncs up and sparkles burst between them on the beat.
@@ -41,12 +46,13 @@ A first-person ride through a glowing neon tunnel of rainbow rounded-rectangle f
 | 9 | **Bubbles** | Translucent rising bubbles filling the full screen — size and spawn rate driven by bass |
 | — | **Plasma** | Full-screen sine-interference plasma — four overlapping wave fields create a flowing psychedelic texture; bass shifts the palette, beat flashes the whole screen |
 | — | **Branches** | Recursive fractal lightning tree — 6 neon arms radiate from centre, each splitting to depth 6 (64 tips); mid frequencies jitter branch angles live; bass drives length; beat fires extra arms with a brightness burst |
-| — | **Spaceflight** | Starship autopilot through deep space — 3-layer parallax stars, drifting planets with optional rings, spontaneous looping maneuvers, beat-reactive engine glow |
 | — | **Butterflies** | Two butterflies dancing to the music — one starts solo, a second joins after 10–30 s and orbits in love; wing flapping syncs when they're close; sparkles burst between them on the beat |
+| — | **RxDiffusion** | Gray-Scott reaction-diffusion — two chemicals grow coral, worm-maze, and spot patterns; feed/kill rates drift with the music; beat injects a new growth front |
+| — | **Vortex** | Pixel feedback tunnel — each frame is zoomed, rotated, and darkened, creating an infinite falling wormhole; neon sparks drift outward from centre; beat fires a spark ring and doubles speed |
 | — | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | — | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
 
-Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all modes including Plasma, Branches, Spaceflight, Butterflies, Spectrum, and Waterfall.
+Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all modes including Plasma, Branches, Butterflies, RxDiffusion, Vortex, Spectrum, and Waterfall.
 
 ## Requirements
 
@@ -122,9 +128,10 @@ psysuals/
 │   ├── bubbles.py       # Bubbles effect
 │   ├── plasma.py        # Plasma effect
 │   ├── branches.py      # Branches effect
-│   ├── spaceflight.py   # Spaceflight effect
-│   ├── butterflies.py   # Butterflies effect
-│   ├── spectrum.py      # Spectrum (Bars) effect
+│   ├── butterflies.py       # Butterflies effect
+│   ├── reactiondiffusion.py # RxDiffusion effect
+│   ├── vortex.py            # Vortex effect
+│   ├── spectrum.py          # Spectrum (Bars) effect
 │   └── waterfall.py     # Waterfall effect
 ├── ARCHITECTURE.md      # Code structure and extension guide
 ├── EFFECTS.md           # Full parameter reference for all effects
