@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.4.0] — 2026-04-05
+
+### Fixed
+- **Butterflies — edge sticking**: avoidance margin was `110 × scale` (792 px at scale 7.2, larger than half the screen height), putting butterflies permanently in boundary mode and causing them to fight themselves; margin is now `min(50 × scale, WIDTH/5, HEIGHT/5)`; repulsion is proportional and directly bumps position away from the wall rather than only steering heading
+- **Butterflies — Android trails**: `TRAIL_ALPHA` changed from 22 to 0; effect now owns a persistent `_trail` surface faded each frame with `BLEND_RGB_MULT`, so trails survive on Android/OpenGL backends where the display backbuffer is not preserved between frames
+
+---
+
 ## [2.3.0] — 2026-04-05
 
 ### Changed
