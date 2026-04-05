@@ -10,7 +10,7 @@ from .bubbles     import Bubbles
 from .triflux     import Attractor
 from .branches    import Branches
 from .butterflies        import Butterflies
-from .reactiondiffusion  import ReactionDiffusion
+from .flowfield          import FlowField
 from .vortex             import Vortex
 from .spectrum           import Bars
 from .waterfall   import GlowSquares
@@ -28,7 +28,7 @@ MODES = [
     ("Plasma",      Plasma),      # ←/→ only
     ("Branches",    Branches),    # ←/→ only
     ("Butterflies", Butterflies),      # ←/→ only
-    ("RxDiffusion", ReactionDiffusion), # ←/→ only
+    ("FlowField",   FlowField),         # ←/→ only
     ("Vortex",      Vortex),           # ←/→ only
     # ── Spectrum and Waterfall must always be the final two entries ──
     ("Spectrum",    Bars),        # ←/→ only — always second-to-last
