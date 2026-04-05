@@ -74,7 +74,7 @@ def detect_genre():
 
 
 def _audio_cb(indata, frames, time, status):
-    global _waveform, _smooth_fft, _beat_energy, _detect_frames
+    global _waveform, _smooth_fft, _beat_energy, _detect_frames, _detect_accum
     mono     = indata[:, 0]
     spectrum = np.abs(np.fft.rfft(mono * _hanning_window))[: config.BLOCK_SIZE // 2]
     np.log1p(spectrum, out=spectrum)

@@ -91,15 +91,21 @@ class _Butterfly:
                 self._wander_cd = random.randint(60, 180)
             desired = self._wander_des
 
-        # Boundary avoidance
+        # Boundary avoidance — stronger correction near edges
         m = int(110 * self.scale)
-        if   self.x < m:                      desired = 0.0
-        elif self.x > config.WIDTH  - m:      desired = math.pi
-        if   self.y < m:                      desired = math.pi * 0.5
-        elif self.y > config.HEIGHT - m:      desired = -math.pi * 0.5
+        in_boundary = False
+        if   self.x < m:                      desired = 0.0;           in_boundary = True
+        elif self.x > config.WIDTH  - m:      desired = math.pi;       in_boundary = True
+        if   self.y < m:                      desired = math.pi * 0.5; in_boundary = True
+        elif self.y > config.HEIGHT - m:      desired = -math.pi * 0.5; in_boundary = True
 
         diff = (desired - self.heading + math.pi) % math.tau - math.pi
-        self.heading += max(-0.10, min(0.10, diff * 0.14))
+        if in_boundary:
+            self.heading += max(-0.22, min(0.22, diff * 0.35))
+            self._wander_des = desired
+            self._wander_cd  = random.randint(60, 180)
+        else:
+            self.heading += max(-0.10, min(0.10, diff * 0.14))
 
         spd = (1.5 + bass * 0.8 + beat * 0.4) * self.scale
         self.x += math.cos(self.heading) * spd
@@ -186,7 +192,7 @@ class _Pair:
         # Spawn solo
         if self.solo is None and self._age >= 0:
             x, y = _edge_spawn()
-            self.solo = _Butterfly(x, y, hue=global_hue, scale=4.0)
+            self.solo = _Butterfly(x, y, hue=global_hue, scale=7.2)
 
         if self.solo is None:
             return
@@ -201,7 +207,7 @@ class _Pair:
             x, y = _edge_spawn()
             self.love = _Butterfly(x, y,
                                    hue=(global_hue + 0.50) % 1.0,
-                                   scale=3.8)
+                                   scale=6.84)
 
         # Start departure when lifetime exceeded
         if self._age >= self._lifetime and not self._departing:
