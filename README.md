@@ -58,9 +58,21 @@ Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all mod
 
 - Python 3.8+
 - A working audio input device (microphone, line-in, or loopback)
+- PortAudio (system library required by `sounddevice`)
 
 ## Installation
 
+**Ubuntu / Debian — install system dependencies first:**
+```bash
+sudo apt install python3-venv libportaudio2
+```
+
+**macOS:**
+```bash
+brew install portaudio
+```
+
+**Then install Python dependencies:**
 ```bash
 git clone https://github.com/tstocke/psysuals.git
 cd psysuals
