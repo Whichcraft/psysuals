@@ -149,21 +149,29 @@ def get_audio():
 
 # ── Monitor helpers ───────────────────────────────────────────────────────────
 
-def _monitor_split() -> int | None:
+def _desktop_geometry() -> tuple:
     """
-    Return the x pixel where monitor 0 ends (= monitor 1 starts), or None.
+    Return (total_w, total_h, split_x) for the full multi-monitor desktop.
+
+    total_w / total_h — spanning window size to create.
+    split_x           — x-pixel where left monitor ends (right monitor starts).
+
+    Returns (None, None, None) when only one monitor is detected.
 
     Strategy:
     1. pygame.display.get_desktop_sizes() — works when SDL sees separate screens.
-    2. xrandr --listmonitors — reliable on Linux/X11 regardless of RandR config.
+    2. xrandr --listmonitors — reliable on Linux/X11 with any RandR config.
     """
     import re, subprocess
 
     # Strategy 1: pygame native
     try:
         sizes = pygame.display.get_desktop_sizes()
-        if len(sizes) >= 2 and sizes[0][0] > 0:
-            return sizes[0][0]
+        if len(sizes) >= 2:
+            total_w = sum(s[0] for s in sizes)
+            total_h = max(s[1] for s in sizes)
+            split_x = sizes[0][0]
+            return total_w, total_h, split_x
     except Exception:
         pass
 
@@ -171,7 +179,6 @@ def _monitor_split() -> int | None:
     try:
         out = subprocess.check_output(
             ["xrandr", "--listmonitors"], stderr=subprocess.DEVNULL, text=True)
-        # Each monitor line: "  0: +*DP-1 1920/527x1080/297+0+0"
         monitors = []
         for line in out.splitlines():
             m = re.search(r"(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
@@ -180,11 +187,14 @@ def _monitor_split() -> int | None:
                 monitors.append((x, y, w, h))
         monitors.sort(key=lambda m: m[0])   # left to right
         if len(monitors) >= 2:
-            return monitors[0][0] + monitors[0][2]   # right edge of left monitor
+            total_w = max(m[0] + m[2] for m in monitors)
+            total_h = max(m[1] + m[3] for m in monitors)
+            split_x = monitors[0][0] + monitors[0][2]
+            return total_w, total_h, split_x
     except Exception:
         pass
 
-    return None
+    return None, None, None
 
 
 # ── Device picker ─────────────────────────────────────────────────────────────
@@ -549,15 +559,18 @@ def main():
                             span_mode = not span_mode
                             if span_mode:
                                 try:
-                                    info  = pygame.display.Info()
-                                    screen = pygame.display.set_mode(
-                                        (info.current_w, info.current_h),
-                                        pygame.NOFRAME)
+                                    total_w, total_h, split_x = _desktop_geometry()
+                                    if total_w:
+                                        screen = pygame.display.set_mode(
+                                            (total_w, total_h), pygame.NOFRAME)
+                                    else:
+                                        info = pygame.display.Info()
+                                        screen = pygame.display.set_mode(
+                                            (info.current_w, info.current_h),
+                                            pygame.NOFRAME)
                                     config.WIDTH, config.HEIGHT = screen.get_size()
-                                    # dual-effect only on genuine multi-monitor setups
-                                    split = _monitor_split()
-                                    if split and 0 < split < config.WIDTH:
-                                        span_split = split
+                                    if split_x and 0 < split_x < config.WIDTH:
+                                        span_split = split_x
                                         _, Vis2Cls = MODES[span_vis2_idx]
                                         vis2 = Vis2Cls()
                                         span_surfs = (
