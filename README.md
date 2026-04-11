@@ -2,10 +2,21 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.7.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.8.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.8.0 — audio-driven forces
+
+### FlowField
+Bass energy now pulls all 4 000 particles gently toward the screen centre — strong kicks cause a brief convergence. Treble energy fires random scatter kicks in any direction, so hi-hats and cymbals send particles dispersing outward in bursts.
+
+### Lissajous
+The knot animation speed now scales with detected BPM — the knot spins faster at 148 BPM than at 138. Treble energy also brightens the glow passes in real time, so hi-hat bursts make the trail shimmer whiter.
+
+### Bubbles
+Strong bass hits now trigger a `bass_flash` swell that inflates all visible bubbles' rendered radius for ~10 frames. Beats above 0.7 also spawn 1–3 mega-bubbles (2–4× normal radius) that rise faster and burst with wider glow halos.
 
 ## What's new in v2.7.0 — effect polish
 

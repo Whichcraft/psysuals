@@ -47,7 +47,9 @@ class Lissajous:
         self.dx += 0.0006 + bass * 0.002
         self.dz += 0.0005 + high * 0.0013
 
-        self.t += 0.016 + beat * 0.04
+        # BPM scaling: faster knot at higher tempo (guard against BPM=0 before detection)
+        bpm_scale = max(0.7, config.BPM / 138.0) if config.BPM > 60 else 1.0
+        self.t += (0.016 + beat * 0.04) * bpm_scale
         self.hist.append((math.sin(ax * self.t + self.dx),
                           math.sin(ay * self.t + self.dy),
                           math.sin(az * self.t + self.dz)))
@@ -87,7 +89,8 @@ class Lissajous:
 
         cx, cy = config.WIDTH // 2, config.HEIGHT // 2
 
-        l1_bright = min(0.90 + beat * 0.08, 0.98)
+        # Treble brightens the glow: hi-hat energy makes the knot shimmer whiter
+        l1_bright = min(0.90 + beat * 0.08 + high * 0.14, 0.98)
         PASSES = [(4, 0.08, 0.22), (1, 0.50, l1_bright)]
 
         t_arr = np.arange(n, dtype=float) / n

@@ -14,9 +14,10 @@ class Bubbles:
     MAX = 700
 
     def __init__(self):
-        self.hue   = 0.0
-        self.pulse = 0.0
-        self.pvel  = 0.0
+        self.hue        = 0.0
+        self.pulse      = 0.0
+        self.pvel       = 0.0
+        self._bass_flash = 0.0   # spikes on strong bass, inflates rendered bubble size
         self.pool = [self._make(y=random.uniform(0, config.HEIGHT)) for _ in range(200)]
         self._surf_cache: dict = {}
 
@@ -52,6 +53,16 @@ class Bubbles:
             b["hue"]  = (self.hue + random.uniform(0, hue_spread)) % 1.0
             self.pool.append(b)
 
+        # Mega-bubbles on strong bass hits: 1-3 extra large luminous bubbles
+        if beat > 0.7 and len(self.pool) < self.MAX:
+            for _ in range(1 + int((beat - 0.7) * 4)):
+                if len(self.pool) < self.MAX:
+                    b = self._make()
+                    b["r"]  *= (2.2 + bass * 2.0)
+                    b["vy"] *= 1.4
+                    b["hue"] = (self.hue + random.uniform(0, 0.5)) % 1.0
+                    self.pool.append(b)
+
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.005
         bass = float(np.mean(fft[:6]))
@@ -61,6 +72,11 @@ class Bubbles:
         self.pvel += -self.pulse * 0.35
         self.pvel *= 0.52
         self.pulse += self.pvel
+
+        # Bass flash: spike on strong hits, inflate all rendered bubbles for ~10 frames
+        if bass > 0.65:
+            self._bass_flash = max(self._bass_flash, bass * 2.8)
+        self._bass_flash = max(0.0, self._bass_flash - 0.18)
 
         self._spawn(beat, bass)
 
@@ -73,7 +89,7 @@ class Bubbles:
                 continue
 
             life  = max(0.0, min(1.0, b["y"] / config.HEIGHT))
-            r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.15)))
+            r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.15 + self._bass_flash * 0.45)))
             pad   = r + 14
             alpha = int(life * 160)
             bsurf = self._get_bsurf(pad * 2)
