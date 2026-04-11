@@ -5,6 +5,27 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.5.0] — 2026-04-11
+
+### Added
+- **Particles** — new `RhythmicParticles` effect: beat bursts from screen centre, continuous trickle driven by treble energy, hue drifts with mid energy; uses numpy batch rendering with pre-rendered blit cache for performance
+- **BPM detection** — onset timestamps tracked in the audio callback; median inter-beat interval gives a live BPM estimate (60–200) exposed as `config.BPM` and shown in the HUD
+- **Multi-band energy** — `config.MID_ENERGY` (bins 20–100, ~860 Hz–4.3 kHz) and `config.TREBLE_ENERGY` (bins 100–256, ~4.3–11 kHz) computed and normalised each frame; effects can read these directly
+- **Shared palette** (`effects/palette.py`) — module-level singleton whose base hue drifts with mid energy and whose saturation/lightness track beat/treble; effects opt in via `palette.get(offset)`
+- **Crossfade on mode switch** — 45-frame dissolve overlay when switching effects
+- **Background layer** — `B` toggles a second effect rendered at 40 % alpha beneath the foreground; `Shift+B` cycles the background effect through modes 1–9
+- **Auto-gain** (`A`) — rolling RMS of the waveform auto-scales beat intensity to stay reactive at any playback volume
+- **Multi-screen support** — `--display N` CLI flag launches on a specific display; `M` key cycles to the next display at runtime; graceful fallback if RANDR is unavailable
+- **Settings persistence** (`settings.py`) — device, mode, intensity, HUD, auto-gain, background state, and display index saved to `~/.config/psysuals/settings.json` and restored on next launch
+- **Enhanced HUD** — second row with live BPM, colour-coded energy bars (beat / mid / treble), particle count when Particles effect is active
+
+### Changed
+- **Blackman window** replaces Hann window for better spectral leakage suppression
+- **Spectral flux beat detection** replaces simple energy averaging — beat signal now tracks the positive rate of change in the bass spectrum, giving sharper and more accurate kick response
+- `config.py` now exports `MID_ENERGY`, `TREBLE_ENERGY`, `BPM` as shared mutable globals
+
+---
+
 ## [2.4.0] — 2026-04-05
 
 ### Fixed
