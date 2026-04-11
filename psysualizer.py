@@ -515,4 +515,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Ctrl+C: restore monitors before exiting
+        try:
+            pygame.display.set_mode((1, 1))
+        except Exception:
+            pass
+        pygame.quit()
