@@ -2,10 +2,29 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.9.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.10.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.10.0 — moderngl GPU engine + dual-screen span
+
+### moderngl render engine
+A new GPU-accelerated rendering path sits alongside the existing pygame CPU path. `gl_renderer.py` wraps a moderngl context with a shared fullscreen-quad VBO, offscreen FBO helpers, and pixel readback to numpy — the foundation for the Android `draw_frame()` bridge.
+
+`effects/plasma_gl.py` is the first effect ported: the four-wave interference plasma runs as a GLSL fragment shader, evaluated per pixel on the GPU instead of in a numpy CPU loop. `psysualizer_gl.py` is the standalone GL entry point (pygame OpenGL window).
+
+Install the extra dependency: `pip install moderngl` (or `sudo apt install python3-moderngl`), then run `python psysualizer_gl.py`.
+
+### Dual-screen span mode
+On multi-monitor setups, `Shift+M` now runs **two independent effect instances** — one per physical screen — split at the real monitor boundary (detected via `pygame.display.get_desktop_sizes()`). Both halves receive the same audio data each frame but maintain completely separate visual state. On a single monitor, span mode behaves as before (one effect, NOFRAME full-screen).
+
+Use `A` / `D` while in span mode to cycle the right-screen effect independently.
+
+### F-key fix in span mode
+Pressing `F` while in span mode now exits span mode and returns to the previous fullscreen state instead of also toggling the fullscreen flag.
+
+---
 
 ## What's new in v2.9.0 — two new effects (Aurora & Lattice)
 
@@ -168,12 +187,12 @@ python3 -m venv .venv
 | `Tab` | Toggle real-time settings pane (effect gain, bg alpha, crossfade length) |
 | `P` | Save current state as a preset |
 | `Shift+P` | Cycle through saved presets |
-| `A` | Toggle auto-gain (auto-scales beat to current volume) |
+| `A` | Toggle auto-gain (auto-scales beat to current volume) · in span mode: cycle right-screen effect backward |
 | `B` | Toggle background layer (renders a second effect at configurable opacity behind the active one) |
 | `Shift+B` | Cycle background effect (modes 1–9) |
 | `M` | Tap tempo — tap 2+ times to lock BPM for 8 s |
-| `Shift+M` | Toggle span mode (stretches window across all monitors) |
-| `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
+| `Shift+M` | Toggle span mode — single monitor: one effect NOFRAME full-screen; multi-monitor: independent effect per screen |
+| `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) · in span mode: cycle right-screen effect forward |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `H` | Toggle HUD on / off |
 | `Shift+H` | Cycle HUD detail: full → minimal → off |

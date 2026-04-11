@@ -5,6 +5,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.10.0] — 2026-04-12
+
+### Added
+- **moderngl GL render engine** — `gl_renderer.py` wraps a moderngl context: shared fullscreen-quad VBO, GLSL shader compilation, offscreen FBO, and numpy pixel readback for the Android `draw_frame()` bridge.
+- **PlasmaGL** (`effects/plasma_gl.py`) — Plasma effect ported to a GLSL fragment shader; same `draw()` interface as all other effects, CPU numpy fallback if moderngl is absent, `draw_frame(w, h, ...)` offscreen API for Chaquopy/Android.
+- **psysualizer_gl.py** — standalone moderngl entry point (pygame OpenGL window, same audio pipeline).
+- **Dual-screen span mode** — on multi-monitor setups `Shift+M` runs two independent effect instances, one per physical screen, split at the real monitor boundary via `pygame.display.get_desktop_sizes()`. Single-monitor span mode is unchanged (one effect, NOFRAME).
+- `A` / `D` in span mode cycle the right-screen effect backward / forward (normal auto-gain / device-picker behaviour preserved outside span mode).
+
+### Fixed
+- `F` while in span mode now exits span mode and restores the previous fullscreen state instead of also toggling the `fullscreen` flag.
+
+---
+
 ## [2.9.0] — 2026-04-12
 
 ### Added
