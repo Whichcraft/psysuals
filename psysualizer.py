@@ -15,6 +15,7 @@ __version__ = "2.5.0"
 
 import argparse
 import threading
+import time as _time
 from collections import deque
 
 import numpy as np
@@ -250,6 +251,12 @@ def main():
     rms_buf    = deque(maxlen=30)
     target_rms = 0.05    # typical speech/music RMS in float PCM
 
+    # Tap tempo (M key)
+    tap_times      = deque(maxlen=4)
+    tap_bpm        = 0.0
+    tap_bpm_expiry = 0.0
+    _TAP_EXPIRE    = 8.0   # seconds before tap BPM falls back to auto
+
     # Task 2: crossfade
     prev_surf       = None   # snapshot taken at mode switch
     crossfade_frame = 0
@@ -287,7 +294,7 @@ def main():
         vis             = VisCls()
 
     hint = ("  ←/→: mode  |  ↑/↓: intensity  |  A: auto-gain  "
-            "|  B: bg layer  |  Shift+B: bg cycle  |  M: next display  "
+            "|  B: bg  |  Shift+B: bg cycle  |  M: tap tempo  "
             "|  1-{n}: jump  |  D: device  |  F: fullscreen  |  H: HUD  |  Q: quit"
             ).format(n=len(MODES))
 
@@ -321,7 +328,7 @@ def main():
                         picking = False
 
                 else:
-                    mods = pygame.key.get_mods()
+                    shift = event.mod & pygame.KMOD_SHIFT
 
                     if event.key in (pygame.K_q, pygame.K_ESCAPE):
                         _save_settings(); stream.stop(); stream.close()
@@ -353,26 +360,30 @@ def main():
                         pick_sel = (active_indices.index(active_dev)
                                     if active_dev in active_indices else 0)
 
-                    # Task 3: auto-gain toggle
                     elif event.key == pygame.K_a:
                         auto_gain = not auto_gain
 
-                    # Task 5: background layer
                     elif event.key == pygame.K_b:
-                        if mods & pygame.KMOD_SHIFT:
+                        if shift:
+                            # Shift+B: cycle background effect and ensure bg is on
                             bg_mode_i = (bg_mode_i + 1) % _BG_MODES
                             bg_name, bg_cls = MODES[bg_mode_i]
                             bg_vis = bg_cls()
+                            bg_on = True
                         else:
                             bg_on = not bg_on
 
-                    # Task 8: cycle display
                     elif event.key == pygame.K_m:
-                        display_idx = (display_idx + 1) % num_displays
-                        screen = _open_display(display_idx, fullscreen)
-                        config.WIDTH, config.HEIGHT = screen.get_size()
-                        fade = make_fade(); vis = VisCls()
-                        bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+                        # Tap tempo: record tap, compute BPM from last 4 taps
+                        now = _time.monotonic()
+                        tap_times.append(now)
+                        tap_bpm_expiry = now + _TAP_EXPIRE
+                        if len(tap_times) >= 2:
+                            intervals = [tap_times[i] - tap_times[i-1]
+                                         for i in range(1, len(tap_times))]
+                            med = sorted(intervals)[len(intervals) // 2]
+                            if med > 0:
+                                tap_bpm = max(60.0, min(200.0, 60.0 / med))
 
                     else:
                         idx = event.key - pygame.K_1
@@ -391,7 +402,14 @@ def main():
         waveform, fft, raw_beat, mid_e, treble_e, bpm = get_audio()
         config.MID_ENERGY    = mid_e
         config.TREBLE_ENERGY = treble_e
-        config.BPM           = bpm
+        # Tap tempo overrides auto-detected BPM for _TAP_EXPIRE seconds
+        if tap_bpm > 0 and _time.monotonic() < tap_bpm_expiry:
+            config.BPM = tap_bpm
+            bpm        = tap_bpm
+            _using_tap = True
+        else:
+            config.BPM = bpm
+            _using_tap = False
 
         if len(energy_hist) == energy_hist.maxlen:
             energy_sum -= energy_hist[0]
@@ -456,8 +474,9 @@ def main():
 
             # Row 2 — BPM + energy bars
             y2      = row1.get_height() + 8
+            bpm_tag = " tap" if _using_tap else ""
             bpm_lbl = font_s.render(
-                f"  BPM:{bpm:5.1f}" if bpm > 0 else "  BPM: --.-", True, (70, 70, 70))
+                f"  BPM:{bpm:5.1f}{bpm_tag}" if bpm > 0 else "  BPM: --.-", True, (70, 70, 70))
             screen.blit(bpm_lbl, (6, y2))
             bx = bpm_lbl.get_width() + 16
 
