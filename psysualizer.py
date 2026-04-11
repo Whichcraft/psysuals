@@ -268,6 +268,15 @@ def main():
     bg_vis     = bg_cls()
     bg_surf    = pygame.Surface((config.WIDTH, config.HEIGHT))
 
+    def _quit():
+        """Exit fullscreen before destroying the display so SDL restores all monitors."""
+        try:
+            pygame.display.set_mode((1, 1))  # drop fullscreen first
+        except Exception:
+            pass
+        stream.stop(); stream.close()
+        pygame.quit()
+
     def _save_settings():
         sett.save({
             "active_dev": active_dev, "mode_idx": mode_idx,
@@ -302,8 +311,7 @@ def main():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                _save_settings(); stream.stop(); stream.close()
-                pygame.quit(); return
+                _save_settings(); _quit(); return
 
             elif event.type == pygame.KEYDOWN:
 
@@ -331,8 +339,7 @@ def main():
                     shift = event.mod & pygame.KMOD_SHIFT
 
                     if event.key in (pygame.K_q, pygame.K_ESCAPE):
-                        _save_settings(); stream.stop(); stream.close()
-                        pygame.quit(); return
+                        _save_settings(); _quit(); return
 
                     elif event.key in (pygame.K_SPACE, pygame.K_RIGHT):
                         _switch_mode(mode_idx + 1)
