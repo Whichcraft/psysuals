@@ -15,7 +15,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.6.0"
+__version__ = "2.7.0"
 
 import argparse
 import threading
@@ -559,6 +559,7 @@ def main():
         waveform, fft, raw_beat, mid_e, treble_e, bpm = get_audio()
         config.MID_ENERGY    = mid_e
         config.TREBLE_ENERGY = treble_e
+        config.EFFECT_GAIN   = effect_gain
         # Tap tempo overrides auto-detected BPM for _TAP_EXPIRE seconds
         if tap_bpm > 0 and _time.monotonic() < tap_bpm_expiry:
             config.BPM = tap_bpm

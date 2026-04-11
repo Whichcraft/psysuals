@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.7.0] — 2026-04-12
+
+### Changed
+- **Tunnel** — triangles now spawn only in the far third of the tube (z ∈ 80–98 % of Z_FAR, was 65–95 %); spawn rate halved; live cap reduced 120 → 50; mid-depth no longer cluttered between beats
+- **Butterflies** — mutual love-chase: both butterflies steer toward each other's offset position (rotating pursuit spiral); orbit radius shrinks from 240 to 40 px over the pair's lifetime; all scales reduced to 70 % (solo 5.04, love 4.79)
+- **Vortex** — auto-launch interval reduced 85 → 40 frames at gain 1.0; interval now scales linearly with `config.EFFECT_GAIN` so high-intensity settings spawn fewer background rockets while beat-triggered rockets are unchanged
+- **config.py** — added `EFFECT_GAIN` (float, updated each frame by main loop); effects can read it to modulate gain-sensitive behaviour
+
+---
+
 ## [2.6.0] — 2026-04-11
 
 ### Added
