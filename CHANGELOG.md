@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.9.0] — 2026-04-12
+
+### Added
+- **Aurora** (`effects/aurora.py`) — five translucent sinusoidal curtain-ribbons rendered additively with a per-ribbon outer glow polygon and bright edge line. Bass drives amplitude; treble drives shimmer speed (phase velocity); mid drives ribbon height; beat triggers a bloom flash and hue shift. `TRAIL_ALPHA = 14`.
+- **Lattice** (`effects/lattice.py`) — 14×9 crystal grid of glowing nodes connected by double-stroke neon beams. FFT frequency bins are mapped spatially across columns (bass left, treble right). Beat fires a shockwave ring from the centre; nodes near the wavefront flare white. Bass drives a subtle scale-breath. Radial hue offset: cyan core → violet edges. `TRAIL_ALPHA = 20`.
+
+### Removed
+- **Particles** (`rhythmic_particles.py`) — replaced by Aurora and Lattice.
+
+---
+
 ## [2.8.0] — 2026-04-12
 
 ### Changed
