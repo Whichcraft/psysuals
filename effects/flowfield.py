@@ -54,11 +54,23 @@ class FlowField:
 
         self._boost = max(0.0, self._boost - 0.08)
 
+        treble = float(np.mean(fft[100:256]))
+
         # Move particles along the field (wrap at edges)
         angles = self._field_angles(bass)
         spd    = 1.6 + bass * 1.4 + self._boost
-        self._px = (self._px + np.cos(angles) * spd) % W
-        self._py = (self._py + np.sin(angles) * spd) % H
+
+        # Bass gravity: pull all particles gently toward screen centre
+        attract_x = (W * 0.5 - self._px) * (bass * 0.0018)
+        attract_y = (H * 0.5 - self._py) * (bass * 0.0018)
+
+        # Treble scatter: random kick in any direction — particles disperse on hi-hats
+        scatter   = treble * 3.2
+        scatter_x = np.random.uniform(-scatter, scatter, _N).astype(np.float32)
+        scatter_y = np.random.uniform(-scatter, scatter, _N).astype(np.float32)
+
+        self._px = (self._px + np.cos(angles) * spd + attract_x + scatter_x) % W
+        self._py = (self._py + np.sin(angles) * spd + attract_y + scatter_y) % H
 
         # Decay trail
         self._trail.fill((247, 247, 247), special_flags=pygame.BLEND_RGB_MULT)
