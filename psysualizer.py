@@ -287,7 +287,11 @@ def main():
     cf_frames = _s.get("cf_frames", _CROSSFADE_FRAMES)
 
     # Task 14: span mode
-    span_mode = False
+    span_mode     = False
+    span_vis2_idx = (mode_idx + 1) % len(MODES)
+    vis2          = None
+    span_split    = config.WIDTH // 2
+    span_surfs    = None   # (left_surf, right_surf) subsurfaces
 
     def _quit():
         """Exit fullscreen before destroying the display so SDL restores all monitors."""
@@ -383,7 +387,7 @@ def main():
         screen.blit(bar_surf, (6, config.HEIGHT - BAR_MAX - 6))
 
     hint = ("  ←/→: mode  |  ↑/↓: intensity  |  A: auto-gain"
-            "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span"
+            "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span  |  [ / ]: span-R"
             "  |  Tab: pane  |  P: preset  |  Shift+P: load"
             "  |  1-{n}: jump  |  D: device  |  F: fullscreen"
             "  |  H: HUD  |  Shift+H: detail  |  Q: quit"
@@ -452,12 +456,14 @@ def main():
                             effect_gain = max(0.0, round(effect_gain - 0.1, 1))
 
                     elif event.key == pygame.K_f:
-                        fullscreen = not fullscreen
+                        if span_mode:
+                            span_mode = False
+                        else:
+                            fullscreen = not fullscreen
                         screen = _open_display(display_idx, fullscreen)
                         config.WIDTH, config.HEIGHT = screen.get_size()
                         fade = make_fade(); vis = VisCls()
                         bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-                        span_mode = False
 
                     # Task 15: H = toggle HUD on/off; Shift+H = cycle detail level
                     elif event.key == pygame.K_h:
@@ -493,16 +499,38 @@ def main():
                             span_mode = not span_mode
                             if span_mode:
                                 try:
-                                    info = pygame.display.Info()
+                                    sizes = pygame.display.get_desktop_sizes()
+                                    info  = pygame.display.Info()
                                     screen = pygame.display.set_mode(
                                         (info.current_w, info.current_h),
                                         pygame.NOFRAME)
+                                    config.WIDTH, config.HEIGHT = screen.get_size()
+                                    # split at right edge of first monitor
+                                    span_split = (
+                                        sizes[0][0]
+                                        if len(sizes) >= 2
+                                        and 0 < sizes[0][0] < config.WIDTH
+                                        else config.WIDTH // 2
+                                    )
+                                    _, Vis2Cls = MODES[span_vis2_idx]
+                                    vis2 = Vis2Cls()
+                                    span_surfs = (
+                                        screen.subsurface(
+                                            (0, 0, span_split, config.HEIGHT)),
+                                        screen.subsurface(
+                                            (span_split, 0,
+                                             config.WIDTH - span_split,
+                                             config.HEIGHT)),
+                                    )
                                 except Exception:
                                     span_mode = False
                                     screen = _open_display(display_idx, fullscreen)
+                                    config.WIDTH, config.HEIGHT = screen.get_size()
+                                    vis2 = None; span_surfs = None
                             else:
                                 screen = _open_display(display_idx, fullscreen)
-                            config.WIDTH, config.HEIGHT = screen.get_size()
+                                config.WIDTH, config.HEIGHT = screen.get_size()
+                                vis2 = None; span_surfs = None
                             fade = make_fade(); vis = VisCls()
                             bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
                         else:
@@ -516,6 +544,16 @@ def main():
                                 med = sorted(intervals)[len(intervals) // 2]
                                 if med > 0:
                                     tap_bpm = max(60.0, min(200.0, 60.0 / med))
+
+                    # Span mode: [ / ] cycle right-screen effect
+                    elif event.key == pygame.K_RIGHTBRACKET and span_mode:
+                        span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
+                        _, Vis2Cls = MODES[span_vis2_idx]
+                        vis2 = Vis2Cls()
+                    elif event.key == pygame.K_LEFTBRACKET and span_mode:
+                        span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
+                        _, Vis2Cls = MODES[span_vis2_idx]
+                        vis2 = Vis2Cls()
 
                     # Task 12: P = save preset; Shift+P = cycle presets
                     elif event.key == pygame.K_p:
@@ -595,17 +633,32 @@ def main():
         if new_alpha != fade_alpha:
             fade_alpha = new_alpha
             fade = make_fade(fade_alpha)
-        screen.blit(fade, (0, 0))
+        if span_mode and span_surfs is not None:
+            # Dual-screen span: independent effect per monitor
+            left_surf, right_surf = span_surfs
+            left_surf.blit(fade, (0, 0))
+            right_surf.blit(fade, (0, 0))
+            vis.draw(left_surf,  waveform, fft, draw_beat, tick)
+            vis2.draw(right_surf, waveform, fft, draw_beat, tick)
+            span2_name = MODES[span_vis2_idx][0]
+            left_surf.blit(
+                font_s.render(f"  {name}  |  [ / ] for right", True, (70, 70, 70)),
+                (6, 6))
+            right_surf.blit(
+                font_s.render(f"  {span2_name}", True, (70, 70, 70)),
+                (6, 6))
+        else:
+            screen.blit(fade, (0, 0))
 
-        # Task 5: background layer at configurable alpha
-        if bg_on:
-            bg_surf.fill((0, 0, 0))
-            bg_vis.draw(bg_surf, waveform, fft, draw_beat, tick)
-            bg_surf.set_alpha(bg_alpha)
-            screen.blit(bg_surf, (0, 0))
+            # Task 5: background layer at configurable alpha
+            if bg_on:
+                bg_surf.fill((0, 0, 0))
+                bg_vis.draw(bg_surf, waveform, fft, draw_beat, tick)
+                bg_surf.set_alpha(bg_alpha)
+                screen.blit(bg_surf, (0, 0))
 
-        # Foreground effect
-        vis.draw(screen, waveform, fft, draw_beat, tick)
+            # Foreground effect
+            vis.draw(screen, waveform, fft, draw_beat, tick)
 
         # Crossfade overlay — ease-in-out cubic dissolve
         if prev_surf is not None:
