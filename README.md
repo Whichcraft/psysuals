@@ -2,10 +2,27 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.5.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.6.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.6.0 — UX improvements
+
+### Presets
+Save the current mode, intensity, and background layer as a named preset with `P`. Cycle through saved presets with `Shift+P`. The active preset name is shown in the HUD.
+
+### Real-time settings pane
+Press `Tab` to open a right-side overlay with three live sliders: effect gain, background alpha, and crossfade length. Use `↑`/`↓` to navigate between sliders and `←`/`→` to adjust values while the music plays. Settings are saved on quit.
+
+### Span mode
+Press `Shift+M` to stretch the window across all connected monitors using the full virtual desktop dimensions. Press `Shift+M` again to return to single-display mode.
+
+### HUD customisation
+`H` toggles the HUD on/off as before. `Shift+H` now cycles through three detail levels: **full** (all rows + bars), **minimal** (mode name + BPM only), **off**.
+
+### Multi-band energy bars
+Three small vertical bars anchored to the bottom-left corner show real-time bass (red), mid (green), and treble (purple) energy at a glance — always visible whenever the HUD is on.
 
 ## What's new in v2.5.0 — audio engine upgrade + new features
 
@@ -110,17 +127,21 @@ python3 -m venv .venv
 
 | Key / Action | Effect |
 |---|---|
-| `←` / `→` or `Space` or click | Cycle to previous / next mode |
-| `↑` / `↓` | Increase / decrease effect intensity (0.0 – 2.0, default 1.0) |
+| `←` / `→` or `Space` or click | Cycle to previous / next mode (or adjust pane slider when pane is open) |
+| `↑` / `↓` | Increase / decrease effect intensity (or navigate pane sliders when pane is open) |
 | `1` – `9` | Jump to modes 1–9 |
-| `0` | Jump to mode 10 (first ←/→-only mode) |
+| `Tab` | Toggle real-time settings pane (effect gain, bg alpha, crossfade length) |
+| `P` | Save current state as a preset |
+| `Shift+P` | Cycle through saved presets |
 | `A` | Toggle auto-gain (auto-scales beat to current volume) |
-| `B` | Toggle background layer (renders a second effect at 40 % opacity behind the active one) |
+| `B` | Toggle background layer (renders a second effect at configurable opacity behind the active one) |
 | `Shift+B` | Cycle background effect (modes 1–9) |
-| `M` | Move visualizer to next available display |
+| `M` | Tap tempo — tap 2+ times to lock BPM for 8 s |
+| `Shift+M` | Toggle span mode (stretches window across all monitors) |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
-| `H` | Toggle HUD / legend visibility |
+| `H` | Toggle HUD on / off |
+| `Shift+H` | Cycle HUD detail: full → minimal → off |
 | `Q` / `Esc` | Quit |
 
 ## Selecting an audio input device

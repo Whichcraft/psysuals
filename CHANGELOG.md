@@ -5,6 +5,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.6.0] — 2026-04-11
+
+### Added
+- **Presets** — `P` saves current mode/intensity/background as a named preset to `~/.config/psysuals/presets.json`; `Shift+P` cycles through saved presets; active preset name shown in the HUD
+- **Real-time settings pane** — `Tab` opens a right-side overlay; `↑`/`↓` navigate three sliders (effect gain, background alpha, crossfade frames); `←`/`→` adjust the selected slider while visuals keep playing; values persist on quit
+- **Span mode** (`Shift+M`) — stretches the window across all connected monitors using the full virtual desktop dimensions; `Shift+M` again restores single-display mode
+- **HUD detail levels** — `Shift+H` cycles full / minimal / off; full shows all rows and bars; minimal shows only mode name and BPM; `H` still toggles on/off as before
+- **Multi-band vertical bars** — three 8 px wide bars anchored to the bottom-left corner visualise real-time bass (red), mid (green), and treble (purple) energy whenever the HUD is visible
+
+### Changed
+- Background layer alpha is now user-configurable via the settings pane (default 102, ~40 %)
+- Crossfade duration is now user-configurable via the settings pane (default 45 frames)
+- `settings.py` gains `load_presets()`, `save_preset()`, `delete_preset()` for preset persistence
+
+---
+
 ## [2.5.0] — 2026-04-11
 
 ### Added
