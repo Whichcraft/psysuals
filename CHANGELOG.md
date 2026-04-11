@@ -5,6 +5,53 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.7.0] — 2026-04-12
+
+### Changed
+- **Tunnel** — triangles now spawn only in the far third of the tube (z ∈ 80–98 % of Z_FAR, was 65–95 %); spawn rate halved; live cap reduced 120 → 50; mid-depth no longer cluttered between beats
+- **Butterflies** — mutual love-chase: both butterflies steer toward each other's offset position (rotating pursuit spiral); orbit radius shrinks from 240 to 40 px over the pair's lifetime; all scales reduced to 70 % (solo 5.04, love 4.79)
+- **Vortex** — auto-launch interval reduced 85 → 40 frames at gain 1.0; interval now scales linearly with `config.EFFECT_GAIN` so high-intensity settings spawn fewer background rockets while beat-triggered rockets are unchanged
+- **config.py** — added `EFFECT_GAIN` (float, updated each frame by main loop); effects can read it to modulate gain-sensitive behaviour
+
+---
+
+## [2.6.0] — 2026-04-11
+
+### Added
+- **Presets** — `P` saves current mode/intensity/background as a named preset to `~/.config/psysuals/presets.json`; `Shift+P` cycles through saved presets; active preset name shown in the HUD
+- **Real-time settings pane** — `Tab` opens a right-side overlay; `↑`/`↓` navigate three sliders (effect gain, background alpha, crossfade frames); `←`/`→` adjust the selected slider while visuals keep playing; values persist on quit
+- **Span mode** (`Shift+M`) — stretches the window across all connected monitors using the full virtual desktop dimensions; `Shift+M` again restores single-display mode
+- **HUD detail levels** — `Shift+H` cycles full / minimal / off; full shows all rows and bars; minimal shows only mode name and BPM; `H` still toggles on/off as before
+- **Multi-band vertical bars** — three 8 px wide bars anchored to the bottom-left corner visualise real-time bass (red), mid (green), and treble (purple) energy whenever the HUD is visible
+
+### Changed
+- Background layer alpha is now user-configurable via the settings pane (default 102, ~40 %)
+- Crossfade duration is now user-configurable via the settings pane (default 45 frames)
+- `settings.py` gains `load_presets()`, `save_preset()`, `delete_preset()` for preset persistence
+
+---
+
+## [2.5.0] — 2026-04-11
+
+### Added
+- **Particles** — new `RhythmicParticles` effect: beat bursts from screen centre, continuous trickle driven by treble energy, hue drifts with mid energy; uses numpy batch rendering with pre-rendered blit cache for performance
+- **BPM detection** — onset timestamps tracked in the audio callback; median inter-beat interval gives a live BPM estimate (60–200) exposed as `config.BPM` and shown in the HUD
+- **Multi-band energy** — `config.MID_ENERGY` (bins 20–100, ~860 Hz–4.3 kHz) and `config.TREBLE_ENERGY` (bins 100–256, ~4.3–11 kHz) computed and normalised each frame; effects can read these directly
+- **Shared palette** (`effects/palette.py`) — module-level singleton whose base hue drifts with mid energy and whose saturation/lightness track beat/treble; effects opt in via `palette.get(offset)`
+- **Crossfade on mode switch** — 45-frame dissolve overlay when switching effects
+- **Background layer** — `B` toggles a second effect rendered at 40 % alpha beneath the foreground; `Shift+B` cycles the background effect through modes 1–9
+- **Auto-gain** (`A`) — rolling RMS of the waveform auto-scales beat intensity to stay reactive at any playback volume
+- **Multi-screen support** — `--display N` CLI flag launches on a specific display; `M` key cycles to the next display at runtime; graceful fallback if RANDR is unavailable
+- **Settings persistence** (`settings.py`) — device, mode, intensity, HUD, auto-gain, background state, and display index saved to `~/.config/psysuals/settings.json` and restored on next launch
+- **Enhanced HUD** — second row with live BPM, colour-coded energy bars (beat / mid / treble), particle count when Particles effect is active
+
+### Changed
+- **Blackman window** replaces Hann window for better spectral leakage suppression
+- **Spectral flux beat detection** replaces simple energy averaging — beat signal now tracks the positive rate of change in the bass spectrum, giving sharper and more accurate kick response
+- `config.py` now exports `MID_ENERGY`, `TREBLE_ENERGY`, `BPM` as shared mutable globals
+
+---
+
 ## [2.4.0] — 2026-04-05
 
 ### Fixed

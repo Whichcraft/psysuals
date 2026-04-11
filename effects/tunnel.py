@@ -52,9 +52,11 @@ class Tunnel:
         dt         = 0.03 + bass * 0.09 + beat * 0.18
         self.time += dt
 
-        spawn_n = int(bass * 4.0 + (beat * 6.0 if beat > 0.3 else 0))
+        # Spawn only in the far third of the tube and cap the live count so the
+        # mid-range doesn't fill up with spinning triangles.
+        spawn_n = int(bass * 2.0 + (beat * 3.0 if beat > 0.5 else 0))
         for _ in range(spawn_n):
-            z = self.Z_FAR * random.uniform(0.65, 0.95)
+            z = self.Z_FAR * random.uniform(0.80, 0.98)
             self.tris.append({
                 "z":    z,
                 "pt":   self.time + z,
@@ -137,4 +139,4 @@ class Tunnel:
             pygame.draw.polygon(surf, hsl(h, l=bright * 0.30), pts, lw + 4)
             pygame.draw.polygon(surf, hsl(h, l=bright),         pts, lw)
             live.append(tri)
-        self.tris = live[-120:]
+        self.tris = live[-50:]
