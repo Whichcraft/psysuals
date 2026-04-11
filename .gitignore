@@ -3,5 +3,7 @@ __pycache__/
 .venv/
 screenshot.png
 
+CLAUDE.md
+
 # QMD search index
 qmd.sqlite
