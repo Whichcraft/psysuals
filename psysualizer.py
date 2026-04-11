@@ -256,6 +256,7 @@ def main():
     tap_bpm        = 0.0
     tap_bpm_expiry = 0.0
     _TAP_EXPIRE    = 8.0   # seconds before tap BPM falls back to auto
+    tap_flash_end  = 0.0   # monotonic time when tap flash overlay expires
 
     # Task 2: crossfade
     prev_surf       = None   # snapshot taken at mode switch
@@ -385,6 +386,7 @@ def main():
                         now = _time.monotonic()
                         tap_times.append(now)
                         tap_bpm_expiry = now + _TAP_EXPIRE
+                        tap_flash_end  = now + 2.0
                         if len(tap_times) >= 2:
                             intervals = [tap_times[i] - tap_times[i-1]
                                          for i in range(1, len(tap_times))]
@@ -405,6 +407,7 @@ def main():
         if detected is not None:
             current_genre = detected
             _apply_genre_weights(detected)
+            palette.set_genre(detected)
 
         waveform, fft, raw_beat, mid_e, treble_e, bpm = get_audio()
         config.MID_ENERGY    = mid_e
@@ -438,7 +441,9 @@ def main():
         palette.update(beat, mid_e, treble_e, tick)
 
         # ── Draw ──────────────────────────────────────────────────────────────
-        new_alpha = getattr(vis, 'TRAIL_ALPHA', 28)
+        # Genre trail_alpha takes precedence when genre is known
+        genre_alpha = palette.trail_alpha if current_genre not in ("detecting…",) else None
+        new_alpha = genre_alpha if genre_alpha is not None else getattr(vis, 'TRAIL_ALPHA', 28)
         if new_alpha != fade_alpha:
             fade_alpha = new_alpha
             fade = make_fade(fade_alpha)
@@ -454,16 +459,32 @@ def main():
         # Foreground effect
         vis.draw(screen, waveform, fft, draw_beat, tick)
 
-        # Task 2: crossfade overlay — dissolve old screenshot out
+        # Crossfade overlay — ease-in-out cubic dissolve
         if prev_surf is not None:
-            alpha = int(255 * (1.0 - crossfade_frame / _CROSSFADE_FRAMES))
-            prev_surf.set_alpha(alpha)
+            t   = crossfade_frame / _CROSSFADE_FRAMES
+            ease = t * t * (3.0 - 2.0 * t)          # smoothstep
+            prev_surf.set_alpha(int(255 * (1.0 - ease)))
             screen.blit(prev_surf, (0, 0))
             crossfade_frame += 1
             if crossfade_frame >= _CROSSFADE_FRAMES:
                 prev_surf = None
 
-        # ── HUD (Tasks 7 + 8) ─────────────────────────────────────────────────
+        # ── Tap tempo flash ───────────────────────────────────────────────────
+        now = _time.monotonic()
+        if tap_bpm > 0 and now < tap_flash_end:
+            t_left  = tap_flash_end - now          # 0..2
+            alpha   = int(180 * min(t_left, 1.0))  # fade in 1 s, hold, then out
+            W, H    = config.WIDTH, config.HEIGHT
+            flash   = pygame.Surface((W, H), pygame.SRCALPHA)
+            flash.fill((255, 255, 255, alpha // 6)) # subtle white pulse
+            screen.blit(flash, (0, 0))
+            font_big = pygame.font.SysFont("monospace", 72, bold=True)
+            lbl = font_big.render(f"{tap_bpm:.0f} BPM", True,
+                                  (255, 255, 255, alpha))
+            screen.blit(lbl, (W // 2 - lbl.get_width() // 2,
+                               H // 2 - lbl.get_height() // 2))
+
+        # ── HUD ───────────────────────────────────────────────────────────────
         if show_hud:
             if active_dev not in dev_name_cache:
                 dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
