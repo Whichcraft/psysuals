@@ -147,6 +147,46 @@ def get_audio():
                 _beat_energy, _mid_energy, _treble_energy, _bpm)
 
 
+# ── Monitor helpers ───────────────────────────────────────────────────────────
+
+def _monitor_split() -> int | None:
+    """
+    Return the x pixel where monitor 0 ends (= monitor 1 starts), or None.
+
+    Strategy:
+    1. pygame.display.get_desktop_sizes() — works when SDL sees separate screens.
+    2. xrandr --listmonitors — reliable on Linux/X11 regardless of RandR config.
+    """
+    import re, subprocess
+
+    # Strategy 1: pygame native
+    try:
+        sizes = pygame.display.get_desktop_sizes()
+        if len(sizes) >= 2 and sizes[0][0] > 0:
+            return sizes[0][0]
+    except Exception:
+        pass
+
+    # Strategy 2: xrandr (Linux / X11)
+    try:
+        out = subprocess.check_output(
+            ["xrandr", "--listmonitors"], stderr=subprocess.DEVNULL, text=True)
+        # Each monitor line: "  0: +*DP-1 1920/527x1080/297+0+0"
+        monitors = []
+        for line in out.splitlines():
+            m = re.search(r"(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
+            if m:
+                w, h, x, y = (int(m.group(i)) for i in range(1, 5))
+                monitors.append((x, y, w, h))
+        monitors.sort(key=lambda m: m[0])   # left to right
+        if len(monitors) >= 2:
+            return monitors[0][0] + monitors[0][2]   # right edge of left monitor
+    except Exception:
+        pass
+
+    return None
+
+
 # ── Device picker ─────────────────────────────────────────────────────────────
 
 def _input_devices():
@@ -509,16 +549,15 @@ def main():
                             span_mode = not span_mode
                             if span_mode:
                                 try:
-                                    sizes = pygame.display.get_desktop_sizes()
                                     info  = pygame.display.Info()
                                     screen = pygame.display.set_mode(
                                         (info.current_w, info.current_h),
                                         pygame.NOFRAME)
                                     config.WIDTH, config.HEIGHT = screen.get_size()
                                     # dual-effect only on genuine multi-monitor setups
-                                    if (len(sizes) >= 2
-                                            and 0 < sizes[0][0] < config.WIDTH):
-                                        span_split = sizes[0][0]
+                                    split = _monitor_split()
+                                    if split and 0 < split < config.WIDTH:
+                                        span_split = split
                                         _, Vis2Cls = MODES[span_vis2_idx]
                                         vis2 = Vis2Cls()
                                         span_surfs = (
