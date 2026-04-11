@@ -387,7 +387,7 @@ def main():
         screen.blit(bar_surf, (6, config.HEIGHT - BAR_MAX - 6))
 
     hint = ("  ←/→: mode  |  ↑/↓: intensity  |  A: auto-gain"
-            "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span  |  [ / ]: span-R"
+            "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span  |  A/D: span-R"
             "  |  Tab: pane  |  P: preset  |  Shift+P: load"
             "  |  1-{n}: jump  |  D: device  |  F: fullscreen"
             "  |  H: HUD  |  Shift+H: detail  |  Q: quit"
@@ -475,13 +475,23 @@ def main():
                             hud_level = 2 if show_hud else 0
 
                     elif event.key == pygame.K_d:
-                        devices = _input_devices(); picking = True
-                        active_indices = [d[0] for d in devices]
-                        pick_sel = (active_indices.index(active_dev)
-                                    if active_dev in active_indices else 0)
+                        if span_mode:
+                            span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
+                            _, Vis2Cls = MODES[span_vis2_idx]
+                            vis2 = Vis2Cls()
+                        else:
+                            devices = _input_devices(); picking = True
+                            active_indices = [d[0] for d in devices]
+                            pick_sel = (active_indices.index(active_dev)
+                                        if active_dev in active_indices else 0)
 
                     elif event.key == pygame.K_a:
-                        auto_gain = not auto_gain
+                        if span_mode:
+                            span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
+                            _, Vis2Cls = MODES[span_vis2_idx]
+                            vis2 = Vis2Cls()
+                        else:
+                            auto_gain = not auto_gain
 
                     elif event.key == pygame.K_b:
                         if shift:
@@ -544,16 +554,6 @@ def main():
                                 med = sorted(intervals)[len(intervals) // 2]
                                 if med > 0:
                                     tap_bpm = max(60.0, min(200.0, 60.0 / med))
-
-                    # Span mode: [ / ] cycle right-screen effect
-                    elif event.key == pygame.K_RIGHTBRACKET and span_mode:
-                        span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
-                        _, Vis2Cls = MODES[span_vis2_idx]
-                        vis2 = Vis2Cls()
-                    elif event.key == pygame.K_LEFTBRACKET and span_mode:
-                        span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
-                        _, Vis2Cls = MODES[span_vis2_idx]
-                        vis2 = Vis2Cls()
 
                     # Task 12: P = save preset; Shift+P = cycle presets
                     elif event.key == pygame.K_p:
@@ -642,7 +642,7 @@ def main():
             vis2.draw(right_surf, waveform, fft, draw_beat, tick)
             span2_name = MODES[span_vis2_idx][0]
             left_surf.blit(
-                font_s.render(f"  {name}  |  [ / ] for right", True, (70, 70, 70)),
+                font_s.render(f"  {name}  |  A/D: right screen", True, (70, 70, 70)),
                 (6, 6))
             right_surf.blit(
                 font_s.render(f"  {span2_name}", True, (70, 70, 70)),
