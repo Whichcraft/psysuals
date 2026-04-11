@@ -195,17 +195,22 @@ def main():
     args = ap.parse_args()
 
     pygame.init()
-    num_displays = pygame.display.get_num_displays()
-    display_idx  = max(0, min(args.display, num_displays - 1))
+    try:
+        num_displays = pygame.display.get_num_displays()
+    except Exception:
+        num_displays = 1
+    display_idx = max(0, min(args.display, num_displays - 1))
 
     def _open_display(idx, fullscreen):
         flags = pygame.FULLSCREEN if fullscreen else 0
-        try:
-            return pygame.display.set_mode(
-                (config.WIDTH, config.HEIGHT), flags, display=idx)
-        except Exception:
-            return pygame.display.set_mode(
-                (config.WIDTH, config.HEIGHT), flags, display=0)
+        # display= kwarg requires working RANDR; fall back silently if unavailable
+        if num_displays > 1:
+            try:
+                return pygame.display.set_mode(
+                    (config.WIDTH, config.HEIGHT), flags, display=idx)
+            except Exception:
+                pass
+        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
 
     screen     = _open_display(display_idx, True)
     fullscreen = True
