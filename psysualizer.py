@@ -15,7 +15,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.7.0"
+__version__ = "2.9.0"
 
 import argparse
 import threading
@@ -515,23 +515,22 @@ def main():
                                         (info.current_w, info.current_h),
                                         pygame.NOFRAME)
                                     config.WIDTH, config.HEIGHT = screen.get_size()
-                                    # split at right edge of first monitor
-                                    span_split = (
-                                        sizes[0][0]
-                                        if len(sizes) >= 2
-                                        and 0 < sizes[0][0] < config.WIDTH
-                                        else config.WIDTH // 2
-                                    )
-                                    _, Vis2Cls = MODES[span_vis2_idx]
-                                    vis2 = Vis2Cls()
-                                    span_surfs = (
-                                        screen.subsurface(
-                                            (0, 0, span_split, config.HEIGHT)),
-                                        screen.subsurface(
-                                            (span_split, 0,
-                                             config.WIDTH - span_split,
-                                             config.HEIGHT)),
-                                    )
+                                    # dual-effect only on genuine multi-monitor setups
+                                    if (len(sizes) >= 2
+                                            and 0 < sizes[0][0] < config.WIDTH):
+                                        span_split = sizes[0][0]
+                                        _, Vis2Cls = MODES[span_vis2_idx]
+                                        vis2 = Vis2Cls()
+                                        span_surfs = (
+                                            screen.subsurface(
+                                                (0, 0, span_split, config.HEIGHT)),
+                                            screen.subsurface(
+                                                (span_split, 0,
+                                                 config.WIDTH - span_split,
+                                                 config.HEIGHT)),
+                                        )
+                                    else:
+                                        vis2 = None; span_surfs = None
                                 except Exception:
                                     span_mode = False
                                     screen = _open_display(display_idx, fullscreen)
