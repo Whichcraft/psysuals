@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 screenshot.png
+
+CLAUDE.md
+
+# QMD search index
+qmd.sqlite

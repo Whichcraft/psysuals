@@ -28,7 +28,10 @@ class Vortex:
     _BEAT_ZOOM       = 1.015
     _BEAT_ROT        = 2.4
     _BEAT_FRAMES     = 50
-    _LAUNCH_INTERVAL = 85   # frames between auto-launches
+    # Auto-launch interval at gain=1.0.  Scales linearly with gain so that
+    # higher intensity → longer interval (fewer rockets) and lower → shorter.
+    # Formula: interval = _BASE_INTERVAL * gain  (clamped 20..200)
+    _BASE_INTERVAL   = 40   # frames between auto-launches at gain 1.0
 
     def __init__(self):
         W, H = config.WIDTH, config.HEIGHT
@@ -75,9 +78,13 @@ class Vortex:
             for _ in range(1 + int(beat * 2)):
                 self._launch()
 
-        # Auto-launch between beats
+        # Auto-launch between beats — interval scales with effect gain so that
+        # low gain → more rockets, high gain → fewer (beat-triggered already
+        # fires more rockets when gain is high via the larger beat value).
+        gain     = max(0.1, getattr(config, 'EFFECT_GAIN', 1.0))
+        interval = int(max(20, min(200, self._BASE_INTERVAL * gain)))
         self._auto_t += 1
-        if self._auto_t >= self._LAUNCH_INTERVAL:
+        if self._auto_t >= interval:
             self._auto_t = 0
             self._launch()
 

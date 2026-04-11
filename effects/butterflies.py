@@ -1,8 +1,10 @@
 """Butterflies — up to three pairs dancing to the music.
 
 Each pair: a solo butterfly flutters in first; its partner joins after
-10–30 s and orbits it lovingly.  After a random lifetime the pair wanders
-off-screen and vanishes.  New pairs can re-enter from the edges.
+10–30 s.  Once together they *chase each other* in a tightening mutual
+orbit — both turning toward the other's position, creating a playful
+love-pursuit spiral.  After a random lifetime the pair wanders off-screen
+and vanishes.  New pairs can re-enter from the edges.
 Wing flapping syncs when partners are close; sparkles on the beat.
 
 Trail is managed on an internal surface (TRAIL_ALPHA = 0) so it is
@@ -70,7 +72,12 @@ class _Butterfly:
         if self._depart_ang is None:
             self._depart_ang = random.uniform(0, math.tau)
 
-    def update(self, bass, beat, t, orbit_pos=None, orbit_angle=0.0, orbit_r=180.0):
+    def update(self, bass, beat, t, chase_pos=None):
+        """Update position and wing phase.
+
+        chase_pos: if set, the butterfly steers toward this (x, y) target
+                   instead of wandering.  Used for the mutual-chase love pairs.
+        """
         self.wing_phase += 0.09 + bass * 0.16 + beat * 0.06
 
         if self._depart_ang is not None:
@@ -80,10 +87,8 @@ class _Butterfly:
             self.y += math.sin(self.heading) * spd
             return
 
-        if orbit_pos is not None:
-            gx = orbit_pos[0] + math.cos(orbit_angle) * orbit_r
-            gy = orbit_pos[1] + math.sin(orbit_angle) * orbit_r
-            desired = math.atan2(gy - self.y, gx - self.x)
+        if chase_pos is not None:
+            desired = math.atan2(chase_pos[1] - self.y, chase_pos[0] - self.x)
         else:
             self._wander_cd -= 1
             if self._wander_cd <= 0:
@@ -93,8 +98,6 @@ class _Butterfly:
             desired = self._wander_des
 
         # ── Boundary repulsion ────────────────────────────────────────────────
-        # Margin capped at 1/5 of the smaller screen dimension so it never
-        # overlaps itself on small / portrait screens.
         m = min(int(50 * self.scale), config.WIDTH // 5, config.HEIGHT // 5)
         rx, ry = 0.0, 0.0
         if self.x < m:
@@ -107,11 +110,9 @@ class _Butterfly:
             ry = (config.HEIGHT - m - self.y) / m
 
         if rx or ry:
-            # Proportional push: directly move position away from wall…
             push = self.scale * max(abs(rx), abs(ry)) * 2.5
             self.x += rx * push
             self.y += ry * push
-            # …and steer heading away from wall
             desired = math.atan2(ry, rx)
             diff = (desired - self.heading + math.pi) % math.tau - math.pi
             self.heading += max(-0.35, min(0.35, diff * 0.50))
@@ -125,7 +126,6 @@ class _Butterfly:
         self.x += math.cos(self.heading) * spd
         self.y += math.sin(self.heading) * spd
 
-        # Hard clamp as last resort (rarely triggered after repulsion)
         cl = int(28 * self.scale)
         self.x = max(float(cl), min(float(config.WIDTH  - cl), self.x))
         self.y = max(float(cl), min(float(config.HEIGHT - cl), self.y))
@@ -176,8 +176,19 @@ def _edge_spawn():
     return random.uniform(m, config.WIDTH - m), float(config.HEIGHT - m)
 
 
+# Scale is 70 % of the original 7.2 / 6.84
+_SOLO_SCALE = round(7.2  * 0.70, 2)   # 5.04
+_LOVE_SCALE = round(6.84 * 0.70, 2)   # 4.79
+
+
 class _Pair:
-    """One loving pair of butterflies with its own lifecycle."""
+    """One loving pair of butterflies with its own lifecycle.
+
+    Once both butterflies are alive they chase each other — solo steers
+    toward love and love steers toward solo, each targeting a point offset
+    by a rotating angle at a shrinking radius.  This creates a playful
+    spiral pursuit that eventually settles into a tight mutual orbit.
+    """
 
     def __init__(self, hue, spawn_delay=0):
         self.hue          = hue
@@ -185,8 +196,8 @@ class _Pair:
         self._join_delay  = random.randint(600, 1800)
         self._lifetime    = random.randint(2400, 5400)
         self._age         = -spawn_delay
-        self._orbit_ang   = 0.0
-        self._orbit_r     = 260.0
+        self._orbit_ang   = random.uniform(0, math.tau)
+        self._orbit_r     = 240.0    # starts wide, shrinks to ~40
         self.solo         = None
         self.love         = None
         self._departing   = False
@@ -204,7 +215,7 @@ class _Pair:
 
         if self.solo is None and self._age >= 0:
             x, y = _edge_spawn()
-            self.solo = _Butterfly(x, y, hue=global_hue, scale=7.2)
+            self.solo = _Butterfly(x, y, hue=global_hue, scale=_SOLO_SCALE)
 
         if self.solo is None:
             return
@@ -217,7 +228,7 @@ class _Pair:
             x, y = _edge_spawn()
             self.love = _Butterfly(x, y,
                                    hue=(global_hue + 0.50) % 1.0,
-                                   scale=6.84)
+                                   scale=_LOVE_SCALE)
 
         if self._age >= self._lifetime and not self._departing:
             self._departing = True
@@ -225,21 +236,39 @@ class _Pair:
             if self.love:
                 self.love.start_depart()
 
-        self._orbit_ang += 0.007 + beat * 0.012
-        if self._orbit_r > 160:
-            self._orbit_r -= 0.04
+        if self.love is not None and not self._departing:
+            # Mutual chase: orbit angle rotates faster as radius shrinks
+            # (conservation-of-angular-momentum feel)
+            ang_speed = 0.012 + beat * 0.020 + 0.003 * max(0.0, 1.0 - self._orbit_r / 240)
+            self._orbit_ang += ang_speed
+            if self._orbit_r > 40.0:
+                self._orbit_r -= 0.06
 
-        self.solo.update(bass, beat, t)
-        if self.love:
-            self.love.update(bass, beat, t,
-                             orbit_pos=(self.solo.x, self.solo.y),
-                             orbit_angle=self._orbit_ang,
-                             orbit_r=self._orbit_r)
+            r = self._orbit_r
+            # Solo chases: point offset from love's position at opposite angle
+            solo_target = (
+                self.love.x + math.cos(self._orbit_ang + math.pi) * r,
+                self.love.y + math.sin(self._orbit_ang + math.pi) * r,
+            )
+            # Love chases: point offset from solo's position at the orbit angle
+            love_target = (
+                self.solo.x + math.cos(self._orbit_ang) * r,
+                self.solo.y + math.sin(self._orbit_ang) * r,
+            )
+            self.solo.update(bass, beat, t, chase_pos=solo_target)
+            self.love.update(bass, beat, t, chase_pos=love_target)
+        else:
+            self.solo.update(bass, beat, t)
+            if self.love:
+                self.love.update(bass, beat, t)
 
+        # Wing sync when close
+        if self.love is not None:
             dist = math.hypot(self.love.x - self.solo.x,
                               self.love.y - self.solo.y)
-            if dist < 130 * 4:
-                sync = 1.0 - dist / (130 * 4)
+            sync_range = 130 * _SOLO_SCALE
+            if dist < sync_range:
+                sync = 1.0 - dist / sync_range
                 diff = self.love.wing_phase - self.solo.wing_phase
                 self.love.wing_phase -= diff * sync * 0.12
 
@@ -271,7 +300,7 @@ class _Pair:
 
 class Butterflies:
     """Three pairs of butterflies.  Each pair has its own lifecycle:
-    solo → partner joins → they orbit in love → wander off-screen → new pair.
+    solo → partner joins → mutual love chase → wander off-screen → new pair.
 
     TRAIL_ALPHA = 0: trails are managed on an internal surface so they survive
     on Android / OpenGL backends where the display backbuffer is not preserved
