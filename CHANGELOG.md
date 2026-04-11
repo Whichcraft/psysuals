@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.8.0] — 2026-04-12
+
+### Changed
+- **FlowField** — bass energy now pulls all particles toward screen centre (gravity strength `bass × 0.0018`); treble energy fires random scatter kicks (`treble × 3.2` px/frame). Bass → convergence on kicks; treble → dispersion on hi-hats.
+- **Lissajous** — t-step scales with detected BPM (`× BPM/138`, clamped ≥ 0.7); treble energy brightens glow passes in real time (`high × 0.14` added to `l1_bright`).
+- **Bubbles** — added `bass_flash` swell: spikes to `bass × 2.8` when bass > 0.65, decays at 0.18/frame, inflates rendered radius × 0.45; added mega-bubble spawns on beat > 0.7 (1–3 bubbles at 2.2–4× radius, 1.4× rise speed).
+
+---
+
 ## [2.7.0] — 2026-04-12
 
 ### Changed
