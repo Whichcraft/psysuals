@@ -568,9 +568,11 @@ def main():
                                         screen = pygame.display.set_mode(
                                             (info.current_w, info.current_h),
                                             pygame.NOFRAME)
-                                    config.WIDTH, config.HEIGHT = screen.get_size()
-                                    if split_x and 0 < split_x < config.WIDTH:
+                                    sw, config.HEIGHT = screen.get_size()
+                                    if split_x and 0 < split_x < sw:
                                         span_split = split_x
+                                        # effects must see per-monitor width
+                                        config.WIDTH = span_split
                                         _, Vis2Cls = MODES[span_vis2_idx]
                                         vis2 = Vis2Cls()
                                         span_surfs = (
@@ -578,7 +580,7 @@ def main():
                                                 (0, 0, span_split, config.HEIGHT)),
                                             screen.subsurface(
                                                 (span_split, 0,
-                                                 config.WIDTH - span_split,
+                                                 sw - span_split,
                                                  config.HEIGHT)),
                                         )
                                     else:
