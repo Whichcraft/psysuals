@@ -13,3 +13,4 @@ CHANNELS    = 1
 MID_ENERGY    = 0.0   # bins 20-100  (~860 Hz – 4.3 kHz)
 TREBLE_ENERGY = 0.0   # bins 100-256 (~4.3 kHz – 11 kHz)
 BPM           = 0.0   # detected tempo (60–200), 0 until enough beats seen
+EFFECT_GAIN   = 1.0   # current effect intensity (set by main loop each frame)

@@ -2,10 +2,21 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.6.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.7.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.7.0 — effect polish
+
+### Tunnel
+Triangles now spawn only in the far third of the tube and the live cap is reduced (50 instead of 120), so the mid-range stays clear and the effect feels calmer between beats.
+
+### Butterflies
+Both butterflies in a pair now chase each other in a mutual pursuit spiral — solo steers toward love's position and love steers toward solo's, each targeting a rotating offset point. The orbit radius tightens from 240 px down to 40 px over the pair's lifetime. All butterflies are 70 % of their former size.
+
+### Vortex fireworks
+Auto-launch rate doubled at default intensity (every 40 frames instead of 85). The interval now scales linearly with `effect_gain` so higher intensity settings yield fewer background rockets (beat-triggered rockets remain unchanged).
 
 ## What's new in v2.6.0 — UX improvements
 
