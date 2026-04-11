@@ -2,10 +2,22 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.8.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.9.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.9.0 — two new effects (Aurora & Lattice)
+
+### Aurora
+Five translucent sinusoidal curtains sweep across the screen like the Northern Lights. Each ribbon is built from three harmonics at different wavelengths and drift speeds, drawn additively so overlapping bands bloom together. Bass swells the amplitude; treble drives shimmer speed; beat triggers a brightness bloom and hue shift.
+
+### Lattice
+A 14×9 crystal grid of glowing nodes connected by double-stroke neon beams. Each column is mapped to a frequency band (bass left → treble right), so the grid reads the spectrum spatially. A shockwave ring expands from the centre on every beat — nodes near the wavefront flare white. Bass drives a subtle scale-breath; hue rotates with a radial offset (cyan core, violet edges).
+
+Both effects replace the previous Particles effect.
+
+---
 
 ## What's new in v2.8.0 — audio-driven forces
 
@@ -107,11 +119,12 @@ A first-person ride through a glowing neon tunnel of rainbow rounded-rectangle f
 | — | **Butterflies** | Two butterflies dancing to the music — one starts solo, a second joins after 10–30 s and orbits in love; wing flapping syncs when they're close; sparkles burst between them on the beat |
 | — | **FlowField** | 4 000 particles riding a 3-layer sine/cosine noise field — vivid rainbow trails on a slow-fade surface; bass warps field intensity; beat phase-jumps all flow lines |
 | — | **Vortex** | Pixel feedback wormhole — zoom-rotate tunnel of decaying trails; firework rockets launch from bottom, explode into 80–120 gravity-affected embers at the apex; beat fires extra rockets |
-| — | **Particles** | Neon particle system — beat bursts from centre, treble drives continuous trickle; velocity scales with beat, hue drifts with mid energy; numpy-batch rendering |
+| — | **Aurora** | Northern Lights curtains — 5 sinusoidal ribbons with additive glow; bass swells amplitude, treble drives shimmer speed, beat triggers bloom flash and hue shift |
+| — | **Lattice** | Crystal grid of 14×9 glowing nodes and neon beams — each column maps bass→treble across the FFT; beat fires a shockwave ring; bass drives scale-breath; radial hue offset (cyan core → violet edge) |
 | — | **Spectrum** | Log-spaced spectrum analyser with peak markers and a waveform overlay |
 | — | **Waterfall** | Scrolling time-frequency spectrogram — newest slice at top, log-spaced bins, hue = frequency, brightness = energy; beat flashes the leading edge |
 
-Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all modes including Plasma, Branches, Butterflies, FlowField, Vortex, Particles, Spectrum, and Waterfall.
+Modes 1–9 are reachable with number keys. Use ←/→ to cycle through all modes including Plasma, Branches, Butterflies, FlowField, Vortex, Aurora, Lattice, Spectrum, and Waterfall.
 
 ## Requirements
 
@@ -215,7 +228,8 @@ psysuals/
 │   ├── butterflies.py        # Butterflies effect
 │   ├── flowfield.py          # FlowField effect
 │   ├── vortex.py             # Vortex effect
-│   ├── rhythmic_particles.py # Particles effect
+│   ├── aurora.py             # Aurora effect
+│   ├── lattice.py            # Lattice effect
 │   ├── spectrum.py           # Spectrum (Bars) effect
 │   └── waterfall.py          # Waterfall effect
 ├── ARCHITECTURE.md           # Code structure and extension guide
