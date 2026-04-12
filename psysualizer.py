@@ -272,22 +272,37 @@ def main():
     num_displays = max(len(xmonitors), 1)
     display_idx  = max(0, min(args.display, num_displays - 1))
 
-    # Suppress X11 errors (BadRRCrtc etc.) so SDL2 can still use RandR for
-    # multi-monitor targeting without crashing on malformed CRTC entries.
+    # Suppress X11 BadRRCrtc errors that SDL2 triggers on some RandR configs.
+    # This lets us keep RandR active for window positioning while preventing
+    # the default Xlib error handler from killing the process.
     _install_x11_error_handler()
-
-    # Tell SDL2 which physical display to use for fullscreen BEFORE init.
-    os.environ['SDL_VIDEO_FULLSCREEN_DISPLAY'] = str(display_idx)
 
     pygame.init()
 
     def _open_display(idx, fullscreen):
+        """Open display window.
+
+        On known monitor geometry: NOFRAME positioned at the monitor's origin.
+        - Never changes display resolution (FULLSCREEN does).
+        - Never triggers the RandR CRTC path that causes BadRRCrtc.
+        - SDL_VIDEO_WINDOW_POS reliably places the window on the right monitor.
+
+        Windowed (fullscreen=False): plain resizable window, no positioning.
+        Single-monitor fallback: real FULLSCREEN when xrandr has no geometry.
+        """
+        if fullscreen and idx < len(xmonitors):
+            mx, my, mw, mh = xmonitors[idx]
+            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{mx},{my}'
+            screen = pygame.display.set_mode((mw, mh), pygame.NOFRAME)
+            os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
+            config.WIDTH  = mw
+            config.HEIGHT = mh
+            return screen
         flags = pygame.FULLSCREEN if fullscreen else 0
         return pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
 
     screen     = _open_display(display_idx, True)
     fullscreen = True
-    config.WIDTH, config.HEIGHT = screen.get_size()
 
     pygame.display.set_caption(f"psysuals v{__version__}")
     clock  = pygame.time.Clock()
@@ -363,16 +378,13 @@ def main():
     span_child    = None   # subprocess.Popen for second-display process
 
     def _spawn_span_child(mode_i):
-        """Spawn a child process fullscreen on the second monitor."""
+        """Spawn a child process on the second monitor (NOFRAME at its origin)."""
         child_idx = 1 - display_idx   # assumes 2 monitors
-        child_env = os.environ.copy()
-        # SDL_VIDEO_FULLSCREEN_DISPLAY tells SDL2 which display to go fullscreen on
-        child_env['SDL_VIDEO_FULLSCREEN_DISPLAY'] = str(child_idx)
         return subprocess.Popen([
             sys.executable, os.path.abspath(__file__),
             '--display', str(child_idx),
             '--mode',    str(mode_i),
-        ], env=child_env)
+        ])
 
     # Auto-start: if multiple monitors and this is the primary process, run both displays
     if len(xmonitors) >= 2 and display_idx == 0:
