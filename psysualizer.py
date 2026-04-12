@@ -342,7 +342,7 @@ def main():
     cf_frames = _s.get("cf_frames", _CROSSFADE_FRAMES)
 
     # Task 14: span mode — subprocess approach
-    span_mode     = False
+    # Auto-activate on multi-monitor; Shift+M toggles off/on
     span_vis2_idx = (mode_idx + 1) % len(MODES)
     span_child    = None   # subprocess.Popen for second-display process
 
@@ -366,6 +366,13 @@ def main():
             '--height', str(ch),
             '--mode',   str(mode_i),
         ], env=child_env)
+
+    # Auto-start: if multiple monitors and this is the primary process, run both displays
+    if len(xmonitors) >= 2 and not args.noframe:
+        span_mode  = True
+        span_child = _spawn_span_child(span_vis2_idx)
+    else:
+        span_mode = False
 
     def _quit():
         """Exit fullscreen before destroying the display so SDL restores all monitors."""
