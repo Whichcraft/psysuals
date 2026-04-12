@@ -298,8 +298,12 @@ def main():
             config.WIDTH  = mw
             config.HEIGHT = mh
             return screen
-        flags = pygame.FULLSCREEN if fullscreen else 0
-        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
+        if fullscreen:
+            # (0, 0) = use current desktop resolution without changing it
+            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            config.WIDTH, config.HEIGHT = screen.get_size()
+            return screen
+        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), 0)
 
     screen     = _open_display(display_idx, True)
     fullscreen = True
