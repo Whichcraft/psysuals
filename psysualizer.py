@@ -15,7 +15,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.13.0"
+__version__ = "2.14.0"
 
 import argparse
 import atexit
@@ -198,8 +198,9 @@ def _draw_device_picker(screen, font, devices, selected, active_idx):
 _CROSSFADE_FRAMES = 45
 _BG_MODES         = 9    # indices 0..8 available as background layers
 
-# Keep a module-level reference so the ctypes callback is never GC'd
+# Keep module-level references so ctypes objects are never GC'd
 _x11_err_handler_ref = None
+_libX11 = None
 
 
 def _install_x11_error_handler():
@@ -209,8 +210,10 @@ def _install_x11_error_handler():
 
     We return 0 from every error — SDL2 does its own recovery internally and
     doesn't rely on the default Xlib exit behaviour.
+
+    Also caches _libX11 for use in _open_display (XMoveWindow).
     """
-    global _x11_err_handler_ref
+    global _x11_err_handler_ref, _libX11
     try:
         import ctypes
 
@@ -232,7 +235,12 @@ def _install_x11_error_handler():
             return 0   # swallow; SDL2 recovers on its own
 
         _x11_err_handler_ref = _HT(_handler)
-        ctypes.CDLL('libX11.so.6').XSetErrorHandler(_x11_err_handler_ref)
+        lib = ctypes.CDLL('libX11.so.6')
+        lib.XSetErrorHandler(_x11_err_handler_ref)
+        lib.XMoveWindow.argtypes = [
+            ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_int]
+        lib.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        _libX11 = lib
     except Exception:
         pass   # non-X11 platform or ctypes unavailable — silently skip
 
@@ -280,22 +288,41 @@ def main():
 
     pygame.init()
 
+    # (dpy, win, mx, my) — set by _open_display when on a known monitor so the
+    # event loop can re-apply XMoveWindow for the first few frames and win the
+    # race against GNOME/Mutter repositioning the window asynchronously.
+    _xmove_target = None
+
     def _open_display(idx, fullscreen):
         """Open display window.
 
         On known monitor geometry: NOFRAME positioned at the monitor's origin.
         - Never changes display resolution (FULLSCREEN does).
         - Never triggers the RandR CRTC path that causes BadRRCrtc.
-        - SDL_VIDEO_WINDOW_POS reliably places the window on the right monitor.
+        - SDL_VIDEO_WINDOW_POS hints position; XMoveWindow enforces it (GNOME).
 
         Windowed (fullscreen=False): plain resizable window, no positioning.
         Single-monitor fallback: real FULLSCREEN when xrandr has no geometry.
         """
+        nonlocal _xmove_target
+        _xmove_target = None
         if fullscreen and idx < len(xmonitors):
             mx, my, mw, mh = xmonitors[idx]
             os.environ['SDL_VIDEO_WINDOW_POS'] = f'{mx},{my}'
             screen = pygame.display.set_mode((mw, mh), pygame.NOFRAME)
             os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
+            # GNOME/Mutter ignores SDL_VIDEO_WINDOW_POS and places NOFRAME
+            # windows on the active monitor.  Force the position via X11, both
+            # immediately and for the first ~60 frames to beat any async
+            # reposition by the compositor.
+            if _libX11:
+                wm = pygame.display.get_wm_info()
+                dpy = wm.get('display')
+                win = wm.get('window')
+                if isinstance(dpy, int) and dpy and win:
+                    _libX11.XMoveWindow(dpy, win, mx, my)
+                    _libX11.XSync(dpy, 0)
+                    _xmove_target = (dpy, win, mx, my)
             config.WIDTH  = mw
             config.HEIGHT = mh
             return screen
@@ -833,6 +860,13 @@ def main():
 
         if picking:
             _draw_device_picker(screen, font, devices, pick_sel, active_dev)
+
+        # Re-enforce window position for first 60 frames to beat GNOME's async
+        # compositor reposition that overrides the initial XMoveWindow call.
+        if _xmove_target and tick < 60:
+            dpy, win, mx, my = _xmove_target
+            _libX11.XMoveWindow(dpy, win, mx, my)
+            _libX11.XSync(dpy, 0)
 
         pygame.display.flip()
         clock.tick(config.FPS)
