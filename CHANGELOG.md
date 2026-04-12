@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.13.0] — 2026-04-12
+
+### Fixed
+- **Orphaned child window** — when the parent process exited via Ctrl+C or a crash, the child process on the second monitor was not terminated, leaving an orphan window. Re-launching spawned a second child, causing two effect windows on screen 2. Fixed by registering an `atexit` handler inside `main()` that terminates the child on any exit path.
+
+---
+
 ## [2.12.0] — 2026-04-12
 
 ### Added
