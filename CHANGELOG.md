@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.11.0] — 2026-04-12
+
+### Changed
+- **Span mode rewritten** — uses subprocess approach: `Shift+M` on a multi-monitor setup spawns a second `psysualizer.py` process with `--display 1 --mode <idx>`, giving each monitor its own true fullscreen SDL window. Eliminates the single-window hacks and positioning failures. `A`/`D` in span mode terminate and respawn the child with the updated mode index. New `--mode N` CLI argument lets any instance start on a specific effect.
+- **Butterflies wander breaks** — while a pair is in its mutual orbit, it now periodically (every 15–30 s) breaks free for 3–8 s of independent wander before the orbit resumes. On reunion the orbit radius expands slightly so they spiral back in.
+
+---
+
 ## [2.10.0] — 2026-04-12
 
 ### Added

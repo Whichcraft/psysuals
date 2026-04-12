@@ -15,10 +15,12 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.10.0"
+__version__ = "2.11.0"
 
 import argparse
 import os
+import subprocess
+import sys
 import threading
 import time as _time
 from collections import deque
@@ -148,55 +150,6 @@ def get_audio():
                 _beat_energy, _mid_energy, _treble_energy, _bpm)
 
 
-# ── Monitor helpers ───────────────────────────────────────────────────────────
-
-def _desktop_geometry() -> tuple:
-    """
-    Return (total_w, total_h, split_x) for the full multi-monitor desktop.
-
-    total_w / total_h — spanning window size to create.
-    split_x           — x-pixel where left monitor ends (right monitor starts).
-
-    Returns (None, None, None) when only one monitor is detected.
-
-    Strategy:
-    1. pygame.display.get_desktop_sizes() — works when SDL sees separate screens.
-    2. xrandr --listmonitors — reliable on Linux/X11 with any RandR config.
-    """
-    import re, subprocess
-
-    # Strategy 1: pygame native
-    try:
-        sizes = pygame.display.get_desktop_sizes()
-        if len(sizes) >= 2:
-            total_w = sum(s[0] for s in sizes)
-            total_h = max(s[1] for s in sizes)
-            split_x = sizes[0][0]
-            return total_w, total_h, split_x
-    except Exception:
-        pass
-
-    # Strategy 2: xrandr (Linux / X11)
-    try:
-        out = subprocess.check_output(
-            ["xrandr", "--listmonitors"], stderr=subprocess.DEVNULL, text=True)
-        monitors = []
-        for line in out.splitlines():
-            m = re.search(r"(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
-            if m:
-                w, h, x, y = (int(m.group(i)) for i in range(1, 5))
-                monitors.append((x, y, w, h))
-        monitors.sort(key=lambda m: m[0])   # left to right
-        if len(monitors) >= 2:
-            total_w = max(m[0] + m[2] for m in monitors)
-            total_h = max(m[1] + m[3] for m in monitors)
-            split_x = monitors[0][0] + monitors[0][2]
-            return total_w, total_h, split_x
-    except Exception:
-        pass
-
-    return None, None, None
-
 
 # ── Device picker ─────────────────────────────────────────────────────────────
 
@@ -248,6 +201,8 @@ def main():
     ap = argparse.ArgumentParser(description="psysuals music visualizer")
     ap.add_argument("--display", type=int, default=0,
                     help="Display index to launch on (default: 0)")
+    ap.add_argument("--mode", type=int, default=None,
+                    help="Start on this mode index (overrides saved setting)")
     args = ap.parse_args()
 
     pygame.init()
@@ -289,6 +244,8 @@ def main():
     stream.start()
 
     mode_idx      = min(_s["mode_idx"], len(MODES) - 1)
+    if args.mode is not None:
+        mode_idx = args.mode % len(MODES)
     name, VisCls  = MODES[mode_idx]
     vis           = VisCls()
     tick          = 0
@@ -337,15 +294,17 @@ def main():
     bg_alpha  = _s.get("bg_alpha", 102)          # 102 ≈ 40 % of 255
     cf_frames = _s.get("cf_frames", _CROSSFADE_FRAMES)
 
-    # Task 14: span mode
+    # Task 14: span mode — subprocess approach
     span_mode     = False
     span_vis2_idx = (mode_idx + 1) % len(MODES)
-    vis2          = None
-    span_split    = config.WIDTH // 2
-    span_surfs    = None   # (left_surf, right_surf) subsurfaces
+    span_child    = None   # subprocess.Popen for second-display process
 
     def _quit():
         """Exit fullscreen before destroying the display so SDL restores all monitors."""
+        nonlocal span_child
+        if span_child and span_child.poll() is None:
+            span_child.terminate()
+        span_child = None
         try:
             pygame.display.set_mode((1, 1))  # drop fullscreen first
         except Exception:
@@ -438,7 +397,7 @@ def main():
         screen.blit(bar_surf, (6, config.HEIGHT - BAR_MAX - 6))
 
     hint = ("  ←/→: mode  |  ↑/↓: intensity  |  A: auto-gain"
-            "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span  |  A/D: span-R"
+            "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span"
             "  |  Tab: pane  |  P: preset  |  Shift+P: load"
             "  |  1-{n}: jump  |  D: device  |  F: fullscreen"
             "  |  H: HUD  |  Shift+H: detail  |  Q: quit"
@@ -509,7 +468,9 @@ def main():
                     elif event.key == pygame.K_f:
                         if span_mode:
                             span_mode = False
-                            vis2 = None; span_surfs = None
+                            if span_child and span_child.poll() is None:
+                                span_child.terminate()
+                            span_child = None
                         else:
                             fullscreen = not fullscreen
                         screen = _open_display(display_idx, fullscreen)
@@ -530,8 +491,13 @@ def main():
                     elif event.key == pygame.K_d:
                         if span_mode:
                             span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
-                            _, Vis2Cls = MODES[span_vis2_idx]
-                            vis2 = Vis2Cls()
+                            if span_child and span_child.poll() is None:
+                                span_child.terminate()
+                            span_child = subprocess.Popen([
+                                sys.executable, os.path.abspath(__file__),
+                                '--display', str(1 - display_idx),
+                                '--mode',    str(span_vis2_idx),
+                            ])
                         else:
                             devices = _input_devices(); picking = True
                             active_indices = [d[0] for d in devices]
@@ -541,8 +507,13 @@ def main():
                     elif event.key == pygame.K_a:
                         if span_mode:
                             span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
-                            _, Vis2Cls = MODES[span_vis2_idx]
-                            vis2 = Vis2Cls()
+                            if span_child and span_child.poll() is None:
+                                span_child.terminate()
+                            span_child = subprocess.Popen([
+                                sys.executable, os.path.abspath(__file__),
+                                '--display', str(1 - display_idx),
+                                '--mode',    str(span_vis2_idx),
+                            ])
                         else:
                             auto_gain = not auto_gain
 
@@ -561,46 +532,20 @@ def main():
                         if shift:
                             span_mode = not span_mode
                             if span_mode:
-                                try:
-                                    total_w, total_h, split_x = _desktop_geometry()
-                                    if total_w:
-                                        # force window to virtual-desktop origin (0,0)
-                                        os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
-                                        screen = pygame.display.set_mode(
-                                            (total_w, total_h), pygame.NOFRAME)
-                                        os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
-                                    else:
-                                        info = pygame.display.Info()
-                                        screen = pygame.display.set_mode(
-                                            (info.current_w, info.current_h),
-                                            pygame.NOFRAME)
-                                    sw, sh = screen.get_size()
-                                    if split_x and 0 < split_x < sw:
-                                        span_split    = split_x
-                                        config.WIDTH  = split_x
-                                        config.HEIGHT = sh
-                                        _, Vis2Cls = MODES[span_vis2_idx]
-                                        vis2 = Vis2Cls()
-                                        span_surfs = (
-                                            pygame.Surface((split_x, sh)),
-                                            pygame.Surface((sw - split_x, sh)),
-                                        )
-                                    else:
-                                        config.WIDTH, config.HEIGHT = sw, sh
-                                        vis2 = None; span_surfs = None
-                                except Exception:
+                                if num_displays >= 2:
+                                    span_child = subprocess.Popen([
+                                        sys.executable, os.path.abspath(__file__),
+                                        '--display', str(1 - display_idx),
+                                        '--mode',    str(span_vis2_idx),
+                                    ])
+                                else:
+                                    # Only one display — no second process to spawn
                                     span_mode = False
-                                    screen = _open_display(display_idx, fullscreen)
-                                    config.WIDTH, config.HEIGHT = screen.get_size()
-                                    vis2 = None; span_surfs = None
                             else:
-                                screen = _open_display(display_idx, fullscreen)
-                                config.WIDTH, config.HEIGHT = screen.get_size()
-                                vis2 = None; span_surfs = None
-                            # clear any in-progress crossfade so it doesn't bleed over span
+                                if span_child and span_child.poll() is None:
+                                    span_child.terminate()
+                                span_child = None
                             prev_surf = None; crossfade_frame = 0
-                            fade = make_fade(); vis = VisCls()
-                            bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
                         else:
                             now = _time.monotonic()
                             tap_times.append(now)
@@ -691,34 +636,17 @@ def main():
         if new_alpha != fade_alpha:
             fade_alpha = new_alpha
             fade = make_fade(fade_alpha)
-        if span_mode and span_surfs is not None:
-            # Dual-screen span: independent effect per monitor
-            left_surf, right_surf = span_surfs
-            left_surf.blit(fade, (0, 0))
-            right_surf.blit(fade, (0, 0))
-            vis.draw(left_surf,  waveform, fft, draw_beat, tick)
-            vis2.draw(right_surf, waveform, fft, draw_beat, tick)
-            span2_name = MODES[span_vis2_idx][0]
-            left_surf.blit(
-                font_s.render(f"  {name}  |  A/D: right screen", True, (70, 70, 70)),
-                (6, 6))
-            right_surf.blit(
-                font_s.render(f"  {span2_name}", True, (70, 70, 70)),
-                (6, 6))
-            screen.blit(left_surf,  (0, 0))
-            screen.blit(right_surf, (span_split, 0))
-        else:
-            screen.blit(fade, (0, 0))
+        screen.blit(fade, (0, 0))
 
-            # Task 5: background layer at configurable alpha
-            if bg_on:
-                bg_surf.fill((0, 0, 0))
-                bg_vis.draw(bg_surf, waveform, fft, draw_beat, tick)
-                bg_surf.set_alpha(bg_alpha)
-                screen.blit(bg_surf, (0, 0))
+        # Task 5: background layer at configurable alpha
+        if bg_on:
+            bg_surf.fill((0, 0, 0))
+            bg_vis.draw(bg_surf, waveform, fft, draw_beat, tick)
+            bg_surf.set_alpha(bg_alpha)
+            screen.blit(bg_surf, (0, 0))
 
-            # Foreground effect
-            vis.draw(screen, waveform, fft, draw_beat, tick)
+        # Foreground effect
+        vis.draw(screen, waveform, fft, draw_beat, tick)
 
         # Crossfade overlay — ease-in-out cubic dissolve
         if prev_surf is not None:
