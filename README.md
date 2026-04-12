@@ -2,10 +2,22 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.10.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.11.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.11.0 — subprocess span mode + butterfly wander breaks
+
+### Span mode rewrite (subprocess approach)
+`Shift+M` on a multi-monitor setup now spawns a **second `psysualizer.py` process** with `--display 1 --mode <idx>`, giving each monitor its own true fullscreen SDL window. This replaces the single-NOFRAME-window hacks that could never reliably position content on specific physical monitors in SDL2.
+
+`A` / `D` in span mode terminate and respawn the child process with the updated mode index. A new `--mode N` CLI argument lets any instance start on a specific effect.
+
+### Butterfly wander breaks
+While a butterfly pair is in its mutual love orbit, it now **periodically breaks free** (every 15–30 s) for a short independent wander (3–8 s) before the orbit resumes. On reunion the orbit radius expands slightly so they spiral back in naturally.
+
+---
 
 ## What's new in v2.10.0 — moderngl GPU engine + dual-screen span
 
