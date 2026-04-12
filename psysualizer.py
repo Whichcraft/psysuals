@@ -234,44 +234,59 @@ def main():
     args = ap.parse_args()
 
     # Enumerate monitors via xrandr (avoids SDL2/RandR CRTC queries entirely)
-    xmonitors   = _xrandr_monitors()
+    xmonitors    = _xrandr_monitors()
     num_displays = max(len(xmonitors), 1)
     display_idx  = max(0, min(args.display, num_displays - 1))
+
+    # On multi-monitor X11, disable SDL2's internal RandR CRTC queries
+    # (pygame.FULLSCREEN + display=N triggers BadRRCrtc on some configs)
+    if num_displays > 1:
+        os.environ.setdefault('SDL_VIDEO_X11_XRANDR', '0')
 
     pygame.init()
 
     def _open_display(idx, fullscreen, noframe=False, xpos=None, ypos=None):
-        if noframe:
-            # Borderless window positioned at the given screen origin.
-            # SDL_VIDEO_WINDOW_POS works in SDL2 for non-fullscreen windows.
-            if xpos is not None and ypos is not None:
-                os.environ['SDL_VIDEO_WINDOW_POS'] = f'{xpos},{ypos}'
-            screen = pygame.display.set_mode(
-                (config.WIDTH, config.HEIGHT), pygame.NOFRAME)
-            os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
-            return screen
-        flags = pygame.FULLSCREEN if fullscreen else 0
-        # display= kwarg selects the monitor; may raise on broken RandR configs
-        if num_displays > 1:
-            try:
-                return pygame.display.set_mode(
-                    (config.WIDTH, config.HEIGHT), flags, display=idx)
-            except Exception:
-                pass
-        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
+        """Open a display window.
 
-    if args.noframe:
-        if args.width:
-            config.WIDTH  = args.width
-        if args.height:
-            config.HEIGHT = args.height
-        screen     = _open_display(display_idx, False, noframe=True,
-                                   xpos=args.xpos, ypos=args.ypos)
-        fullscreen = False
-    else:
-        screen     = _open_display(display_idx, True)
-        fullscreen = True
-        config.WIDTH, config.HEIGHT = screen.get_size()
+        On multi-monitor setups fullscreen is emulated via NOFRAME + window
+        position so we never need SDL2's RandR CRTC path (avoids BadRRCrtc).
+        """
+        # Determine target geometry from xmonitors when available
+        if idx < len(xmonitors):
+            mx, my, mw, mh = xmonitors[idx]
+        else:
+            mx   = xpos  if xpos  is not None else 0
+            my   = ypos  if ypos  is not None else 0
+            mw   = config.WIDTH
+            mh   = config.HEIGHT
+
+        # Child processes always open NOFRAME at the provided position
+        if noframe:
+            if xpos is not None:
+                mx = xpos
+            if ypos is not None:
+                my = ypos
+            if args.width:
+                mw = args.width
+            if args.height:
+                mh = args.height
+
+        if fullscreen or noframe:
+            # NOFRAME covers the whole monitor — visually identical to fullscreen
+            # but never uses the RandR CRTC path that causes BadRRCrtc.
+            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{mx},{my}'
+            screen = pygame.display.set_mode((mw, mh), pygame.NOFRAME)
+            os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
+            config.WIDTH  = mw
+            config.HEIGHT = mh
+            return screen
+
+        # Windowed (F-key toggle off fullscreen)
+        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), 0)
+
+    screen     = _open_display(display_idx, True, noframe=args.noframe,
+                               xpos=args.xpos, ypos=args.ypos)
+    fullscreen = True
 
     pygame.display.set_caption(f"psysuals v{__version__}")
     clock  = pygame.time.Clock()
@@ -549,7 +564,8 @@ def main():
                         else:
                             fullscreen = not fullscreen
                         screen = _open_display(display_idx, fullscreen)
-                        config.WIDTH, config.HEIGHT = screen.get_size()
+                        if not fullscreen:
+                            config.WIDTH, config.HEIGHT = screen.get_size()
                         prev_surf = None; crossfade_frame = 0
                         fade = make_fade(); vis = VisCls()
                         bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
