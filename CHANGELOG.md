@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.14.0] — 2026-04-12
+
+### Fixed
+- **Dual-monitor window placement** — both windows landed on screen 2 due to GNOME/Mutter repositioning NOFRAME windows asynchronously after creation. Fixed by re-applying `XMoveWindow` each frame for the first 60 frames to override the compositor's delayed reposition. Also added null-guards on the `dpy`/`win` values from `pygame.display.get_wm_info()`.
+
+---
+
 ## [2.13.0] — 2026-04-12
 
 ### Fixed

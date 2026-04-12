@@ -2,10 +2,19 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.13.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.14.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.14.0 — dual-monitor window placement fix
+
+### Both windows landing on screen 2 (GNOME race condition)
+GNOME/Mutter repositions NOFRAME windows asynchronously after `pygame.display.set_mode()` returns, placing them on the active monitor regardless of `SDL_VIDEO_WINDOW_POS`. This caused both the primary (screen 1) and secondary (screen 2) windows to end up on screen 2.
+
+Fixed by re-applying `XMoveWindow` for the first 60 frames (~1 s at 60 fps) in the event loop, which consistently beats the compositor's delayed reposition. Also tightened the null-guard on the `dpy`/`win` values from `pygame.display.get_wm_info()` to avoid calling XMoveWindow with a zero pointer.
+
+---
 
 ## What's new in v2.13.0 — orphaned child window fix
 
