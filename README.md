@@ -2,10 +2,24 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.11.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.12.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.12.0 — reliable dual-monitor startup + no resolution changes
+
+### Auto dual-display on multi-monitor setups
+On startup with two or more monitors, psysuals automatically opens a fullscreen-equivalent window on each display — no `Shift+M` required. Each process gets its own independent effect. `Shift+M` toggles the second display off/on; `A`/`D` cycle the effect on the second screen.
+
+### Reliable monitor targeting (NOFRAME + SDL_VIDEO_WINDOW_POS)
+Previous approaches (`pygame.FULLSCREEN + display=N`, `SDL_VIDEO_FULLSCREEN_DISPLAY`) both failed to reliably target the correct monitor on X11/RandR and also changed the display resolution. The new approach:
+- Monitor geometry is read from `xrandr --listmonitors` (no SDL RandR CRTC queries)
+- Each process opens a `NOFRAME` window positioned at its monitor's exact `(x, y)` origin
+- A ctypes/libX11 error handler suppresses `BadRRCrtc` errors so the child process no longer crashes
+- `config.WIDTH` / `config.HEIGHT` default to `0` and are always set from xrandr geometry — no hardcoded resolution anywhere
+
+---
 
 ## What's new in v2.11.0 — subprocess span mode + butterfly wander breaks
 

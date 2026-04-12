@@ -5,6 +5,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.12.0] — 2026-04-12
+
+### Added
+- **Auto dual-display** — on startup with 2+ monitors, the app automatically opens on both displays (one effect each). `Shift+M` toggles the second display off/on; `A`/`D` cycle its effect.
+- **X11 error handler** — ctypes/libX11 callback installed before `pygame.init()` suppresses `BadRRCrtc` errors that previously crashed the child process on certain RandR configurations.
+
+### Changed
+- **NOFRAME + SDL_VIDEO_WINDOW_POS** replaces `pygame.FULLSCREEN + display=N` for monitor targeting. Monitor geometry comes from `xrandr --listmonitors`; each process opens a borderless window at its monitor's exact pixel origin. Avoids SDL2's RandR CRTC code path entirely.
+- **No hardcoded resolution** — `config.WIDTH/HEIGHT` default to `0` and are always overwritten from xrandr geometry before any effect is instantiated. Fullscreen fallback uses `set_mode((0,0), FULLSCREEN)` which respects the current desktop resolution.
+
+---
+
 ## [2.11.0] — 2026-04-12
 
 ### Changed

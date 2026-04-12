@@ -1,7 +1,10 @@
-"""Shared mutable configuration — update config.WIDTH/HEIGHT after display init."""
+"""Shared mutable configuration — WIDTH/HEIGHT are set by the host at display
+init time (psysualizer.py reads the actual monitor geometry from xrandr).
+These defaults are placeholders only; effects must not be instantiated before
+the display is opened."""
 
-WIDTH  = 1280
-HEIGHT = 720
+WIDTH  = 0
+HEIGHT = 0
 FPS    = 60
 
 SAMPLE_RATE = 44100
