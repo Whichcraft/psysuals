@@ -2,10 +2,19 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.12.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.13.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+
+## What's new in v2.13.0 — orphaned child window fix
+
+### Orphaned child window on restart
+When the parent process was killed with Ctrl+C (or crashed), the child process on the second monitor was not terminated — it kept running as an orphan. Re-launching the parent then spawned a second child, resulting in two effect windows on screen 2.
+
+Fixed by registering an `atexit` handler (`_kill_child`) inside `main()` immediately after the child is spawned. The handler fires on any exit path — Ctrl+C, `sys.exit()`, or unhandled exception — ensuring the child is always terminated when the parent goes away.
+
+---
 
 ## What's new in v2.12.0 — reliable dual-monitor startup + no resolution changes
 
