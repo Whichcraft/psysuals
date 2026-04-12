@@ -15,9 +15,10 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.12.0"
+__version__ = "2.13.0"
 
 import argparse
+import atexit
 import os
 import re as _re
 import subprocess
@@ -396,6 +397,12 @@ def main():
         span_child = _spawn_span_child(span_vis2_idx)
     else:
         span_mode = False
+
+    def _kill_child():
+        if span_child and span_child.poll() is None:
+            span_child.terminate()
+
+    atexit.register(_kill_child)
 
     def _quit():
         """Exit fullscreen before destroying the display so SDL restores all monitors."""
