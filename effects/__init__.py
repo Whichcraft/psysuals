@@ -12,7 +12,8 @@ from .branches    import Branches
 from .butterflies        import Butterflies
 from .flowfield          import FlowField
 from .vortex             import Vortex
-from .rhythmic_particles import RhythmicParticles
+from .aurora             import Aurora
+from .lattice            import Lattice
 from .spectrum           import Bars
 from .waterfall   import GlowSquares
 
@@ -30,8 +31,9 @@ MODES = [
     ("Branches",    Branches),    # ←/→ only
     ("Butterflies", Butterflies),      # ←/→ only
     ("FlowField",   FlowField),         # ←/→ only
-    ("Vortex",      Vortex),           # ←/→ only
-    ("Particles",   RhythmicParticles), # ←/→ only
+    ("Vortex",      Vortex),   # ←/→ only
+    ("Aurora",      Aurora),   # ←/→ only
+    ("Lattice",     Lattice),  # ←/→ only
     # ── Spectrum and Waterfall must always be the final two entries ──
     ("Spectrum",    Bars),        # ←/→ only — always second-to-last
     ("Waterfall",   GlowSquares), # ←/→ only — always last

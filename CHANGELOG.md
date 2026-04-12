@@ -5,6 +5,39 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.11.0] — 2026-04-12
+
+### Changed
+- **Span mode rewritten** — uses subprocess approach: `Shift+M` on a multi-monitor setup spawns a second `psysualizer.py` process with `--display 1 --mode <idx>`, giving each monitor its own true fullscreen SDL window. Eliminates the single-window hacks and positioning failures. `A`/`D` in span mode terminate and respawn the child with the updated mode index. New `--mode N` CLI argument lets any instance start on a specific effect.
+- **Butterflies wander breaks** — while a pair is in its mutual orbit, it now periodically (every 15–30 s) breaks free for 3–8 s of independent wander before the orbit resumes. On reunion the orbit radius expands slightly so they spiral back in.
+
+---
+
+## [2.10.0] — 2026-04-12
+
+### Added
+- **moderngl GL render engine** — `gl_renderer.py` wraps a moderngl context: shared fullscreen-quad VBO, GLSL shader compilation, offscreen FBO, and numpy pixel readback for the Android `draw_frame()` bridge.
+- **PlasmaGL** (`effects/plasma_gl.py`) — Plasma effect ported to a GLSL fragment shader; same `draw()` interface as all other effects, CPU numpy fallback if moderngl is absent, `draw_frame(w, h, ...)` offscreen API for Chaquopy/Android.
+- **psysualizer_gl.py** — standalone moderngl entry point (pygame OpenGL window, same audio pipeline).
+- **Dual-screen span mode** — on multi-monitor setups `Shift+M` runs two independent effect instances, one per physical screen, split at the real monitor boundary via `pygame.display.get_desktop_sizes()`. Single-monitor span mode is unchanged (one effect, NOFRAME).
+- `A` / `D` in span mode cycle the right-screen effect backward / forward (normal auto-gain / device-picker behaviour preserved outside span mode).
+
+### Fixed
+- `F` while in span mode now exits span mode and restores the previous fullscreen state instead of also toggling the `fullscreen` flag.
+
+---
+
+## [2.9.0] — 2026-04-12
+
+### Added
+- **Aurora** (`effects/aurora.py`) — five translucent sinusoidal curtain-ribbons rendered additively with a per-ribbon outer glow polygon and bright edge line. Bass drives amplitude; treble drives shimmer speed (phase velocity); mid drives ribbon height; beat triggers a bloom flash and hue shift. `TRAIL_ALPHA = 14`.
+- **Lattice** (`effects/lattice.py`) — 14×9 crystal grid of glowing nodes connected by double-stroke neon beams. FFT frequency bins are mapped spatially across columns (bass left, treble right). Beat fires a shockwave ring from the centre; nodes near the wavefront flare white. Bass drives a subtle scale-breath. Radial hue offset: cyan core → violet edges. `TRAIL_ALPHA = 20`.
+
+### Removed
+- **Particles** (`rhythmic_particles.py`) — replaced by Aurora and Lattice.
+
+---
+
 ## [2.8.0] — 2026-04-12
 
 ### Changed
