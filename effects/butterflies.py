@@ -201,6 +201,9 @@ class _Pair:
         self.solo         = None
         self.love         = None
         self._departing   = False
+        # Wander-break: occasionally one butterfly leaves the orbit briefly
+        self._break_cd    = random.randint(800, 1600)  # frames until next break
+        self._break_timer = 0                          # counts down during break
 
     @property
     def dead(self):
@@ -237,26 +240,42 @@ class _Pair:
                 self.love.start_depart()
 
         if self.love is not None and not self._departing:
-            # Mutual chase: orbit angle rotates faster as radius shrinks
-            # (conservation-of-angular-momentum feel)
-            ang_speed = 0.012 + beat * 0.020 + 0.003 * max(0.0, 1.0 - self._orbit_r / 240)
-            self._orbit_ang += ang_speed
-            if self._orbit_r > 40.0:
-                self._orbit_r -= 0.06
+            # Wander-break countdown
+            if self._break_timer > 0:
+                self._break_timer -= 1
+            else:
+                self._break_cd -= 1
+                if self._break_cd <= 0:
+                    self._break_timer = random.randint(200, 500)
+                    self._break_cd    = random.randint(900, 1800)
+                    # Expand orbit radius back out so reunion feels fresh
+                    self._orbit_r = min(self._orbit_r + 80.0, 200.0)
 
-            r = self._orbit_r
-            # Solo chases: point offset from love's position at opposite angle
-            solo_target = (
-                self.love.x + math.cos(self._orbit_ang + math.pi) * r,
-                self.love.y + math.sin(self._orbit_ang + math.pi) * r,
-            )
-            # Love chases: point offset from solo's position at the orbit angle
-            love_target = (
-                self.solo.x + math.cos(self._orbit_ang) * r,
-                self.solo.y + math.sin(self._orbit_ang) * r,
-            )
-            self.solo.update(bass, beat, t, chase_pos=solo_target)
-            self.love.update(bass, beat, t, chase_pos=love_target)
+            if self._break_timer > 0:
+                # One butterfly wanders freely; the orbit pauses
+                self.solo.update(bass, beat, t)
+                self.love.update(bass, beat, t)
+            else:
+                # Mutual chase: orbit angle rotates faster as radius shrinks
+                # (conservation-of-angular-momentum feel)
+                ang_speed = 0.012 + beat * 0.020 + 0.003 * max(0.0, 1.0 - self._orbit_r / 240)
+                self._orbit_ang += ang_speed
+                if self._orbit_r > 40.0:
+                    self._orbit_r -= 0.06
+
+                r = self._orbit_r
+                # Solo chases: point offset from love's position at opposite angle
+                solo_target = (
+                    self.love.x + math.cos(self._orbit_ang + math.pi) * r,
+                    self.love.y + math.sin(self._orbit_ang + math.pi) * r,
+                )
+                # Love chases: point offset from solo's position at the orbit angle
+                love_target = (
+                    self.solo.x + math.cos(self._orbit_ang) * r,
+                    self.solo.y + math.sin(self._orbit_ang) * r,
+                )
+                self.solo.update(bass, beat, t, chase_pos=solo_target)
+                self.love.update(bass, beat, t, chase_pos=love_target)
         else:
             self.solo.update(bass, beat, t)
             if self.love:

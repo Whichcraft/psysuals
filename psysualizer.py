@@ -15,9 +15,12 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.7.0"
+__version__ = "2.11.0"
 
 import argparse
+import os
+import subprocess
+import sys
 import threading
 import time as _time
 from collections import deque
@@ -147,6 +150,7 @@ def get_audio():
                 _beat_energy, _mid_energy, _treble_energy, _bpm)
 
 
+
 # ── Device picker ─────────────────────────────────────────────────────────────
 
 def _input_devices():
@@ -197,6 +201,8 @@ def main():
     ap = argparse.ArgumentParser(description="psysuals music visualizer")
     ap.add_argument("--display", type=int, default=0,
                     help="Display index to launch on (default: 0)")
+    ap.add_argument("--mode", type=int, default=None,
+                    help="Start on this mode index (overrides saved setting)")
     args = ap.parse_args()
 
     pygame.init()
@@ -238,6 +244,8 @@ def main():
     stream.start()
 
     mode_idx      = min(_s["mode_idx"], len(MODES) - 1)
+    if args.mode is not None:
+        mode_idx = args.mode % len(MODES)
     name, VisCls  = MODES[mode_idx]
     vis           = VisCls()
     tick          = 0
@@ -286,11 +294,17 @@ def main():
     bg_alpha  = _s.get("bg_alpha", 102)          # 102 ≈ 40 % of 255
     cf_frames = _s.get("cf_frames", _CROSSFADE_FRAMES)
 
-    # Task 14: span mode
-    span_mode = False
+    # Task 14: span mode — subprocess approach
+    span_mode     = False
+    span_vis2_idx = (mode_idx + 1) % len(MODES)
+    span_child    = None   # subprocess.Popen for second-display process
 
     def _quit():
         """Exit fullscreen before destroying the display so SDL restores all monitors."""
+        nonlocal span_child
+        if span_child and span_child.poll() is None:
+            span_child.terminate()
+        span_child = None
         try:
             pygame.display.set_mode((1, 1))  # drop fullscreen first
         except Exception:
@@ -452,12 +466,18 @@ def main():
                             effect_gain = max(0.0, round(effect_gain - 0.1, 1))
 
                     elif event.key == pygame.K_f:
-                        fullscreen = not fullscreen
+                        if span_mode:
+                            span_mode = False
+                            if span_child and span_child.poll() is None:
+                                span_child.terminate()
+                            span_child = None
+                        else:
+                            fullscreen = not fullscreen
                         screen = _open_display(display_idx, fullscreen)
                         config.WIDTH, config.HEIGHT = screen.get_size()
+                        prev_surf = None; crossfade_frame = 0
                         fade = make_fade(); vis = VisCls()
                         bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-                        span_mode = False
 
                     # Task 15: H = toggle HUD on/off; Shift+H = cycle detail level
                     elif event.key == pygame.K_h:
@@ -469,13 +489,33 @@ def main():
                             hud_level = 2 if show_hud else 0
 
                     elif event.key == pygame.K_d:
-                        devices = _input_devices(); picking = True
-                        active_indices = [d[0] for d in devices]
-                        pick_sel = (active_indices.index(active_dev)
-                                    if active_dev in active_indices else 0)
+                        if span_mode:
+                            span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
+                            if span_child and span_child.poll() is None:
+                                span_child.terminate()
+                            span_child = subprocess.Popen([
+                                sys.executable, os.path.abspath(__file__),
+                                '--display', str(1 - display_idx),
+                                '--mode',    str(span_vis2_idx),
+                            ])
+                        else:
+                            devices = _input_devices(); picking = True
+                            active_indices = [d[0] for d in devices]
+                            pick_sel = (active_indices.index(active_dev)
+                                        if active_dev in active_indices else 0)
 
                     elif event.key == pygame.K_a:
-                        auto_gain = not auto_gain
+                        if span_mode:
+                            span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
+                            if span_child and span_child.poll() is None:
+                                span_child.terminate()
+                            span_child = subprocess.Popen([
+                                sys.executable, os.path.abspath(__file__),
+                                '--display', str(1 - display_idx),
+                                '--mode',    str(span_vis2_idx),
+                            ])
+                        else:
+                            auto_gain = not auto_gain
 
                     elif event.key == pygame.K_b:
                         if shift:
@@ -492,19 +532,20 @@ def main():
                         if shift:
                             span_mode = not span_mode
                             if span_mode:
-                                try:
-                                    info = pygame.display.Info()
-                                    screen = pygame.display.set_mode(
-                                        (info.current_w, info.current_h),
-                                        pygame.NOFRAME)
-                                except Exception:
+                                if num_displays >= 2:
+                                    span_child = subprocess.Popen([
+                                        sys.executable, os.path.abspath(__file__),
+                                        '--display', str(1 - display_idx),
+                                        '--mode',    str(span_vis2_idx),
+                                    ])
+                                else:
+                                    # Only one display — no second process to spawn
                                     span_mode = False
-                                    screen = _open_display(display_idx, fullscreen)
                             else:
-                                screen = _open_display(display_idx, fullscreen)
-                            config.WIDTH, config.HEIGHT = screen.get_size()
-                            fade = make_fade(); vis = VisCls()
-                            bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+                                if span_child and span_child.poll() is None:
+                                    span_child.terminate()
+                                span_child = None
+                            prev_surf = None; crossfade_frame = 0
                         else:
                             now = _time.monotonic()
                             tap_times.append(now)
