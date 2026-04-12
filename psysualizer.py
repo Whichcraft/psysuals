@@ -571,17 +571,15 @@ def main():
                                     sw, config.HEIGHT = screen.get_size()
                                     if split_x and 0 < split_x < sw:
                                         span_split = split_x
-                                        # effects must see per-monitor width
-                                        config.WIDTH = span_split
+                                        # effects see per-monitor width, not full span
+                                        config.WIDTH  = split_x
+                                        config.HEIGHT = total_h
                                         _, Vis2Cls = MODES[span_vis2_idx]
                                         vis2 = Vis2Cls()
+                                        # standalone surfaces — no subsurface coord issues
                                         span_surfs = (
-                                            screen.subsurface(
-                                                (0, 0, span_split, config.HEIGHT)),
-                                            screen.subsurface(
-                                                (span_split, 0,
-                                                 sw - span_split,
-                                                 config.HEIGHT)),
+                                            pygame.Surface((split_x, total_h)),
+                                            pygame.Surface((sw - split_x, total_h)),
                                         )
                                     else:
                                         vis2 = None; span_surfs = None
@@ -700,6 +698,8 @@ def main():
             right_surf.blit(
                 font_s.render(f"  {span2_name}", True, (70, 70, 70)),
                 (6, 6))
+            screen.blit(left_surf,  (0, 0))
+            screen.blit(right_surf, (span_split, 0))
         else:
             screen.blit(fade, (0, 0))
 
