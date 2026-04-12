@@ -15,7 +15,7 @@ Controls:
   Q / ESC         Quit
 """
 
-__version__ = "2.11.0"
+__version__ = "2.12.0"
 
 import argparse
 import os
@@ -197,6 +197,45 @@ def _draw_device_picker(screen, font, devices, selected, active_idx):
 _CROSSFADE_FRAMES = 45
 _BG_MODES         = 9    # indices 0..8 available as background layers
 
+# Keep a module-level reference so the ctypes callback is never GC'd
+_x11_err_handler_ref = None
+
+
+def _install_x11_error_handler():
+    """Suppress X11 RandR errors (BadRRCrtc etc.) that SDL2 triggers on some
+    multi-monitor RandR configs.  Without this the child process exits when
+    SDL2 calls XRRGetCrtcInfo for a CRTC that doesn't exist in the config.
+
+    We return 0 from every error — SDL2 does its own recovery internally and
+    doesn't rely on the default Xlib exit behaviour.
+    """
+    global _x11_err_handler_ref
+    try:
+        import ctypes
+
+        class _XErrorEvent(ctypes.Structure):
+            _fields_ = [
+                ('type',         ctypes.c_int),
+                ('display',      ctypes.c_void_p),
+                ('resourceid',   ctypes.c_ulong),
+                ('serial',       ctypes.c_ulong),
+                ('error_code',   ctypes.c_ubyte),
+                ('request_code', ctypes.c_ubyte),
+                ('minor_code',   ctypes.c_ubyte),
+            ]
+
+        _HT = ctypes.CFUNCTYPE(
+            ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(_XErrorEvent))
+
+        def _handler(display, ev):
+            return 0   # swallow; SDL2 recovers on its own
+
+        _x11_err_handler_ref = _HT(_handler)
+        ctypes.CDLL('libX11.so.6').XSetErrorHandler(_x11_err_handler_ref)
+    except Exception:
+        pass   # non-X11 platform or ctypes unavailable — silently skip
+
+
 def _xrandr_monitors():
     """Return list of (x, y, w, h) for each physical monitor, sorted left→right.
 
@@ -222,56 +261,52 @@ def main():
     # ── CLI args ──────────────────────────────────────────────────────────────
     ap = argparse.ArgumentParser(description="psysuals music visualizer")
     ap.add_argument("--display", type=int, default=0,
-                    help="Display index to launch on (default: 0)")
+                    help="Display index to open on (default: 0)")
     ap.add_argument("--mode", type=int, default=None,
                     help="Start on this mode index (overrides saved setting)")
-    ap.add_argument("--noframe", action="store_true",
-                    help="Open as borderless window; use with --xpos/--ypos")
-    ap.add_argument("--xpos",   type=int, default=None)
-    ap.add_argument("--ypos",   type=int, default=None)
-    ap.add_argument("--width",  type=int, default=None)
-    ap.add_argument("--height", type=int, default=None)
     args = ap.parse_args()
 
-    # Enumerate monitors via xrandr (avoids SDL2/RandR CRTC queries entirely)
-    xmonitors   = _xrandr_monitors()
+    # Enumerate monitors via xrandr — never use pygame.display.get_num_displays()
+    # which itself triggers the RandR CRTC path on some X11 configs.
+    xmonitors    = _xrandr_monitors()
     num_displays = max(len(xmonitors), 1)
     display_idx  = max(0, min(args.display, num_displays - 1))
 
+    # Suppress X11 BadRRCrtc errors that SDL2 triggers on some RandR configs.
+    # This lets us keep RandR active for window positioning while preventing
+    # the default Xlib error handler from killing the process.
+    _install_x11_error_handler()
+
     pygame.init()
 
-    def _open_display(idx, fullscreen, noframe=False, xpos=None, ypos=None):
-        if noframe:
-            # Borderless window positioned at the given screen origin.
-            # SDL_VIDEO_WINDOW_POS works in SDL2 for non-fullscreen windows.
-            if xpos is not None and ypos is not None:
-                os.environ['SDL_VIDEO_WINDOW_POS'] = f'{xpos},{ypos}'
-            screen = pygame.display.set_mode(
-                (config.WIDTH, config.HEIGHT), pygame.NOFRAME)
-            os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
-            return screen
-        flags = pygame.FULLSCREEN if fullscreen else 0
-        # display= kwarg selects the monitor; may raise on broken RandR configs
-        if num_displays > 1:
-            try:
-                return pygame.display.set_mode(
-                    (config.WIDTH, config.HEIGHT), flags, display=idx)
-            except Exception:
-                pass
-        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
+    def _open_display(idx, fullscreen):
+        """Open display window.
 
-    if args.noframe:
-        if args.width:
-            config.WIDTH  = args.width
-        if args.height:
-            config.HEIGHT = args.height
-        screen     = _open_display(display_idx, False, noframe=True,
-                                   xpos=args.xpos, ypos=args.ypos)
-        fullscreen = False
-    else:
-        screen     = _open_display(display_idx, True)
-        fullscreen = True
-        config.WIDTH, config.HEIGHT = screen.get_size()
+        On known monitor geometry: NOFRAME positioned at the monitor's origin.
+        - Never changes display resolution (FULLSCREEN does).
+        - Never triggers the RandR CRTC path that causes BadRRCrtc.
+        - SDL_VIDEO_WINDOW_POS reliably places the window on the right monitor.
+
+        Windowed (fullscreen=False): plain resizable window, no positioning.
+        Single-monitor fallback: real FULLSCREEN when xrandr has no geometry.
+        """
+        if fullscreen and idx < len(xmonitors):
+            mx, my, mw, mh = xmonitors[idx]
+            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{mx},{my}'
+            screen = pygame.display.set_mode((mw, mh), pygame.NOFRAME)
+            os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
+            config.WIDTH  = mw
+            config.HEIGHT = mh
+            return screen
+        if fullscreen:
+            # (0, 0) = use current desktop resolution without changing it
+            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            config.WIDTH, config.HEIGHT = screen.get_size()
+            return screen
+        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), 0)
+
+    screen     = _open_display(display_idx, True)
+    fullscreen = True
 
     pygame.display.set_caption(f"psysuals v{__version__}")
     clock  = pygame.time.Clock()
@@ -342,30 +377,25 @@ def main():
     cf_frames = _s.get("cf_frames", _CROSSFADE_FRAMES)
 
     # Task 14: span mode — subprocess approach
-    span_mode     = False
+    # Auto-activate on multi-monitor; Shift+M toggles off/on
     span_vis2_idx = (mode_idx + 1) % len(MODES)
     span_child    = None   # subprocess.Popen for second-display process
 
     def _spawn_span_child(mode_i):
-        """Spawn a NOFRAME child process positioned on the second monitor."""
+        """Spawn a child process on the second monitor (NOFRAME at its origin)."""
         child_idx = 1 - display_idx   # assumes 2 monitors
-        if child_idx < len(xmonitors):
-            cx, cy, cw, ch = xmonitors[child_idx]
-        else:
-            # Fallback: guess second monitor is directly to the right
-            cx, cy, cw, ch = config.WIDTH, 0, config.WIDTH, config.HEIGHT
-        child_env = os.environ.copy()
-        # Disable SDL2's RandR CRTC enumeration in the child — avoids BadRRCrtc
-        child_env['SDL_VIDEO_X11_XRANDR'] = '0'
         return subprocess.Popen([
             sys.executable, os.path.abspath(__file__),
-            '--noframe',
-            '--xpos',   str(cx),
-            '--ypos',   str(cy),
-            '--width',  str(cw),
-            '--height', str(ch),
-            '--mode',   str(mode_i),
-        ], env=child_env)
+            '--display', str(child_idx),
+            '--mode',    str(mode_i),
+        ])
+
+    # Auto-start: if multiple monitors and this is the primary process, run both displays
+    if len(xmonitors) >= 2 and display_idx == 0:
+        span_mode  = True
+        span_child = _spawn_span_child(span_vis2_idx)
+    else:
+        span_mode = False
 
     def _quit():
         """Exit fullscreen before destroying the display so SDL restores all monitors."""
