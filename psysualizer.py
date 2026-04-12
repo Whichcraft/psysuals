@@ -18,6 +18,7 @@ Controls:
 __version__ = "2.10.0"
 
 import argparse
+import os
 import threading
 import time as _time
 from collections import deque
@@ -508,10 +509,12 @@ def main():
                     elif event.key == pygame.K_f:
                         if span_mode:
                             span_mode = False
+                            vis2 = None; span_surfs = None
                         else:
                             fullscreen = not fullscreen
                         screen = _open_display(display_idx, fullscreen)
                         config.WIDTH, config.HEIGHT = screen.get_size()
+                        prev_surf = None; crossfade_frame = 0
                         fade = make_fade(); vis = VisCls()
                         bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
 
@@ -561,27 +564,29 @@ def main():
                                 try:
                                     total_w, total_h, split_x = _desktop_geometry()
                                     if total_w:
+                                        # force window to virtual-desktop origin (0,0)
+                                        os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
                                         screen = pygame.display.set_mode(
                                             (total_w, total_h), pygame.NOFRAME)
+                                        os.environ.pop('SDL_VIDEO_WINDOW_POS', None)
                                     else:
                                         info = pygame.display.Info()
                                         screen = pygame.display.set_mode(
                                             (info.current_w, info.current_h),
                                             pygame.NOFRAME)
-                                    sw, config.HEIGHT = screen.get_size()
+                                    sw, sh = screen.get_size()
                                     if split_x and 0 < split_x < sw:
-                                        span_split = split_x
-                                        # effects see per-monitor width, not full span
+                                        span_split    = split_x
                                         config.WIDTH  = split_x
-                                        config.HEIGHT = total_h
+                                        config.HEIGHT = sh
                                         _, Vis2Cls = MODES[span_vis2_idx]
                                         vis2 = Vis2Cls()
-                                        # standalone surfaces — no subsurface coord issues
                                         span_surfs = (
-                                            pygame.Surface((split_x, total_h)),
-                                            pygame.Surface((sw - split_x, total_h)),
+                                            pygame.Surface((split_x, sh)),
+                                            pygame.Surface((sw - split_x, sh)),
                                         )
                                     else:
+                                        config.WIDTH, config.HEIGHT = sw, sh
                                         vis2 = None; span_surfs = None
                                 except Exception:
                                     span_mode = False
@@ -592,6 +597,8 @@ def main():
                                 screen = _open_display(display_idx, fullscreen)
                                 config.WIDTH, config.HEIGHT = screen.get_size()
                                 vis2 = None; span_surfs = None
+                            # clear any in-progress crossfade so it doesn't bleed over span
+                            prev_surf = None; crossfade_frame = 0
                             fade = make_fade(); vis = VisCls()
                             bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
                         else:
