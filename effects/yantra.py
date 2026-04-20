@@ -7,7 +7,9 @@ import config
 from .utils import hsl
 
 
-class Yantra:
+from .base import Effect
+
+class Yantra(Effect):
     """Psychedelic sacred-geometry mandala for psytrance.
 
     Six concentric polygon rings (triangle → octagon) alternate rotation

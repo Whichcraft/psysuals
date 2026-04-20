@@ -12,6 +12,7 @@ import numpy as np
 import pygame
 
 import config
+from .base import Effect
 
 
 _N      = 4000
@@ -19,7 +20,7 @@ _FS     = 0.0022   # spatial frequency of the noise field
 _LAYERS = 3        # sine layers stacked
 
 
-class FlowField:
+class FlowField(Effect):
     TRAIL_ALPHA = 0   # we manage the surface
 
     def __init__(self):

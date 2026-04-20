@@ -7,7 +7,9 @@ import config
 from .utils import hsl
 
 
-class Branches:
+from .base import Effect
+
+class Branches(Effect):
     """Recursive fractal lightning tree — psychedelic edition.
 
     Nine neon arms radiate from screen centre, each splitting recursively to

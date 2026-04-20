@@ -8,7 +8,9 @@ import config
 from .utils import hsl
 
 
-class Tunnel:
+from .base import Effect
+
+class Tunnel(Effect):
     """First-person ride through a curving tube.
 
     Each ring has a fixed position on the tube path and a z-depth that

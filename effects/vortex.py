@@ -20,7 +20,9 @@ _GRAV = 0.13    # pixels/frame² downward
 _DRAG = 0.991   # velocity multiplier per frame
 
 
-class Vortex:
+from .base import Effect
+
+class Vortex(Effect):
     TRAIL_ALPHA = 0   # we manage the surface
 
     _BASE_ZOOM       = 1.0038

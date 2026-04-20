@@ -5,7 +5,9 @@ import config
 from .utils import hsl
 
 
-class Bars:
+from .base import Effect
+
+class Bars(Effect):
     """Classic spectrum bars with peak markers and a waveform overlay."""
 
     def __init__(self):
