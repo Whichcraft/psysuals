@@ -7,7 +7,9 @@ import config
 from .utils import hsl
 
 
-class GlowSquares:
+from .base import Effect
+
+class GlowSquares(Effect):
     """Waterfall spectrogram — scrolling time-frequency display.
 
     Each new frame adds a row at the top; older slices scroll downward.

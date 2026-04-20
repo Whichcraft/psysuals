@@ -7,7 +7,9 @@ import config
 from .utils import hsl, _hsl_batch
 
 
-class Spiral:
+from .base import Effect
+
+class Spiral(Effect):
     """Neon helix vortex — 6 arms fly toward the viewer with audio-reactive radius
     breathing, two-pass neon glow on arm lines, and cross-ring connections between
     arms at regular depth intervals.  Beat spring explodes the whole structure

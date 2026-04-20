@@ -8,7 +8,9 @@ import config
 from .utils import hsl
 
 
-class Corridor:
+from .base import Effect
+
+class Corridor(Effect):
     """Neon rainbow corridor — concentric rounded-rectangle frames fly toward
     the camera creating a first-person ride through a glowing geometric passage.
     Full rainbow sweep across depth; beat flares nearest frames and spawns

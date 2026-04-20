@@ -8,7 +8,9 @@ import config
 from .utils import hsl
 
 
-class Attractor:
+from .base import Effect
+
+class Attractor(Effect):
     """Triangle mosaic wall.
 
     All triangles are wireframe with rainbow edges.  4-6 tiles are filled

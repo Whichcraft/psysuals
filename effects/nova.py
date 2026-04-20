@@ -7,7 +7,9 @@ import config
 from .utils import hsl
 
 
-class Nova:
+from .base import Effect
+
+class Nova(Effect):
     """Extremely psychedelic waveform kaleidoscope — audio waveform mapped to
     polar sectors with 7-fold mirror symmetry across 4 concentric spinning
     layers.  Each layer reacts to a different frequency band; beat explodes

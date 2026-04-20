@@ -8,7 +8,9 @@ import config
 from .utils import hsl
 
 
-class Bubbles:
+from .base import Effect
+
+class Bubbles(Effect):
     """Translucent rising bubbles — fills the full screen; size and spawn rate driven by bass."""
 
     MAX = 700

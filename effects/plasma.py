@@ -6,7 +6,9 @@ import pygame
 import config
 
 
-class Plasma:
+from .base import Effect
+
+class Plasma(Effect):
     """Full-screen sine-interference plasma — four overlapping wave fields
     create a flowing psychedelic texture.  Audio modulates wave frequency,
     time speed, palette, and beat triggers a global brightness flash."""

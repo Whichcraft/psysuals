@@ -7,7 +7,9 @@ import config
 from .utils import hsl
 
 
-class Cube:
+from .base import Effect
+
+class Cube(Effect):
     """Dual rotating wireframe cubes — each axis driven by a different band.
 
     Satellites are rendered on a dedicated persistent surface (faded more

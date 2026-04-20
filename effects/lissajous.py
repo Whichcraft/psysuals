@@ -8,7 +8,9 @@ import config
 from .utils import hsl, _hsl_batch
 
 
-class Lissajous:
+from .base import Effect
+
+class Lissajous(Effect):
     """Psytrance 3-D Lissajous knot — trefoil (3-fold) symmetry, neon glow,
     beat-driven spring bursts.
 

@@ -353,6 +353,7 @@ def main():
         channels=config.CHANNELS, device=active_dev, callback=_audio_cb)
     stream.start()
 
+<<<<<<< HEAD
     mode_idx      = min(_s["mode_idx"], len(MODES) - 1)
     if args.mode is not None:
         mode_idx = args.mode % len(MODES)
@@ -361,6 +362,16 @@ def main():
     tick          = 0
     energy_hist   = deque(maxlen=15)
     energy_sum    = 0.0
+=======
+    mode_idx       = 0
+    name, VisCls   = MODES[mode_idx]
+    vis            = VisCls()
+    fullscreen     = True
+    tick           = 0
+    energy_hist    = deque(maxlen=40)  # ~0.66s at 60fps, captures >90BPM
+    energy_sum     = 0.0
+    beat_decay     = 0.0
+>>>>>>> b1139a5 (Refactor effects to use base class and improve beat detection)
     dev_name_cache = {None: "default"}
     picking       = False
     pick_sel      = 0
@@ -735,7 +746,12 @@ def main():
         energy_hist.append(raw_beat)
         energy_sum += raw_beat
         avg  = energy_sum / len(energy_hist) if energy_hist else 1e-6
-        beat = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
+        
+        # Immediate impulse
+        impulse = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
+        # Smooth decay envelope
+        beat_decay = max(impulse, beat_decay * 0.90)
+        beat = beat_decay
 
         # Task 3: adaptive intensity
         rms_buf.append(float(np.sqrt(np.mean(waveform ** 2))))

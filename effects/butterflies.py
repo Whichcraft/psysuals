@@ -21,6 +21,8 @@ import config
 from .utils import hsl
 
 
+from .base import Effect
+
 # ── Wing geometry ─────────────────────────────────────────────────────────────
 
 def _wing_poly(x, y, heading, side, upper, flap, scale):
@@ -317,7 +319,7 @@ class _Pair:
 
 # ── Main effect ───────────────────────────────────────────────────────────────
 
-class Butterflies:
+class Butterflies(Effect):
     """Three pairs of butterflies.  Each pair has its own lifecycle:
     solo → partner joins → mutual love chase → wander off-screen → new pair.
 
