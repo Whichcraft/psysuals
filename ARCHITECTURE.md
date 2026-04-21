@@ -175,6 +175,9 @@ Rules that matter in this repo:
 
 | File | Role |
 |------|------|
+| `core/audio_engine.py` | `AudioEngine`: capture, FFT, beat/genre detection |
+| `core/display_manager.py` | `DisplayManager`: monitors, X11, windowing, span mode |
+| `core/ui_manager.py` | `UIManager`: HUD, pane, picker rendering |
 | `effects/utils.py` | `hsl()` and `_hsl_batch()` colour helpers |
 | `effects/palette.py` | shared hue/saturation/lightness palette driven by audio |
 | `settings.py` | persistent settings and preset storage under `~/.config/psysuals/` |
@@ -188,10 +191,15 @@ Rules that matter in this repo:
 
 | File | Lines | Role |
 |------|-------|------|
-| `psysualizer.py` | `961` | main runtime |
+| `psysualizer.py` | `~340` | thin orchestrator |
+| `core/audio_engine.py` | `~160` | audio logic |
+| `core/display_manager.py` | `~130` | window/span logic |
+| `core/ui_manager.py` | `~90` | UI rendering |
 | `config.py` | `20` | shared runtime state |
 | `effects/__init__.py` | `40` | mode registry |
 | `effects/utils.py` | `27` | colour helpers |
-| `gl_renderer.py` | `110` | GL helper and shader-asset loader |
+| `gl_renderer.py` | `144` | GL helper and shader-asset loader |
 | `settings.py` | `72` | settings and preset persistence |
 | `effects/*.py` | `18` modes + shared helpers | visual implementations |
+
+
