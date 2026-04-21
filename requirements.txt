@@ -2,3 +2,5 @@ numpy
 pygame
 sounddevice
 moderngl
+PyOpenGL
+librosa

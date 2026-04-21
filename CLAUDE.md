@@ -18,6 +18,12 @@ called **androsaver** (Kotlin/Java).  Keep this in mind when touching the
 python code: simple math, avoiding heavy new dependencies, keeping
 drawing code self-contained.
 
+## Assistant workflow
+
+When practical, prefer using `~/bin/codebot.sh` for broad repo analysis,
+ranking, brainstorming, and first-pass diagnosis to save local model tokens.
+Keep final code edits, local debugging, and verification in the repo itself.
+
 ## Effect order
 
 **Spectrum and Waterfall must always be the last two entries in `MODES`** (in `effects/__init__.py`), in that order: Spectrum second-to-last, Waterfall last. When adding new effects, insert them before Spectrum.
