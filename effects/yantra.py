@@ -22,7 +22,8 @@ class Yantra(Effect):
     N_RINGS  = 7
     N_SPOKES = 24
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue  = 0.0
         self.time = 0.0
         signs = [1, -1, 1, -1, 1, -1, 1]

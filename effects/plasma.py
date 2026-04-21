@@ -15,7 +15,8 @@ class Plasma(Effect):
 
     RES_DIV = 4
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue  = 0.0
         self.time = 0.0
         rw = max(1, config.WIDTH  // self.RES_DIV)

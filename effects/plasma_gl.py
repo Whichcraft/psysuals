@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from gl_renderer import GLRenderer
 
 import config
+from .base import Effect
 
 # ── Shaders ───────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ def _hsl_arr(h: np.ndarray, l: np.ndarray) -> np.ndarray:
 
 # ── Effect class ──────────────────────────────────────────────────────────────
 
-class PlasmaGL:
+class PlasmaGL(Effect):
     """
     GPU-accelerated Plasma effect.
 
@@ -132,10 +133,10 @@ class PlasmaGL:
     from a numpy CPU loop to a GLSL fragment shader executed on the GPU.
     """
 
-    def __init__(self, renderer: "GLRenderer | None" = None):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._hue      = 0.0
         self._time     = 0.0
-        self._renderer = renderer
         self._prog     = None   # compiled lazily on first draw
         self._vao      = None
         self._fbo_cache: dict = {}  # (w,h) → Framebuffer, for draw_frame reuse
@@ -156,7 +157,7 @@ class PlasmaGL:
     def _ensure_shader(self, renderer: "GLRenderer") -> None:
         """Lazily compile the fragment shader on first use."""
         if self._prog is None:
-            self._renderer = renderer
+            self.renderer = renderer
             self._prog, self._vao = renderer.program(_VERT, _FRAG)
 
     def _advance(self, fft: np.ndarray, beat: float) -> tuple[float, float, float]:
@@ -187,10 +188,10 @@ class PlasmaGL:
         """
         bass, mid, high = self._advance(fft, beat)
 
-        if self._renderer is not None and HAS_MODERNGL:
-            self._ensure_shader(self._renderer)
+        if self.renderer is not None and HAS_MODERNGL:
+            self._ensure_shader(self.renderer)
             self._set_uniforms(bass, mid, high, beat)
-            self._renderer.render(self._vao)
+            self.renderer.render(self._vao)
         elif HAS_PYGAME and surf is not None:
             self._draw_numpy(surf, bass, mid, high, beat)
 
@@ -225,7 +226,7 @@ class PlasmaGL:
 
         The returned array is a fresh copy safe to hand to Kotlin/Chaquopy.
         """
-        r = renderer or self._renderer
+        r = renderer or self.renderer
         if r is None or not HAS_MODERNGL:
             raise RuntimeError("A GLRenderer is required for draw_frame()")
 

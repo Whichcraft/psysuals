@@ -29,7 +29,8 @@ class Attractor(Effect):
     ACTIVE_LIFE_MAX = 360  # 6 s — maximum random lifetime
     MIN_LIFE        = 150  # minimum remaining life when extended by a beat
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue        = 0.0
         self.tiles      = []
         self.filled_ids = []

@@ -16,6 +16,7 @@ import pygame
 
 import config
 from .utils import hsl
+from .base import Effect
 
 try:
     import pygame as _pg
@@ -26,7 +27,7 @@ except ImportError:
 _STEP = 5   # pixels between polygon vertices (lower → smoother, slower)
 
 
-class Aurora:
+class Aurora(Effect):
     TRAIL_ALPHA = 14
 
     # (y_fraction, hue_offset, [(k_multiplier, speed_rad_per_frame, amp_weight)])
@@ -39,7 +40,8 @@ class Aurora:
         (0.80, 0.74, [(1.1, +0.45, 1.00), (2.5, -0.78, 0.55), (3.5, +0.35, 0.25)]),
     ]
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         W = config.WIDTH
         self._hue       = 0.42          # start in cyan-green range
         self._bloom     = 0.0

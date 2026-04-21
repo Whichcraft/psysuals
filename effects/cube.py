@@ -27,7 +27,8 @@ class Cube(Effect):
     EDGES = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),
              (0,4),(1,5),(2,6),(3,7)]
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.rx = self.ry = self.rz = 0.0
         self.hue      = 0.0
         self.fade_hue = 0.0

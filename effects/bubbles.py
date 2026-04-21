@@ -15,7 +15,8 @@ class Bubbles(Effect):
 
     MAX = 700
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue        = 0.0
         self.pulse      = 0.0
         self.pvel       = 0.0

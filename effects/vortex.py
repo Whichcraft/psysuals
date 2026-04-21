@@ -35,7 +35,8 @@ class Vortex(Effect):
     # Formula: interval = _BASE_INTERVAL * gain  (clamped 20..200)
     _BASE_INTERVAL   = 40   # frames between auto-launches at gain 1.0
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
         self._trail   = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))

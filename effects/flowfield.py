@@ -23,7 +23,8 @@ _LAYERS = 3        # sine layers stacked
 class FlowField(Effect):
     TRAIL_ALPHA = 0   # we manage the surface
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
         self._px    = np.random.uniform(0, W, _N).astype(np.float32)
         self._py    = np.random.uniform(0, H, _N).astype(np.float32)

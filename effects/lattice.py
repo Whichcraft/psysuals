@@ -19,6 +19,7 @@ import pygame
 
 import config
 from .utils import hsl
+from .base import Effect
 
 try:
     import pygame as _pg
@@ -33,10 +34,11 @@ _SHOCK_W = 22     # half-width of shockwave boost zone in pixels
 _IDLE    = 0.08   # base glow when there is no audio
 
 
-class Lattice:
+class Lattice(Effect):
     TRAIL_ALPHA = 20
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
         self._hue       = 0.52          # start in cyan-blue
         self._shock_r   = 9999.0        # large = inactive

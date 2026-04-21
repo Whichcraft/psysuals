@@ -22,7 +22,8 @@ class Lissajous(Effect):
     TRAIL = 1400
     N_SYM = 3
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue   = 0.0
         self.t     = 0.0
         self.rx    = 0.0

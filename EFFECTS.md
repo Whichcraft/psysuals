@@ -17,6 +17,14 @@ All effects consume the same shared audio signals. They differ only in how they 
 
 `effect_gain` scales only the foreground beat response. Current default is `0.7`, and changing modes resets it back to that default.
 
+## Hardware Acceleration (ModernGL)
+
+The app supports hardware acceleration via the `--gl` flag. When enabled:
+- The app uses ModernGL to offload heavy pixel calculations to the GPU.
+- Effects like `Plasma` switch to a GLSL shader-based implementation.
+- Other effects continue to draw to a transparent surface that is composited over the GL viewport each frame.
+- A fallback system ensures that all effects remain functional even if ModernGL is not installed or the GPU path is disabled.
+
 If no audio input stream is available, the app stays up and the effects simply run against silence until a device is selected.
 
 Common band splits used in most effects:
@@ -121,10 +129,10 @@ Hundreds of glowing translucent bubbles drift upward with layered halos, reflect
 
 ## 10. Plasma
 
-Four sine-wave fields interfere into a full-screen psychedelic texture rendered at reduced resolution and scaled up for speed.
+Four sine-wave fields interfere into a full-screen psychedelic texture. When running with `--gl`, this effect uses a GLSL fragment shader for per-pixel hardware acceleration.
 
 - Audio: bass shifts hue and flow speed, mid changes wave density, high adds brightness, beat flashes the whole frame.
-- Visual notes: this is the closest thing to a pure fullscreen shader look in the CPU path.
+- Visual notes: this is the primary effect that takes advantage of the ModernGL path, providing high-performance fluid motion. A CPU fallback is automatically used if GL is not available.
 
 ## 11. Branches
 

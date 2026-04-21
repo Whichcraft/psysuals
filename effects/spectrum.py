@@ -10,7 +10,8 @@ from .base import Effect
 class Bars(Effect):
     """Classic spectrum bars with peak markers and a waveform overlay."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue = 0.0
         n_bins     = config.BLOCK_SIZE // 2
         raw        = np.geomspace(2, int(n_bins * 0.85), 81).astype(int)

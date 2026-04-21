@@ -23,7 +23,8 @@ class Branches(Effect):
     MAX_DEPTH   = 7
     BASE_ARMS   = 9
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue  = 0.0
         self.time = 0.0
         self.beat_flash = 0.0

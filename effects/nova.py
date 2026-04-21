@@ -19,7 +19,8 @@ class Nova(Effect):
     N_LAYERS = 4
     N_WAVE   = 120
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue  = 0.0
         self.time = 0.0
         signs = [1, -1, 1, -1]

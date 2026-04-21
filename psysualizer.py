@@ -17,7 +17,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "2.15.0"
+__version__ = "2.16.0"
 
 import argparse
 import atexit
@@ -32,6 +32,11 @@ from collections import deque
 import numpy as np
 import pygame
 import sounddevice as sd
+
+try:
+    from gl_renderer import GLRenderer, HAS_MODERNGL
+except ImportError:
+    HAS_MODERNGL = False
 
 from beat_tracking import LibrosaBeatTracker
 import config
@@ -199,21 +204,21 @@ def _input_devices() -> list[tuple[int, str]]:
     return devices
 
 
-def _draw_device_picker(screen, font, devices, selected, active_idx) -> None:
+def _draw_device_picker(target, font, devices, selected, active_idx) -> None:
     overlay = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 210))
-    screen.blit(overlay, (0, 0))
+    target.blit(overlay, (0, 0))
 
     title = font.render(
         "SELECT INPUT DEVICE   Up/Down navigate   Enter confirm   Esc cancel",
         True,
         (200, 200, 200),
     )
-    screen.blit(title, (40, 30))
+    target.blit(title, (40, 30))
 
     if not devices:
         empty = font.render("No input devices available", True, (180, 180, 180))
-        screen.blit(empty, (40, 80))
+        target.blit(empty, (40, 80))
         return
 
     row_h = 28
@@ -227,11 +232,11 @@ def _draw_device_picker(screen, font, devices, selected, active_idx) -> None:
         is_selected = row == selected
         is_active = dev_idx == active_idx
         if is_selected:
-            pygame.draw.rect(screen, (40, 80, 140), (30, y - 2, config.WIDTH - 60, row_h - 2))
+            pygame.draw.rect(target, (40, 80, 140), (30, y - 2, config.WIDTH - 60, row_h - 2))
         marker = ">> " if is_active else "   "
         label = f"{marker}{dev_idx:3d}  {name}"
         color = (255, 255, 100) if is_selected else (140, 140, 140)
-        screen.blit(font.render(label, True, color), (40, y))
+        target.blit(font.render(label, True, color), (40, y))
 
 
 # ── Main loop ────────────────────────────────────────────────────────────────
@@ -319,6 +324,11 @@ def main() -> None:
         help="Start on this mode index (overrides saved setting)",
     )
     parser.add_argument(
+        "--gl",
+        action="store_true",
+        help="Use ModernGL for hardware-accelerated effects",
+    )
+    parser.add_argument(
         "--span-child",
         action="store_true",
         help=argparse.SUPPRESS,
@@ -338,14 +348,19 @@ def main() -> None:
     pygame.init()
 
     _xmove_target = None
+    renderer: GLRenderer | None = None
 
     def _open_display(idx: int, fullscreen: bool):
-        nonlocal _xmove_target
+        nonlocal _xmove_target, renderer
         _xmove_target = None
+        flags = 0
+        if args.gl:
+            flags |= pygame.OPENGL | pygame.DOUBLEBUF
+        
         if fullscreen and idx < len(xmonitors):
             mx, my, mw, mh = xmonitors[idx]
             os.environ["SDL_VIDEO_WINDOW_POS"] = f"{mx},{my}"
-            screen = pygame.display.set_mode((mw, mh), pygame.NOFRAME)
+            screen = pygame.display.set_mode((mw, mh), flags | pygame.NOFRAME)
             os.environ.pop("SDL_VIDEO_WINDOW_POS", None)
             if _libX11:
                 wm = pygame.display.get_wm_info()
@@ -357,14 +372,21 @@ def main() -> None:
                     _xmove_target = (dpy, win, mx, my)
             config.WIDTH = mw
             config.HEIGHT = mh
-            return screen
-        if fullscreen:
-            screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        elif fullscreen:
+            screen = pygame.display.set_mode((0, 0), flags | pygame.FULLSCREEN)
             config.WIDTH, config.HEIGHT = screen.get_size()
-            return screen
-        return pygame.display.set_mode((config.WIDTH, config.HEIGHT), 0)
+        else:
+            screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
+        
+        if args.gl and HAS_MODERNGL:
+            renderer = GLRenderer(config.WIDTH, config.HEIGHT)
+        
+        return screen
 
     screen = _open_display(display_idx, True)
+    target = screen
+    if args.gl:
+        target = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
     fullscreen = True
 
     pygame.display.set_caption(f"psysuals v{__version__}")
@@ -414,7 +436,7 @@ def main() -> None:
     if args.mode is not None:
         mode_idx = args.mode % len(MODES)
     name, VisCls = MODES[mode_idx]
-    vis = VisCls()
+    vis = VisCls(renderer=renderer)
 
     tick = 0
     energy_hist = deque(maxlen=40)
@@ -445,7 +467,7 @@ def main() -> None:
     bg_on = settings.get("bg_on", False)
     bg_mode_i = settings.get("bg_mode_i", 0) % _BG_MODES
     bg_name, bg_cls = MODES[bg_mode_i]
-    bg_vis = bg_cls()
+    bg_vis = bg_cls(renderer=renderer)
     bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
 
     presets = sett.load_presets()
@@ -487,6 +509,10 @@ def main() -> None:
         for child in span_children.values():
             if child.poll() is None:
                 child.terminate()
+                try:
+                    child.wait(timeout=0.2)
+                except subprocess.TimeoutExpired:
+                    child.kill()
         span_children = {}
 
     atexit.register(_kill_children)
@@ -499,6 +525,7 @@ def main() -> None:
             pass
         _stop_input_stream(stream)
         pygame.quit()
+        sys.exit(0)
 
     def _save_settings() -> None:
         if args.span_child:
@@ -533,20 +560,20 @@ def main() -> None:
             vis.release()
         if hasattr(bg_vis, "release") and callable(bg_vis.release):
             bg_vis.release()
-        vis = VisCls()
+        vis = VisCls(renderer=renderer)
         bg_name, bg_cls = MODES[bg_mode_i]
-        bg_vis = bg_cls()
+        bg_vis = bg_cls(renderer=renderer)
         bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
 
     def _switch_mode(new_idx: int) -> None:
         nonlocal mode_idx, name, VisCls, vis, prev_surf, crossfade_frame, effect_gain
         if hasattr(vis, "release") and callable(vis.release):
             vis.release()
-        prev_surf = screen.copy()
+        prev_surf = target.copy()
         crossfade_frame = 0
         mode_idx = new_idx % len(MODES)
         name, VisCls = MODES[mode_idx]
-        vis = VisCls()
+        vis = VisCls(renderer=renderer)
         effect_gain = config.DEFAULT_EFFECT_GAIN
 
     def _pane_adjust(delta: int) -> None:
@@ -564,10 +591,10 @@ def main() -> None:
         py = 50
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         panel.fill((0, 0, 0, 185))
-        screen.blit(panel, (px, py))
-        pygame.draw.rect(screen, (80, 80, 80), (px, py, panel_w, panel_h), 1)
+        target.blit(panel, (px, py))
+        pygame.draw.rect(target, (80, 80, 80), (px, py, panel_w, panel_h), 1)
         title = font_s.render("Settings  (Tab: close)", True, (120, 120, 120))
-        screen.blit(title, (px + 8, py + 6))
+        target.blit(title, (px + 8, py + 6))
         items = [
             ("effect_gain", effect_gain, 2.0, f"{effect_gain:.1f}"),
             ("bg_alpha", bg_alpha, 255, f"{bg_alpha}"),
@@ -578,15 +605,15 @@ def main() -> None:
             selected = i == pane_sel
             color = (255, 255, 100) if selected else (150, 150, 150)
             marker = ">> " if selected else "   "
-            screen.blit(
+            target.blit(
                 font_s.render(f"{marker}{label}: {value_str}", True, color),
                 (px + 10, y),
             )
             bar_total = panel_w - 24
             bar_w = int(bar_total * max(0.0, min(value / max_value, 1.0)))
-            pygame.draw.rect(screen, (50, 50, 50), (px + 10, y + 16, bar_total, 6))
+            pygame.draw.rect(target, (50, 50, 50), (px + 10, y + 16, bar_total, 6))
             if bar_w > 0:
-                pygame.draw.rect(screen, color, (px + 10, y + 16, bar_w, 6))
+                pygame.draw.rect(target, color, (px + 10, y + 16, bar_w, 6))
 
     def _draw_multiband_bars(beat_val: float, mid_val: float, treble_val: float) -> None:
         bar_w = 8
@@ -604,7 +631,7 @@ def main() -> None:
             x = i * (bar_w + gap)
             if h > 0:
                 pygame.draw.rect(bar_surf, color, (x, bar_max - h, bar_w, h))
-        screen.blit(bar_surf, (6, config.HEIGHT - bar_max - 6))
+        target.blit(bar_surf, (6, config.HEIGHT - bar_max - 6))
 
     hint = (
         "  Left/Right: mode  |  Up/Down: intensity  |  A: auto-gain"
@@ -680,6 +707,9 @@ def main() -> None:
                     else:
                         fullscreen = not fullscreen
                     screen = _open_display(display_idx, fullscreen)
+                    target = screen
+                    if args.gl:
+                        target = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
                     config.WIDTH, config.HEIGHT = screen.get_size()
                     prev_surf = None
                     crossfade_frame = 0
@@ -713,7 +743,7 @@ def main() -> None:
                     if shift:
                         bg_mode_i = (bg_mode_i + 1) % _BG_MODES
                         bg_name, bg_cls = MODES[bg_mode_i]
-                        bg_vis = bg_cls()
+                        bg_vis = bg_cls(renderer=renderer)
                         bg_on = True
                     else:
                         bg_on = not bg_on
@@ -756,7 +786,7 @@ def main() -> None:
                             bg_on = preset.get("bg_on", bg_on)
                             bg_mode_i = preset.get("bg_mode_i", bg_mode_i)
                             bg_name, bg_cls = MODES[bg_mode_i]
-                            bg_vis = bg_cls()
+                            bg_vis = bg_cls(renderer=renderer)
                     else:
                         preset_name = f"Preset {len(presets) + 1}"
                         sett.save_preset(
@@ -826,22 +856,22 @@ def main() -> None:
         if new_alpha != fade_alpha:
             fade_alpha = new_alpha
             fade = make_fade(fade_alpha)
-        screen.blit(fade, (0, 0))
+        target.blit(fade, (0, 0))
 
         if bg_on:
             bg_surf.fill((0, 0, 0))
             bg_vis.draw(bg_surf, waveform, fft, draw_beat, tick)
             bg_surf.set_alpha(bg_alpha)
-            screen.blit(bg_surf, (0, 0))
+            target.blit(bg_surf, (0, 0))
 
-        vis.draw(screen, waveform, fft, draw_beat, tick)
+        vis.draw(target, waveform, fft, draw_beat, tick)
 
         if prev_surf is not None:
             frames = max(1, int(cf_frames))
             t = crossfade_frame / frames
             ease = t * t * (3.0 - 2.0 * t)
             prev_surf.set_alpha(int(255 * (1.0 - ease)))
-            screen.blit(prev_surf, (0, 0))
+            target.blit(prev_surf, (0, 0))
             crossfade_frame += 1
             if crossfade_frame >= frames:
                 prev_surf = None
@@ -852,10 +882,10 @@ def main() -> None:
             alpha = int(180 * min(t_left, 1.0))
             flash = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
             flash.fill((255, 255, 255, alpha // 6))
-            screen.blit(flash, (0, 0))
+            target.blit(flash, (0, 0))
             font_big = pygame.font.SysFont("monospace", 72, bold=True)
             label = font_big.render(f"{tap_bpm:.0f} BPM", True, (255, 255, 255, alpha))
-            screen.blit(
+            target.blit(
                 label,
                 (
                     config.WIDTH // 2 - label.get_width() // 2,
@@ -892,7 +922,7 @@ def main() -> None:
                     True,
                     (90, 90, 90),
                 )
-                screen.blit(row1, (6, 6))
+                target.blit(row1, (6, 6))
 
                 y2 = row1.get_height() + 8
                 bpm_tag = " tap" if using_tap else ""
@@ -901,16 +931,16 @@ def main() -> None:
                     True,
                     (70, 70, 70),
                 )
-                screen.blit(bpm_label, (6, y2))
+                target.blit(bpm_label, (6, y2))
                 bx = bpm_label.get_width() + 16
 
                 def _bar(label: str, value: float, max_value: float, color, x: int) -> int:
                     lbl = font_s.render(label, True, (70, 70, 70))
-                    screen.blit(lbl, (x, y2))
+                    target.blit(lbl, (x, y2))
                     x2 = x + lbl.get_width() + 4
                     width = int(80 * max(0.0, min(value / max_value, 1.0)))
                     if width > 0:
-                        pygame.draw.rect(screen, color, (x2, y2 + 2, width, 13))
+                        pygame.draw.rect(target, color, (x2, y2 + 2, width, 13))
                     return x2 + 88
 
                 bx = _bar("beat", beat, 3.0, (180, 50, 50), bx)
@@ -918,14 +948,14 @@ def main() -> None:
                 bx = _bar(" tri", treble_e, 2.0, (130, 60, 200), bx)
 
                 if hasattr(vis, "_n"):
-                    screen.blit(
+                    target.blit(
                         font_s.render(f"  particles: {vis._n}", True, (60, 60, 60)),
                         (6, y2 + 20),
                     )
             elif hud_level == 1:
                 bpm_tag = " tap" if using_tap else ""
                 bpm_str = f"{bpm:5.1f}{bpm_tag}" if bpm > 0 else "--.-"
-                screen.blit(
+                target.blit(
                     font_s.render(
                         f"  [{mode_idx + 1}/{len(MODES)}] {name}  |  BPM:{bpm_str}",
                         True,
@@ -938,12 +968,16 @@ def main() -> None:
             _draw_pane()
 
         if picking:
-            _draw_device_picker(screen, font, devices, pick_sel, active_dev)
+            _draw_device_picker(target, font, devices, pick_sel, active_dev)
 
         if _xmove_target and tick < 60:
             dpy, win, mx, my = _xmove_target
             _libX11.XMoveWindow(dpy, win, mx, my)
             _libX11.XSync(dpy, 0)
+
+        if args.gl and renderer is not None:
+            renderer.blit(target)
+            target.fill((0, 0, 0, 0))
 
         pygame.display.flip()
         clock.tick(config.FPS)
@@ -959,3 +993,4 @@ if __name__ == "__main__":
         except Exception:
             pass
         pygame.quit()
+        sys.exit(130)
