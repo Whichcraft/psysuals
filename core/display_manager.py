@@ -174,14 +174,24 @@ class DisplayManager:
 
     def kill_children(self) -> None:
         """Terminate all span child processes and wait for them to exit."""
+        # 1. Send SIGTERM to all first (parallel)
         for child in self.span_children.values():
             if child.poll() is None:
                 child.terminate()
-                try:
-                    child.wait(timeout=0.2)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait() # Ensure zombie cleanup
+        
+        # 2. Wait a bit for all to exit gracefully
+        for child in self.span_children.values():
+            try:
+                child.wait(timeout=0.15)
+            except subprocess.TimeoutExpired:
+                pass
+        
+        # 3. Kill any survivors and wait to clean up zombies
+        for child in self.span_children.values():
+            if child.poll() is None:
+                child.kill()
+                child.wait()
+        
         self.span_children = {}
 
     def __del__(self):

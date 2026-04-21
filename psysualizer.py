@@ -232,7 +232,6 @@ class VisualizerApp:
                     continue
 
                 if event.key in (pygame.K_ESCAPE, pygame.K_q):
-                    self.display.kill_children()
                     self._save_settings()
                     self._quit()
                 elif event.key == pygame.K_f:
@@ -383,6 +382,13 @@ class VisualizerApp:
         palette.update(self.beat, mid_e, treble_e, self.tick)
         
         self.display.reposition_window_fix(self.tick)
+
+        # Unified exit: if any child window is closed/ESC'd, parent quits too
+        if self.span_mode:
+            for child in self.display.span_children.values():
+                if child.poll() is not None:
+                    self._save_settings()
+                    self._quit()
 
     def _render(self):
         target = self.display.target
