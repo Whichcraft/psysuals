@@ -6,6 +6,9 @@ class Effect:
     
     # Optional — controls trail fade speed (lower = longer trails, default 28)
     TRAIL_ALPHA = 28
+    
+    # Resolution divisor for performance-heavy effects
+    RES_DIV = 1
 
     def __init__(self, renderer=None, **kwargs):
         """One-time setup. Stores optional GLRenderer."""
