@@ -7,9 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [2.17.0] — 2026-04-21
+## [3.0.0] — 2026-04-21
 
 ### Added
+- **Super-Duper Massive Release** — Psysuals v3 is here!
 - **Modular OO Architecture** — complete refactor of `psysualizer.py` into specialized classes (`AudioEngine`, `DisplayManager`, `UIManager`, `VisualizerApp`)
 - **Performance Benchmarks** — added `benchmarks.py` to measure and compare effect frame rates (CPU vs GPU)
 - **Regression Testing** — integrated `core/regression_tester.py` into `smoke_test.py` to guard effect contract and registry order
