@@ -129,6 +129,8 @@ class DisplayManager:
         
         if self.args.gl and HAS_MODERNGL:
             try:
+                if self.renderer:
+                    self.renderer.release()
                 self.renderer = GLRenderer(config.WIDTH, config.HEIGHT)
             except Exception:
                 # If GL fails, we might want to disable it, but for now just clear renderer
