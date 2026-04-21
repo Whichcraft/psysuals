@@ -52,21 +52,24 @@ class Lissajous(Effect):
 
         # BPM scaling: faster knot at higher tempo (guard against BPM=0 before detection)
         bpm_scale = max(0.7, config.BPM / 138.0) if config.BPM > 60 else 1.0
-        self.t += (0.016 + beat * 0.04) * bpm_scale
+        
+        # Dampened beat response to prevent "wild" behavior
+        clamped_beat = min(1.5, beat)
+        self.t += (0.016 + clamped_beat * 0.03) * bpm_scale
         self.hist.append((math.sin(ax * self.t + self.dx),
                           math.sin(ay * self.t + self.dy),
                           math.sin(az * self.t + self.dz)))
 
-        self.svel  += beat * 0.30
+        self.svel  += clamped_beat * 0.22
         self.svel  += (1.0 - self.scale) * 0.16
         self.svel  *= 0.72
         self.scale += self.svel
         self.scale  = max(0.35, self.scale)
 
-        self.hue += beat * 0.06
+        self.hue += clamped_beat * 0.06
 
-        self.rvx += beat * 0.008 + 0.0001
-        self.rvy += beat * 0.010 + 0.00015
+        self.rvx += clamped_beat * 0.006 + 0.0001
+        self.rvy += clamped_beat * 0.008 + 0.00015
         self.rvx *= 0.985
         self.rvy *= 0.985
         self.rx  += self.rvx

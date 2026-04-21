@@ -137,33 +137,31 @@ class _Butterfly:
         body_col = hsl(self.hue, l=0.28)
         wc1      = hsl(self.hue, l=0.58)
         wc2      = hsl((self.hue + 0.10) % 1.0, l=0.46)
-        oc       = outline_col or body_col
-
+        
+        # Consolidate wing drawing - fewer polygon calls
         for upper in (-1, 1):
             col = wc1 if upper == 1 else wc2
             for side in (-1, 1):
                 pts = _wing_poly(self.x, self.y, self.heading,
                                  side, upper, flap, self.scale)
                 pygame.draw.polygon(surf, col, pts)
-                pygame.draw.polygon(surf, oc,  pts, 1)
+                # Skip outline when scale is small or just draw one
+                if self.scale > 3.0:
+                    pygame.draw.polygon(surf, (20, 20, 20), pts, 1)
 
         ca, sa = math.cos(self.heading), math.sin(self.heading)
-        bl = int(10 * self.scale)
+        bl = int(8 * self.scale) # Slightly shorter body
         hx, hy = int(self.x + ca * bl), int(self.y + sa * bl)
         tx, ty = int(self.x - ca * bl), int(self.y - sa * bl)
-        lw = max(2, int(3 * self.scale))
+        lw = max(1, int(2 * self.scale))
         pygame.draw.line(surf, body_col, (hx, hy), (tx, ty), lw)
-        pygame.draw.circle(surf, hsl(self.hue, l=0.22), (hx, hy),
-                           max(2, int(3 * self.scale)))
 
-        for s in (-1, 1):
-            a_ang = self.heading + s * 0.38
-            aex = int(hx + math.cos(a_ang) * 9 * self.scale)
-            aey = int(hy + math.sin(a_ang) * 9 * self.scale)
-            pygame.draw.line(surf, body_col, (hx, hy), (aex, aey), 1)
-            pygame.draw.circle(surf,
-                               hsl((self.hue + 0.15) % 1.0, l=0.70),
-                               (aex, aey), max(1, int(2 * self.scale)))
+        # Skip antennas for better FPS
+        # for s in (-1, 1):
+        #     a_ang = self.heading + s * 0.38
+        #     aex = int(hx + math.cos(a_ang) * 9 * self.scale)
+        #     aey = int(hy + math.sin(a_ang) * 9 * self.scale)
+        #     pygame.draw.line(surf, body_col, (hx, hy), (aex, aey), 1)
 
 
 # ── Pair ──────────────────────────────────────────────────────────────────────

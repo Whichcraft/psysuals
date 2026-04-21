@@ -57,15 +57,15 @@ class Vortex(Effect):
         self._rockets.append([float(x), float(H), vx, vy, h, []])
 
     def _explode(self, x, y, hue):
-        n = random.randint(80, 120)
+        n = random.randint(40, 60) # Fewer embers for speed
         for _ in range(n):
             ang = random.uniform(0, math.tau)
             spd = random.gauss(4.5, 1.8)
             vx  = math.cos(ang) * spd
             vy  = math.sin(ang) * spd * 0.85 - random.uniform(0, 1.5)
-            life = random.randint(50, 100)
+            life = random.randint(30, 60) # Shorter life
             h    = (hue + random.uniform(-0.09, 0.09)) % 1.0
-            r    = random.randint(2, 5)
+            r    = random.randint(1, 3) # Smaller embers
             self._embers.append([x, y, vx, vy, h, r, life, life])
 
     # ── main draw ─────────────────────────────────────────────────────────────
@@ -76,16 +76,14 @@ class Vortex(Effect):
         self._hue = (self._hue + 0.0015 + bass * 0.002) % 1.0
 
         # Beat: launch rockets + boost
-        if beat > 0.6:
+        if beat > 0.7:
             self._beat_t = self._BEAT_FRAMES
-            for _ in range(1 + int(beat * 2)):
+            for _ in range(1 + int(beat)):
                 self._launch()
 
-        # Auto-launch between beats — interval scales with effect gain so that
-        # low gain → more rockets, high gain → fewer (beat-triggered already
-        # fires more rockets when gain is high via the larger beat value).
+        # Auto-launch between beats
         gain     = max(0.1, getattr(config, 'EFFECT_GAIN', 1.0))
-        interval = int(max(20, min(200, self._BASE_INTERVAL * gain)))
+        interval = int(max(30, min(200, self._BASE_INTERVAL * gain)))
         self._auto_t += 1
         if self._auto_t >= interval:
             self._auto_t = 0
@@ -94,16 +92,17 @@ class Vortex(Effect):
         # ── feedback: zoom + rotate trail ─────────────────────────────────────
         t = self._beat_t / self._BEAT_FRAMES if self._beat_t > 0 else 0.0
         self._beat_t = max(0, self._beat_t - 1)
-        zoom    = self._BASE_ZOOM + t * (self._BEAT_ZOOM - self._BASE_ZOOM) + bass * 0.003
+        zoom    = self._BASE_ZOOM + t * (self._BEAT_ZOOM - self._BASE_ZOOM) + bass * 0.002
         rot_deg = self._BASE_ROT  + t * (self._BEAT_ROT  - self._BASE_ROT)
 
+        # Optimize: rotozoom is expensive, but necessary for the effect
         rotated = pygame.transform.rotozoom(self._trail, rot_deg, zoom)
         rw, rh  = rotated.get_size()
         self._trail.fill((0, 0, 0))
         self._trail.blit(rotated, (-((rw - W) // 2), -((rh - H) // 2)))
 
-        # Decay (~94% per frame so trails persist ~40 frames)
-        self._trail.fill((240, 240, 240), special_flags=pygame.BLEND_RGB_MULT)
+        # Decay (~92% per frame)
+        self._trail.fill((235, 230, 235), special_flags=pygame.BLEND_RGB_MULT)
 
         # ── rockets ───────────────────────────────────────────────────────────
         live = []
@@ -112,18 +111,18 @@ class Vortex(Effect):
             vy += _GRAV
             vx *= _DRAG
             x += vx; y += vy
-            trail.append((int(x), int(y)))
-            if len(trail) > 14:
-                trail.pop(0)
+            # Thinned trail for performance
+            if tick % 2 == 0:
+                trail.append((int(x), int(y)))
+                if len(trail) > 8:
+                    trail.pop(0)
             rk[0], rk[1], rk[2], rk[3] = x, y, vx, vy
 
-            # Draw rocket trail
-            for i, pt in enumerate(trail):
-                frac = (i + 1) / len(trail)
-                pygame.draw.circle(self._trail, hsl(hue, l=0.30 + frac * 0.55),
-                                   pt, max(1, round(3 * frac)))
+            # Draw rocket trail core only
+            if trail:
+                pygame.draw.circle(self._trail, hsl(hue, l=0.8), trail[-1], 2)
 
-            if vy >= 0 or y < -20:          # apex reached → explode
+            if vy >= 0 or y < -20:
                 self._explode(x, y, hue)
             elif -20 < x < W + 20:
                 live.append(rk)
@@ -138,8 +137,9 @@ class Vortex(Effect):
             vy *= _DRAG
             x += vx; y += vy
             em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life - 1
-            if life > 0 and -60 < x < W + 60 and y < H + 60:
-                brightness = 0.32 + (life / max_life) * 0.52
+            if life > 0 and -40 < x < W + 40 and y < H + 40:
+                brightness = 0.4 + (life / max_life) * 0.5
+                # Smaller radius for speed
                 pygame.draw.circle(self._trail, hsl(hue, l=brightness),
                                    (int(x), int(y)), radius)
                 live.append(em)
