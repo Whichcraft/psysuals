@@ -16,6 +16,31 @@
 
 ---
 
+## ⚙️ Installation
+
+### 1. Requirements
+- Python 3.8+
+- Audio input device (microphone or loopback monitor)
+- (Optional) OpenGL 3.3+ capable GPU for hardware acceleration
+
+### 2. Setup
+Clone the repository and create a virtual environment:
+```bash
+git clone https://github.com/Whichcraft/psysuals.git
+cd psysuals
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Hardware Acceleration (Optional)
+To enable the high-performance ModernGL path:
+```bash
+pip install -r requirements-gl.txt
+```
+
+---
+
 ## Usage
 
 ```bash
