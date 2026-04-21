@@ -146,6 +146,19 @@ class AudioEngine:
 
             self._prev_spectrum[:] = spectrum
 
+    def get_audio(self):
+        """Return a thread-safe copy of the current audio analysis state."""
+        with self._lock:
+            return (
+                self._waveform.copy(),
+                self._smooth_fft.copy(),
+                self._raw_beat_energy,
+                self._mid_energy,
+                self._treble_energy,
+                self._bpm,
+                self._audio_time,
+            )
+
     def is_active(self) -> bool:
         """Return True if the audio stream is currently running."""
         return self.stream is not None and self.stream.active
