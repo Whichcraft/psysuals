@@ -9,6 +9,9 @@ class Effect:
     
     # Resolution divisor for performance-heavy effects
     RES_DIV = 1
+    
+    # Set to True if the effect renders directly to the GL backbuffer
+    IS_GL = False
 
     def __init__(self, renderer=None, **kwargs):
         """One-time setup. Stores optional GLRenderer."""

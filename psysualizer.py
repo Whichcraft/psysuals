@@ -429,8 +429,7 @@ class VisualizerApp:
             
         # In GL mode, we ONLY apply the fade if NOT using a pure GL effect.
         # Otherwise, the fade (black blit) will hide the GL rendering.
-        is_gl_effect = self.args.gl and getattr(self.vis, "renderer", None) is not None
-        if not is_gl_effect:
+        if not (self.args.gl and self.vis.IS_GL):
             target.blit(self.fade, (0, 0))
         
         if self.bg_on:
