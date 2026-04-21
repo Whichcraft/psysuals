@@ -5,6 +5,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.15.0] — 2026-04-21
+
+### Added
+- **`beat_tracking.py`** — optional `librosa`-backed BPM and beat-grid refinement layered on top of the existing callback-time spectral-flux detector
+
+### Changed
+- **Default intensity** — foreground effect intensity now defaults to `0.7` instead of `1.0`
+- **Mode switching** — changing modes resets intensity to the default instead of carrying the previous mode's setting forward
+
+### Fixed
+- **Render-thread stalls after a few seconds** — heavy `librosa` onset / beat analysis now runs on a background thread and the main loop consumes cached results only
+- **Broken CPU mode imports** — restored the working pygame implementations for `Cube`, `Lissajous`, and `Spectrum` in the primary app path instead of the incomplete `config.GL_CONTEXT` ports
+- **Spectrum startup regression** — restored the missing `Effect` base-class import in `effects/spectrum.py`
+
+---
+
 ## [2.14.0] — 2026-04-12
 
 ### Fixed

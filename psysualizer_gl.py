@@ -119,7 +119,7 @@ def main():
 
             # ── Render ───────────────────────────────────────────────────────
             waveform, fft, beat = _get_audio()
-            config.EFFECT_GAIN  = 1.0
+            config.EFFECT_GAIN  = config.DEFAULT_EFFECT_GAIN
 
             effect.draw(None, waveform, fft, beat, tick)
 

@@ -2,10 +2,23 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.14.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.15.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
-See [EFFECTS.md](EFFECTS.md) for a detailed reference of all effects and their parameters.
+See [EFFECTS.md](EFFECTS.md) for a detailed reference of all current effects and their audio reactions.
+
+## What's new in v2.15.0 — beat tracking stability + restored core effects
+
+### Smarter beat/BPM refinement without blocking the visuals
+`beat_tracking.py` now layers a `librosa`-backed tracker on top of the existing low-latency spectral-flux detector. The callback still computes an immediate raw beat signal, while the tracker buffers a few seconds of audio and refines BPM plus beat-grid timing in the background. Heavy onset / beat analysis no longer runs on the render thread, so visuals stay responsive after the first few seconds of playback.
+
+### Main app uses the working CPU effects again
+The partial ModernGL ports of `Cube`, `Lissajous`, and `Spectrum` have been removed from the normal pygame path. The primary `psysualizer.py` entry point is back on the stable CPU implementations, while the GL proof-of-concept remains isolated in `psysualizer_gl.py`.
+
+### Lower default intensity and per-mode reset
+Default intensity is now `0.7` instead of `1.0`, and changing modes always resets the foreground effect back to that default. Presets still restore any explicitly saved intensity.
+
+---
 
 ## What's new in v2.14.0 — dual-monitor window placement fix
 
@@ -242,6 +255,8 @@ python3 -m venv .venv
 | `Shift+H` | Cycle HUD detail: full → minimal → off |
 | `Q` / `Esc` | Quit |
 
+Changing modes with `←` / `→`, `Space`, number keys, or mouse click resets intensity to the default `0.7`. Saved presets can still restore a custom intensity deliberately.
+
 ## Selecting an audio input device
 
 Press `D` while running to open the interactive device picker. Use `↑`/`↓` to navigate the list of available input devices, `Enter` to switch, `Esc` to cancel. The active device is shown in the HUD at the top of the screen.
@@ -258,21 +273,24 @@ Then press `D` in-app and select it from the list.
 
 ## How it works
 
-1. `sounddevice` streams raw PCM from the input device in 1 024-sample blocks.
-2. A Blackman-windowed FFT is computed each block; the spectrum is log-scaled and smoothed with an exponential moving average (α = 0.50).
-3. **Beat detection** uses spectral flux — the mean positive difference between successive bass spectra (bins 0–20), normalised against a long-term rolling average. Beats are sharper and more kick-accurate than simple energy thresholding.
-4. **BPM** is estimated from the median interval between detected onset timestamps, updated in real time and clamped to 60–200 BPM.
-5. **Multi-band energy** — mid (bins 20–100, ~860 Hz–4.3 kHz) and treble (bins 100–256, ~4.3–11 kHz) are each normalised independently and exposed as `config.MID_ENERGY` / `config.TREBLE_ENERGY` for effects to read.
-6. Genre classification runs every ~5 seconds (300 frames) from the accumulated spectrum and adjusts beat-weight presets for electronic, rock, or classical content.
-7. `pygame` renders each frame with a per-effect semi-transparent black overlay for motion-trail / persistence effects. Mode switches dissolve over 45 frames.
+1. `sounddevice` streams raw mono PCM from the selected input device in 1 024-sample blocks at 44.1 kHz.
+2. The audio callback applies a Blackman-windowed FFT, `log1p` scaling, and exponential smoothing (`α = 0.50`) to produce the shared spectrum used by every effect.
+3. The same callback computes a low-latency raw beat signal from spectral flux in bass bins `0..19`, plus fallback BPM from onset timestamps and independent mid / treble energy tracks.
+4. `beat_tracking.py` optionally buffers recent audio and runs `librosa` onset / beat analysis on a background thread. The render loop reads cached BPM estimates immediately and never blocks waiting for that heavier analysis.
+5. The main loop normalises raw beat energy against a rolling average, applies an exponential decay for a cleaner impulse envelope, and then feeds that beat into the active effect or auto-gain path.
+6. Genre detection runs from the accumulated spectrum and adjusts beat weights for electronic, rock, classical, or generic content.
+7. `pygame` renders the active effect, optional background layer, HUD, and crossfade overlay each frame. Mode switches restart the effect at the default intensity `0.7`.
 
 ## Project structure
 
 ```
 psysuals/
 ├── psysualizer.py            # Entry point — audio pipeline and main loop
+├── beat_tracking.py          # Optional librosa-based BPM/beat refinement
 ├── config.py                 # Shared mutable state (WIDTH, HEIGHT, FPS, BPM, MID_ENERGY, …)
 ├── settings.py               # User settings persistence (~/.config/psysuals/settings.json)
+├── psysualizer_gl.py         # Experimental moderngl entry point
+├── gl_renderer.py            # Shared moderngl renderer utilities
 ├── effects/
 │   ├── __init__.py           # MODES list and package re-exports
 │   ├── utils.py              # Shared colour helpers: hsl(), _hsl_batch()
@@ -294,7 +312,8 @@ psysuals/
 │   ├── aurora.py             # Aurora effect
 │   ├── lattice.py            # Lattice effect
 │   ├── spectrum.py           # Spectrum (Bars) effect
-│   └── waterfall.py          # Waterfall effect
+│   ├── waterfall.py          # Waterfall effect
+│   └── plasma_gl.py          # Shader-driven Plasma prototype
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects
 ├── requirements.txt
