@@ -142,8 +142,8 @@ class VisualizerApp:
             description=desc,
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
-        parser.add_argument("-d", "--display", type=int, default=None, help="Target display index")
-        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index")
+        parser.add_argument("-d", "--display", type=int, default=None, help="Target display index (e.g. 0, 1)")
+        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index (0-17)")
         parser.add_argument("-g", "--gl", action="store_true", help="Enable ModernGL hardware acceleration")
         parser.add_argument("--span-child", action="store_true", help=argparse.SUPPRESS)
         return parser.parse_args()
