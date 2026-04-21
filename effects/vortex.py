@@ -24,6 +24,7 @@ from .base import Effect
 
 class Vortex(Effect):
     TRAIL_ALPHA = 0   # we manage the surface
+    RES_DIV     = 2   # Render at 1/2 resolution for FPS boost
 
     _BASE_ZOOM       = 1.0038
     _BASE_ROT        = 0.42
@@ -37,7 +38,7 @@ class Vortex(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         self._trail   = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
         self._hue     = random.random()
@@ -49,10 +50,10 @@ class Vortex(Effect):
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _launch(self):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         x  = random.uniform(W * 0.10, W * 0.90)
-        vy = random.uniform(-15, -10)
-        vx = random.uniform(-2.0, 2.0)
+        vy = random.uniform(-15 / self.RES_DIV, -10 / self.RES_DIV)
+        vx = random.uniform(-2.0 / self.RES_DIV, 2.0 / self.RES_DIV)
         h  = (self._hue + random.uniform(-0.25, 0.25)) % 1.0
         self._rockets.append([float(x), float(H), vx, vy, h, []])
 
@@ -60,18 +61,18 @@ class Vortex(Effect):
         n = random.randint(40, 60) # Fewer embers for speed
         for _ in range(n):
             ang = random.uniform(0, math.tau)
-            spd = random.gauss(4.5, 1.8)
+            spd = random.gauss(4.5 / self.RES_DIV, 1.8 / self.RES_DIV)
             vx  = math.cos(ang) * spd
-            vy  = math.sin(ang) * spd * 0.85 - random.uniform(0, 1.5)
+            vy  = math.sin(ang) * spd * 0.85 - random.uniform(0, 1.5 / self.RES_DIV)
             life = random.randint(30, 60) # Shorter life
             h    = (hue + random.uniform(-0.09, 0.09)) % 1.0
-            r    = random.randint(1, 3) # Smaller embers
+            r    = max(1, random.randint(1, 3) // self.RES_DIV)
             self._embers.append([x, y, vx, vy, h, r, life, life])
 
     # ── main draw ─────────────────────────────────────────────────────────────
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H  = config.WIDTH, config.HEIGHT
+        W, H  = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         bass  = float(np.mean(fft[:6]))
         self._hue = (self._hue + 0.0015 + bass * 0.002) % 1.0
 
@@ -95,7 +96,7 @@ class Vortex(Effect):
         zoom    = self._BASE_ZOOM + t * (self._BEAT_ZOOM - self._BASE_ZOOM) + bass * 0.002
         rot_deg = self._BASE_ROT  + t * (self._BEAT_ROT  - self._BASE_ROT)
 
-        # Optimize: rotozoom is expensive, but necessary for the effect
+        # Optimize: rotozoom is expensive, but faster at lower res
         rotated = pygame.transform.rotozoom(self._trail, rot_deg, zoom)
         rw, rh  = rotated.get_size()
         self._trail.fill((0, 0, 0))
@@ -108,7 +109,7 @@ class Vortex(Effect):
         live = []
         for rk in self._rockets:
             x, y, vx, vy, hue, trail = rk
-            vy += _GRAV
+            vy += _GRAV / self.RES_DIV
             vx *= _DRAG
             x += vx; y += vy
             # Thinned trail for performance
@@ -120,7 +121,7 @@ class Vortex(Effect):
 
             # Draw rocket trail core only
             if trail:
-                pygame.draw.circle(self._trail, hsl(hue, l=0.8), trail[-1], 2)
+                pygame.draw.circle(self._trail, hsl(hue, l=0.8), trail[-1], 1)
 
             if vy >= 0 or y < -20:
                 self._explode(x, y, hue)
@@ -132,17 +133,19 @@ class Vortex(Effect):
         live = []
         for em in self._embers:
             x, y, vx, vy, hue, radius, life, max_life = em
-            vy += _GRAV
+            vy += _GRAV / self.RES_DIV
             vx *= _DRAG
             vy *= _DRAG
             x += vx; y += vy
             em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life - 1
             if life > 0 and -40 < x < W + 40 and y < H + 40:
                 brightness = 0.4 + (life / max_life) * 0.5
-                # Smaller radius for speed
                 pygame.draw.circle(self._trail, hsl(hue, l=brightness),
                                    (int(x), int(y)), radius)
                 live.append(em)
         self._embers = live
 
-        surf.blit(self._trail, (0, 0))
+        if self.RES_DIV > 1:
+            surf.blit(pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT)), (0, 0))
+        else:
+            surf.blit(self._trail, (0, 0))

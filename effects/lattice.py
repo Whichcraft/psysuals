@@ -18,15 +18,16 @@ _IDLE = 0.08
 
 class Lattice(Effect):
     TRAIL_ALPHA = 0 # Managed by internal surface
+    RES_DIV     = 2 # Render at 1/2 resolution
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         self._surf = pygame.Surface((W, H))
         self._surf.fill((0, 0, 0))
         self._hue = 0.52
         self._shock_r = 9999.0
-        self._shock_spd = 6.0
+        self._shock_spd = 6.0 / self.RES_DIV
         self._beat_prev = 0.0
         self._scale = 1.0
         self._svel = 0.0
@@ -57,7 +58,7 @@ class Lattice(Effect):
         return int(col / (_COLS - 1) * min(fft_len - 1, int(fft_len * _FFT_USE)))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         fft_len = len(fft)
         bass = float(np.mean(fft[:6]))
         mid = float(np.mean(fft[6:30]))
@@ -74,7 +75,7 @@ class Lattice(Effect):
         self._svel *= 0.70
         self._scale = max(0.90, min(self._scale + self._svel, 1.12))
 
-        # Feedback loop
+        # Feedback loop at lower res
         rotated = pygame.transform.rotozoom(self._surf, 0.5 + beat * 2.0, 1.0 + bass * 0.01)
         rw, rh = rotated.get_size()
         self._surf.fill((0, 0, 0))
@@ -92,7 +93,7 @@ class Lattice(Effect):
             sx_arr[ni], sy_arr[ni] = sx, sy
             energy = float(fft[self._bin(nd['col'], fft_len)]) + _IDLE
             dist = math.hypot(sx - cx, sy - cy)
-            shock = max(0.0, 1.0 - abs(dist - self._shock_r) / _SHOCK_W)
+            shock = max(0.0, 1.0 - abs(dist - self._shock_r) / (_SHOCK_W / self.RES_DIV))
             bright[ni] = min(energy + shock * (0.6 + bass * 0.4), 1.6)
 
         # Draw Beams
@@ -124,4 +125,7 @@ class Lattice(Effect):
                 pygame.draw.circle(self._surf, hsl(hue, l=min(b * 0.6 + 0.15, 0.95)),
                                    (int(sx_arr[ni]), int(sy_arr[ni])), r)
 
-        surf.blit(self._surf, (0, 0))
+        if self.RES_DIV > 1:
+            surf.blit(pygame.transform.scale(self._surf, (config.WIDTH, config.HEIGHT)), (0, 0))
+        else:
+            surf.blit(self._surf, (0, 0))

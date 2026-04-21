@@ -31,10 +31,17 @@ import atexit
 import os
 import sys
 import time as _time
+import signal
+import subprocess
 from collections import deque
 
 import numpy as np
 import pygame
+
+try:
+    import moderngl
+except ImportError:
+    moderngl = None
 
 import config
 import settings as sett
@@ -49,6 +56,7 @@ _BG_MODES = 9
 
 class VisualizerApp:
     def __init__(self):
+        self._setup_signals()
         self.args = self._parse_args()
         self.settings = sett.load()
         
@@ -56,7 +64,7 @@ class VisualizerApp:
         self.audio = AudioEngine()
         
         self._init_display()
-        self.ui = UIManager() # Init UI after display for font loading
+        self.ui = UIManager()
         self._init_audio()
         
         self.mode_idx = min(self.settings.get("mode_idx", 0), len(MODES) - 1)
@@ -111,11 +119,32 @@ class VisualizerApp:
         
         atexit.register(self.display.kill_children)
 
+    def _setup_signals(self):
+        def _sig_handler(sig, frame):
+            self._quit()
+        signal.signal(signal.SIGINT, _sig_handler)
+        signal.signal(signal.SIGTERM, _sig_handler)
+
     def _parse_args(self):
-        parser = argparse.ArgumentParser(description="psysuals music visualizer")
-        parser.add_argument("--display", type=int, default=None)
-        parser.add_argument("--mode", type=int, default=None)
-        parser.add_argument("--gl", action="store_true")
+        desc = "psysuals — The Ultimate Psychedelic Music Visualizer v" + __version__ + "\n\n"
+        desc += "Controls:\n"
+        desc += "  Space / Click   Cycle modes\n"
+        desc += "  1-9             Jump to mode\n"
+        desc += "  Arrows          Intensity / Settings / Modes\n"
+        desc += "  Tab             Toggle settings pane\n"
+        desc += "  F               Toggle fullscreen\n"
+        desc += "  H / Shift+H     HUD visibility / Detail\n"
+        desc += "  M / Shift+M     Tap Tempo / Span Mode\n"
+        desc += "  D               Device picker / Span cycle\n"
+        desc += "  Q / Esc         Quit"
+        
+        parser = argparse.ArgumentParser(
+            description=desc,
+            formatter_class=argparse.RawDescriptionHelpFormatter
+        )
+        parser.add_argument("-d", "--display", type=int, default=None, help="Target display index")
+        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index")
+        parser.add_argument("-g", "--gl", action="store_true", help="Enable ModernGL hardware acceleration")
         parser.add_argument("--span-child", action="store_true", help=argparse.SUPPRESS)
         return parser.parse_args()
 
@@ -135,9 +164,9 @@ class VisualizerApp:
         self.audio.open_input_stream(active_dev, None)
 
     def _make_fade(self, alpha: int):
-        surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-        surf.set_alpha(alpha)
-        surf.fill((0, 0, 0))
+        # Use SRCALPHA for the UI layer surface to allow layering over GL
+        surf = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
+        surf.fill((0, 0, 0, alpha))
         return surf
 
     def _quit(self):
@@ -198,7 +227,6 @@ class VisualizerApp:
             if self.args.gl and self.display.renderer:
                 self.display.renderer.ctx.screen.use()
                 self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
-                # Ensure blend is off before the main effect draws (effects may enable it)
                 self.display.renderer.ctx.disable(moderngl.BLEND)
 
             self._render()
@@ -399,7 +427,11 @@ class VisualizerApp:
             self.fade_alpha = new_alpha
             self.fade = self._make_fade(self.fade_alpha)
             
-        target.blit(self.fade, (0, 0))
+        # In GL mode, we ONLY apply the fade if NOT using a pure GL effect.
+        # Otherwise, the fade (black blit) will hide the GL rendering.
+        is_gl_effect = self.args.gl and getattr(self.vis, "renderer", None) is not None
+        if not is_gl_effect:
+            target.blit(self.fade, (0, 0))
         
         if self.bg_on:
             self.bg_surf.fill((0, 0, 0))
