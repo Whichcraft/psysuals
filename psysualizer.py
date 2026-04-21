@@ -74,6 +74,9 @@ class VisualizerApp:
         self.name, self.VisCls = MODES[self.mode_idx]
         self.vis = self.VisCls(renderer=self.display.renderer)
         
+        # Initialize target resolution based on effect
+        self._update_target_res()
+        
         self.bg_on = self.settings.get("bg_on", False)
         self.bg_mode_i = self.settings.get("bg_mode_i", 0) % _BG_MODES
         self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
@@ -163,9 +166,24 @@ class VisualizerApp:
             active_dev = None
         self.audio.open_input_stream(active_dev, None)
 
+    def _update_target_res(self):
+        div = 1
+        if hasattr(self, "vis"):
+            div = getattr(self.vis, "RES_DIV", 1)
+        
+        if not self.args.gl:
+            self.display.target = self.display.screen
+            return
+
+        tw, th = config.WIDTH // div, config.HEIGHT // div
+        if self.display.target is None or self.display.target.get_size() != (tw, th):
+            self.display.target = pygame.Surface((tw, th), pygame.SRCALPHA)
+            self.fade = self._make_fade(self.fade_alpha)
+
     def _make_fade(self, alpha: int):
-        # Use SRCALPHA for the UI layer surface to allow layering over GL
-        surf = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
+        # Use local target dimensions
+        tw, th = self.display.target.get_size()
+        surf = pygame.Surface((tw, th), pygame.SRCALPHA)
         surf.fill((0, 0, 0, alpha))
         return surf
 
@@ -207,6 +225,7 @@ class VisualizerApp:
         self.name, self.VisCls = MODES[self.mode_idx]
         self.vis = self.VisCls(renderer=self.display.renderer)
         self.effect_gain = config.DEFAULT_EFFECT_GAIN
+        self._update_target_res()
 
     def _rebuild_effects(self):
         if hasattr(self.vis, "release") and callable(self.vis.release):
@@ -217,13 +236,13 @@ class VisualizerApp:
         self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
         self.bg_vis = self.bg_cls(renderer=self.display.renderer)
         self.bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+        self._update_target_res()
 
     def run(self):
         while True:
             self._handle_events()
             self._update()
             
-            # Clear GL screen at start of frame
             if self.args.gl and self.display.renderer:
                 self.display.renderer.ctx.screen.use()
                 self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
@@ -265,7 +284,6 @@ class VisualizerApp:
                 elif event.key == pygame.K_f:
                     self.display.toggle_fullscreen()
                     self._rebuild_effects()
-                    self.fade = self._make_fade(self.fade_alpha)
                 elif event.key == pygame.K_h:
                     if event.mod & pygame.KMOD_SHIFT:
                         self.hud_level = (self.hud_level + 1) % 3
@@ -411,7 +429,6 @@ class VisualizerApp:
         
         self.display.reposition_window_fix(self.tick)
 
-        # Unified exit: if any child window is closed/ESC'd, parent quits too
         if self.span_mode:
             for child in self.display.span_children.values():
                 if child.poll() is not None:
@@ -427,8 +444,6 @@ class VisualizerApp:
             self.fade_alpha = new_alpha
             self.fade = self._make_fade(self.fade_alpha)
             
-        # In GL mode, we ONLY apply the fade if NOT using a pure GL effect.
-        # Otherwise, the fade (black blit) will hide the GL rendering.
         if not (self.args.gl and self.vis.IS_GL):
             target.blit(self.fade, (0, 0))
         
@@ -441,11 +456,13 @@ class VisualizerApp:
         self.vis.draw(target, self.waveform, self.fft, self.draw_beat, self.tick)
         
         if self.prev_surf:
+            tw, th = target.get_size()
+            scaled_prev = pygame.transform.scale(self.prev_surf, (tw, th))
             frames = max(1, int(self.cf_frames))
             t = self.crossfade_frame / frames
             ease = t * t * (3.0 - 2.0 * t)
-            self.prev_surf.set_alpha(int(255 * (1.0 - ease)))
-            target.blit(self.prev_surf, (0, 0))
+            scaled_prev.set_alpha(int(255 * (1.0 - ease)))
+            target.blit(scaled_prev, (0, 0))
             self.crossfade_frame += 1
             if self.crossfade_frame >= frames:
                 self.prev_surf = None

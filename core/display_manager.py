@@ -137,9 +137,6 @@ class DisplayManager:
                 self.renderer = None
         
         self.target = self.screen
-        if self.args.gl and self.renderer:
-            self.target = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-            
         return self.screen
 
     def toggle_fullscreen(self):
