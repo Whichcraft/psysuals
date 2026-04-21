@@ -12,6 +12,8 @@ Android / headless path:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 try:
@@ -29,6 +31,7 @@ class GLRenderer:
 
     # Two triangles as a strip covering clip space [-1,1]²
     _QUAD = np.array([-1, -1,  1, -1,  -1, 1,  1, 1], dtype="f4")
+    _SHADER_DIR = Path(__file__).resolve().parent / "effects" / "shaders"
 
     def __init__(self, width: int, height: int, ctx: "moderngl.Context | None" = None):
         if not HAS_MODERNGL:
@@ -37,6 +40,7 @@ class GLRenderer:
         self.height = height
         self.ctx    = ctx if ctx is not None else moderngl.create_context()
         self._vbo   = self.ctx.buffer(self._QUAD.tobytes())
+        self._program_cache: dict[tuple[str, str], tuple] = {}
 
     # ── Shader helpers ────────────────────────────────────────────────────────
 
@@ -49,6 +53,29 @@ class GLRenderer:
         prog = self.ctx.program(vertex_shader=vert, fragment_shader=frag)
         vao  = self.ctx.vertex_array(prog, [(self._vbo, "2f", "in_vert")])
         return prog, vao
+
+    def shader_asset(self, name: str) -> str:
+        """Load a tracked GLSL asset from effects/shaders/."""
+        path = self._SHADER_DIR / name
+        return path.read_text(encoding="utf-8")
+
+    def asset_program(self, vert_name: str, frag_name: str) -> tuple:
+        """Compile and cache a shader program from tracked asset files."""
+        key = (vert_name, frag_name)
+        if key not in self._program_cache:
+            self._program_cache[key] = self.program(
+                self.shader_asset(vert_name),
+                self.shader_asset(frag_name),
+            )
+        return self._program_cache[key]
+
+    def line_program(self) -> tuple:
+        """Return the shared line shader pair from effects/shaders/."""
+        return self.asset_program("line.vert", "line.frag")
+
+    def rect_program(self) -> tuple:
+        """Return the shared rect shader pair from effects/shaders/."""
+        return self.asset_program("rect.vert", "rect.frag")
 
     # ── Render helpers ────────────────────────────────────────────────────────
 

@@ -5,6 +5,26 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **`requirements-gl.txt`** — optional GL dependency set for `psysualizer_gl.py`, keeping the CPU app install separate from the `moderngl` proof of concept
+
+### Changed
+- **Span mode** — the primary instance now spawns one child process for every non-primary monitor instead of assuming a fixed two-display layout
+- **GL shader assets** — `gl_renderer.py` now owns loading the tracked GLSL files under `effects/shaders/`
+
+### Fixed
+- **Saved display selection** — `display_idx` is now restored from settings on startup unless `--display N` overrides it
+- **No-input startup and device switching** — failure to open the saved or default input device now degrades to a live silent mode instead of aborting the app
+- **Background effect rebuild on display changes** — fullscreen toggles now recreate the background visualiser as well as the foreground one, avoiding stale cached geometry and surfaces
+- **Span-child recursion** — child windows launched by span mode no longer recursively enter span mode themselves
+
+### Removed
+- **Dead Particles module** — removed the unregistered `effects/rhythmic_particles.py` file so the shipped effect tree matches the live registry
+
+---
+
 ## [2.15.0] — 2026-04-21
 
 ### Added

@@ -17,6 +17,8 @@ All effects consume the same shared audio signals. They differ only in how they 
 
 `effect_gain` scales only the foreground beat response. Current default is `0.7`, and changing modes resets it back to that default.
 
+If no audio input stream is available, the app stays up and the effects simply run against silence until a device is selected.
+
 Common band splits used in most effects:
 
 | Band | Bins | Typical role |
@@ -192,7 +194,7 @@ A scrolling spectrogram stores recent history as rows, with hue encoding frequen
 | `↑` / `↓` | Adjust intensity for the current mode (`0.0 .. 2.0`) |
 | `Tab` | Open the settings pane |
 | `P` / `Shift+P` | Save / load presets |
-| `D` | Open the device picker |
+| `D` | Open the device picker, or cycle the shared secondary-display mode while span mode is active |
 | `F` | Toggle fullscreen |
 | `H` / `Shift+H` | Toggle HUD / change HUD detail |
 | `Q` / `Esc` | Quit |

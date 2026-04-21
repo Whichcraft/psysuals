@@ -19,8 +19,8 @@ Ranked on 2026-04-21 from `codebot-test` (`~/bin/codebot.sh -s`) plus local veri
    - Evidence: `ARCHITECTURE.md` still describes older file sizes, `config.py` defaults, and effect counts that no longer match the repo.
 
 5. Pin or constrain runtime dependencies (`P1`)
-   - Add tested version ranges for `pygame`, `sounddevice`, `moderngl`, and `PyOpenGL`, and document the supported Python/runtime matrix.
-   - Evidence: `requirements.txt` currently contains unpinned top-level packages only.
+   - Add tested version ranges for `pygame`, `sounddevice`, and `librosa`, and document the optional GL extra in `requirements-gl.txt`.
+   - Evidence: `requirements.txt` and `requirements-gl.txt` currently contain unpinned top-level packages only.
 
 6. Break `psysualizer.py` into smaller modules (`P1`)
    - Extract audio analysis, display/window management, HUD/input handling, and mode switching into separate units.

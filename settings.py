@@ -10,7 +10,14 @@ _PRESETS_FILE  = os.path.join(_CONFIG_DIR, "presets.json")
 _DEFAULTS = {
     "active_dev": None,
     "mode_idx": 0,
+    "display_idx": 0,
     "show_hud": True,
+    "hud_level": 2,
+    "auto_gain": False,
+    "bg_on": False,
+    "bg_mode_i": 0,
+    "bg_alpha": 102,
+    "cf_frames": 45,
 }
 
 
