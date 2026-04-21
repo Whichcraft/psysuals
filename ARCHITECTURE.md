@@ -8,9 +8,10 @@ beat_tracking.py ← optional librosa beat/BPM refinement, off the render thread
 config.py        ← shared mutable runtime state
 effects/         ← one file per effect, registered in MODES
 psysualizer_gl.py← experimental moderngl proof-of-concept
+requirements-gl.txt ← optional dependency set for the GL path
 ```
 
-`psysualizer.py` owns the runtime: audio capture, beat/BPM extraction, device selection, mode switching, span mode, HUD, and render orchestration. Visual logic stays inside `effects/`.
+`psysualizer.py` owns the runtime: audio capture, beat/BPM extraction, device selection, saved display restoration, span mode, HUD, and render orchestration. Visual logic stays inside `effects/`.
 
 ---
 
@@ -33,6 +34,8 @@ get_audio()
 ```
 
 The callback stays cheap and deterministic. It computes the always-available fallback beat/BPM path and pushes raw audio into `LibrosaBeatTracker`.
+
+Input-stream startup is tolerant now: the app tries the saved device first, then the default device, and if both fail it keeps running with no live input stream so the UI can still come up.
 
 `beat_tracking.py` is an optional refinement layer:
 
@@ -72,6 +75,17 @@ Each frame in `psysualizer.py`:
 10. `pygame.display.flip()` and `clock.tick(config.FPS)`.
 
 Mode switches recreate the effect instance and reset foreground intensity to `config.DEFAULT_EFFECT_GAIN`.
+
+Fullscreen/display changes also recreate the background effect so display-bound caches stay aligned with the new geometry.
+
+---
+
+## Display and Span Mode
+
+- Startup display selection comes from saved settings unless `--display N` overrides it.
+- On multi-monitor setups, the primary process can enter span mode and spawn one child process for every *other* monitor.
+- Child windows are launched with `--span-child`, so they never recursively create more span children.
+- `A` / `D` in span mode change the shared secondary-display mode across all spawned child windows.
 
 ---
 
@@ -161,6 +175,8 @@ Rules that matter in this repo:
 | `effects/palette.py` | shared hue/saturation/lightness palette driven by audio |
 | `settings.py` | persistent settings and preset storage under `~/.config/psysuals/` |
 | `gl_renderer.py` | moderngl helper for the experimental GL path |
+| `effects/shaders/` | tracked GLSL assets loaded by `gl_renderer.py` |
+| `requirements-gl.txt` | optional dependency set for the GL path |
 
 ---
 
@@ -168,8 +184,10 @@ Rules that matter in this repo:
 
 | File | Lines | Role |
 |------|-------|------|
-| `psysualizer.py` | `893` | main runtime |
+| `psysualizer.py` | `961` | main runtime |
 | `config.py` | `20` | shared runtime state |
 | `effects/__init__.py` | `40` | mode registry |
 | `effects/utils.py` | `27` | colour helpers |
+| `gl_renderer.py` | `110` | GL helper and shader-asset loader |
+| `settings.py` | `72` | settings and preset persistence |
 | `effects/*.py` | `18` modes + shared helpers | visual implementations |

@@ -187,8 +187,13 @@ def get_audio():
 
 def _input_devices() -> list[tuple[int, str]]:
     """Return list of (index, name) for all input-capable devices."""
+    try:
+        queried = sd.query_devices()
+    except Exception:
+        return []
+
     devices = []
-    for idx, device in enumerate(sd.query_devices()):
+    for idx, device in enumerate(queried):
         if device["max_input_channels"] > 0:
             devices.append((idx, device["name"]))
     return devices
@@ -205,6 +210,11 @@ def _draw_device_picker(screen, font, devices, selected, active_idx) -> None:
         (200, 200, 200),
     )
     screen.blit(title, (40, 30))
+
+    if not devices:
+        empty = font.render("No input devices available", True, (180, 180, 180))
+        screen.blit(empty, (40, 80))
+        return
 
     row_h = 28
     y0 = 80
@@ -299,8 +309,8 @@ def main() -> None:
     parser.add_argument(
         "--display",
         type=int,
-        default=0,
-        help="Display index to open on (default: 0)",
+        default=None,
+        help="Display index to open on (defaults to saved setting)",
     )
     parser.add_argument(
         "--mode",
@@ -308,11 +318,21 @@ def main() -> None:
         default=None,
         help="Start on this mode index (overrides saved setting)",
     )
+    parser.add_argument(
+        "--span-child",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args()
+
+    settings = sett.load()
 
     xmonitors = _xrandr_monitors()
     num_displays = max(len(xmonitors), 1)
-    display_idx = max(0, min(args.display, num_displays - 1))
+    requested_display = (
+        settings.get("display_idx", 0) if args.display is None else args.display
+    )
+    display_idx = max(0, min(requested_display, num_displays - 1))
 
     _install_x11_error_handler()
     pygame.init()
@@ -352,20 +372,43 @@ def main() -> None:
     font = pygame.font.SysFont("monospace", 16)
     font_s = pygame.font.SysFont("monospace", 14)
 
-    settings = sett.load()
     devices = _input_devices()
     active_dev = settings["active_dev"]
     if active_dev is not None and active_dev not in [d[0] for d in devices]:
         active_dev = None
 
-    stream = sd.InputStream(
-        samplerate=config.SAMPLE_RATE,
-        blocksize=config.BLOCK_SIZE,
-        channels=config.CHANNELS,
-        device=active_dev,
-        callback=_audio_cb,
-    )
-    stream.start()
+    def _start_input_stream(device_idx: int | None):
+        stream = sd.InputStream(
+            samplerate=config.SAMPLE_RATE,
+            blocksize=config.BLOCK_SIZE,
+            channels=config.CHANNELS,
+            device=device_idx,
+            callback=_audio_cb,
+        )
+        stream.start()
+        return stream
+
+    def _stop_input_stream(stream_obj) -> None:
+        if stream_obj is None:
+            return
+        try:
+            stream_obj.stop()
+        finally:
+            stream_obj.close()
+
+    def _open_input_stream(*candidates):
+        seen = []
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.append(candidate)
+            try:
+                return _start_input_stream(candidate), candidate
+            except Exception:
+                continue
+        return None, None
+
+    stream, active_dev = _open_input_stream(active_dev, None)
 
     mode_idx = min(settings["mode_idx"], len(MODES) - 1)
     if args.mode is not None:
@@ -377,7 +420,7 @@ def main() -> None:
     energy_hist = deque(maxlen=40)
     energy_sum = 0.0
     beat_decay = 0.0
-    dev_name_cache = {None: "default"}
+    dev_name_cache = {}
     picking = False
     pick_sel = 0
     effect_gain = config.DEFAULT_EFFECT_GAIN
@@ -414,46 +457,52 @@ def main() -> None:
     cf_frames = settings.get("cf_frames", _CROSSFADE_FRAMES)
 
     span_vis2_idx = (mode_idx + 1) % len(MODES)
-    span_child = None
+    span_children: dict[int, subprocess.Popen] = {}
 
-    def _spawn_span_child(mode_i: int):
-        child_idx = 1 - display_idx
-        return subprocess.Popen(
-            [
-                sys.executable,
-                os.path.abspath(__file__),
-                "--display",
-                str(child_idx),
-                "--mode",
-                str(mode_i),
-            ]
-        )
+    def _span_target_indices() -> list[int]:
+        return [idx for idx in range(num_displays) if idx != display_idx]
 
-    span_mode = len(xmonitors) >= 2 and display_idx == 0
+    def _spawn_span_children(mode_i: int) -> dict[int, subprocess.Popen]:
+        children = {}
+        for child_idx in _span_target_indices():
+            children[child_idx] = subprocess.Popen(
+                [
+                    sys.executable,
+                    os.path.abspath(__file__),
+                    "--display",
+                    str(child_idx),
+                    "--mode",
+                    str(mode_i),
+                    "--span-child",
+                ]
+            )
+        return children
+
+    span_mode = len(xmonitors) >= 2 and not args.span_child
     if span_mode:
-        span_child = _spawn_span_child(span_vis2_idx)
+        span_children = _spawn_span_children(span_vis2_idx)
 
-    def _kill_child() -> None:
-        nonlocal span_child
-        if span_child and span_child.poll() is None:
-            span_child.terminate()
-        span_child = None
+    def _kill_children() -> None:
+        nonlocal span_children
+        for child in span_children.values():
+            if child.poll() is None:
+                child.terminate()
+        span_children = {}
 
-    atexit.register(_kill_child)
+    atexit.register(_kill_children)
 
     def _quit() -> None:
-        _kill_child()
+        _kill_children()
         try:
             pygame.display.set_mode((1, 1))
         except Exception:
             pass
-        try:
-            stream.stop()
-        finally:
-            stream.close()
+        _stop_input_stream(stream)
         pygame.quit()
 
     def _save_settings() -> None:
+        if args.span_child:
+            return
         sett.save(
             {
                 "active_dev": active_dev,
@@ -477,6 +526,17 @@ def main() -> None:
 
     fade_alpha = 28
     fade = make_fade()
+
+    def _rebuild_display_bound_effects() -> None:
+        nonlocal vis, bg_name, bg_cls, bg_vis, bg_surf
+        if hasattr(vis, "release") and callable(vis.release):
+            vis.release()
+        if hasattr(bg_vis, "release") and callable(bg_vis.release):
+            bg_vis.release()
+        vis = VisCls()
+        bg_name, bg_cls = MODES[bg_mode_i]
+        bg_vis = bg_cls()
+        bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
 
     def _switch_mode(new_idx: int) -> None:
         nonlocal mode_idx, name, VisCls, vis, prev_surf, crossfade_frame, effect_gain
@@ -563,6 +623,10 @@ def main() -> None:
 
             if event.type == pygame.KEYDOWN:
                 if picking:
+                    if not devices:
+                        if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                            picking = False
+                        continue
                     if event.key == pygame.K_ESCAPE:
                         picking = False
                     elif event.key == pygame.K_UP:
@@ -572,17 +636,12 @@ def main() -> None:
                     elif event.key == pygame.K_RETURN:
                         new_idx = devices[pick_sel][0]
                         if new_idx != active_dev:
-                            stream.stop()
-                            stream.close()
-                            active_dev = new_idx
-                            stream = sd.InputStream(
-                                samplerate=config.SAMPLE_RATE,
-                                blocksize=config.BLOCK_SIZE,
-                                channels=config.CHANNELS,
-                                device=active_dev,
-                                callback=_audio_cb,
+                            old_stream = stream
+                            old_dev = active_dev
+                            _stop_input_stream(old_stream)
+                            stream, active_dev = _open_input_stream(
+                                new_idx, old_dev, None
                             )
-                            stream.start()
                         picking = False
                     continue
 
@@ -617,7 +676,7 @@ def main() -> None:
                 elif event.key == pygame.K_f:
                     if span_mode:
                         span_mode = False
-                        _kill_child()
+                        _kill_children()
                     else:
                         fullscreen = not fullscreen
                     screen = _open_display(display_idx, fullscreen)
@@ -625,8 +684,7 @@ def main() -> None:
                     prev_surf = None
                     crossfade_frame = 0
                     fade = make_fade(fade_alpha)
-                    vis = VisCls()
-                    bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+                    _rebuild_display_bound_effects()
                 elif event.key == pygame.K_h:
                     if shift:
                         hud_level = (hud_level - 1) % 3
@@ -637,8 +695,8 @@ def main() -> None:
                 elif event.key == pygame.K_d:
                     if span_mode:
                         span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
-                        _kill_child()
-                        span_child = _spawn_span_child(span_vis2_idx)
+                        _kill_children()
+                        span_children = _spawn_span_children(span_vis2_idx)
                     else:
                         devices = _input_devices()
                         picking = True
@@ -647,8 +705,8 @@ def main() -> None:
                 elif event.key == pygame.K_a:
                     if span_mode:
                         span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
-                        _kill_child()
-                        span_child = _spawn_span_child(span_vis2_idx)
+                        _kill_children()
+                        span_children = _spawn_span_children(span_vis2_idx)
                     else:
                         auto_gain = not auto_gain
                 elif event.key == pygame.K_b:
@@ -661,14 +719,16 @@ def main() -> None:
                         bg_on = not bg_on
                 elif event.key == pygame.K_m:
                     if shift:
+                        if args.span_child:
+                            continue
                         span_mode = not span_mode
                         if span_mode:
                             if num_displays >= 2:
-                                span_child = _spawn_span_child(span_vis2_idx)
+                                span_children = _spawn_span_children(span_vis2_idx)
                             else:
                                 span_mode = False
                         else:
-                            _kill_child()
+                            _kill_children()
                         prev_surf = None
                         crossfade_frame = 0
                     else:
@@ -805,9 +865,17 @@ def main() -> None:
 
         if show_hud:
             _draw_multiband_bars(beat, mid_e, treble_e)
-            if active_dev not in dev_name_cache:
-                dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
-            dev_name = dev_name_cache[active_dev]
+            if stream is None:
+                dev_name = "no input"
+            elif active_dev is None:
+                dev_name = "default"
+            else:
+                if active_dev not in dev_name_cache:
+                    try:
+                        dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
+                    except Exception:
+                        dev_name_cache[active_dev] = f"device {active_dev}"
+                dev_name = dev_name_cache[active_dev]
             gain_str = "auto" if auto_gain else f"{effect_gain:.1f}"
             bg_str = f"  bg:{bg_name}" if bg_on else ""
             disp_str = f"  disp:{display_idx}/{num_displays - 1}"

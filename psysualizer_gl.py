@@ -13,7 +13,7 @@ Controls:
     F           Toggle fullscreen
 
 Dependencies (beyond the normal requirements.txt):
-    pip install moderngl
+    pip install -r requirements-gl.txt
 """
 
 __version__ = "0.1.0-gl"
@@ -28,7 +28,7 @@ try:
     import moderngl          # noqa: F401 — import check before we go further
     import sounddevice as sd
 except ImportError as e:
-    raise SystemExit(f"Missing dependency: {e}\n  pip install moderngl pygame sounddevice")
+    raise SystemExit(f"Missing dependency: {e}\n  pip install -r requirements-gl.txt")
 
 import config
 from gl_renderer import GLRenderer

@@ -7,6 +7,18 @@ Real-time music visualizer — listens to audio input and renders animated visua
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all current effects and their audio reactions.
 
+## Current worktree updates
+
+These changes are in the current worktree and docs, but are not yet released as a new tagged version:
+
+- **Saved display selection works again** — `display_idx` is now restored from settings on startup unless `--display N` overrides it.
+- **Span mode scales beyond two monitors** — the primary instance now spawns one child process per *other* monitor, and `A` / `D` cycle the shared secondary-screen mode across all spawned children.
+- **No-input startup is safe** — if no audio capture device is available, the app stays up in silent mode, the HUD shows `no input`, and you can attach or choose a device later with `D`.
+- **GL extras are split cleanly** — `requirements.txt` covers the CPU app, while `requirements-gl.txt` installs the optional `moderngl` path used by `psysualizer_gl.py`.
+- **Tracked shader assets are owned by the GL helper** — `gl_renderer.py` now loads the checked-in GLSL files under `effects/shaders/`.
+
+---
+
 ## What's new in v2.15.0 — beat tracking stability + restored core effects
 
 ### Smarter beat/BPM refinement without blocking the visuals
@@ -55,9 +67,9 @@ Previous approaches (`pygame.FULLSCREEN + display=N`, `SDL_VIDEO_FULLSCREEN_DISP
 ## What's new in v2.11.0 — subprocess span mode + butterfly wander breaks
 
 ### Span mode rewrite (subprocess approach)
-`Shift+M` on a multi-monitor setup now spawns a **second `psysualizer.py` process** with `--display 1 --mode <idx>`, giving each monitor its own true fullscreen SDL window. This replaces the single-NOFRAME-window hacks that could never reliably position content on specific physical monitors in SDL2.
+`Shift+M` on a multi-monitor setup now spawns **child `psysualizer.py` process(es)** on the other monitor(s), giving each display its own true fullscreen SDL window. This replaces the single-NOFRAME-window hacks that could never reliably position content on specific physical monitors in SDL2.
 
-`A` / `D` in span mode terminate and respawn the child process with the updated mode index. A new `--mode N` CLI argument lets any instance start on a specific effect.
+`A` / `D` in span mode terminate and respawn the child process set with the updated mode index. A new `--mode N` CLI argument lets any instance start on a specific effect.
 
 ### Butterfly wander breaks
 While a butterfly pair is in its mutual love orbit, it now **periodically breaks free** (every 15–30 s) for a short independent wander (3–8 s) before the orbit resumes. On reunion the orbit radius expands slightly so they spiral back in naturally.
@@ -71,12 +83,12 @@ A new GPU-accelerated rendering path sits alongside the existing pygame CPU path
 
 `effects/plasma_gl.py` is the first effect ported: the four-wave interference plasma runs as a GLSL fragment shader, evaluated per pixel on the GPU instead of in a numpy CPU loop. `psysualizer_gl.py` is the standalone GL entry point (pygame OpenGL window).
 
-Install the extra dependency: `pip install moderngl` (or `sudo apt install python3-moderngl`), then run `python psysualizer_gl.py`.
+Current install path for the GL proof of concept: `pip install -r requirements-gl.txt`, then run `python psysualizer_gl.py`.
 
 ### Dual-screen span mode
-On multi-monitor setups, `Shift+M` now runs **two independent effect instances** — one per physical screen — split at the real monitor boundary (detected via `pygame.display.get_desktop_sizes()`). Both halves receive the same audio data each frame but maintain completely separate visual state. On a single monitor, span mode behaves as before (one effect, NOFRAME full-screen).
+On multi-monitor setups, `Shift+M` now runs **independent effect instances across the attached screens**. Each window receives the same audio data each frame but maintains separate visual state. On a single monitor, span mode behaves as before (one effect, NOFRAME full-screen).
 
-Use `A` / `D` while in span mode to cycle the right-screen effect independently.
+Use `A` / `D` while in span mode to cycle the shared secondary-screen effect.
 
 ### F-key fix in span mode
 Pressing `F` while in span mode now exits span mode and returns to the previous fullscreen state instead of also toggling the fullscreen flag.
@@ -228,11 +240,18 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
+**Optional GL proof of concept:**
+```bash
+.venv/bin/pip install -r requirements-gl.txt
+```
+
 ## Usage
 
 ```bash
 .venv/bin/python psysualizer.py
 ```
+
+The app restores the last saved display index on startup. Use `--display N` to override that for a single launch.
 
 ### Controls
 
@@ -244,12 +263,12 @@ python3 -m venv .venv
 | `Tab` | Toggle real-time settings pane (effect gain, bg alpha, crossfade length) |
 | `P` | Save current state as a preset |
 | `Shift+P` | Cycle through saved presets |
-| `A` | Toggle auto-gain (auto-scales beat to current volume) · in span mode: cycle right-screen effect backward |
+| `A` | Toggle auto-gain (auto-scales beat to current volume) · in span mode: cycle the shared secondary-display effect backward |
 | `B` | Toggle background layer (renders a second effect at configurable opacity behind the active one) |
 | `Shift+B` | Cycle background effect (modes 1–9) |
 | `M` | Tap tempo — tap 2+ times to lock BPM for 8 s |
-| `Shift+M` | Toggle span mode — single monitor: one effect NOFRAME full-screen; multi-monitor: independent effect per screen |
-| `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) · in span mode: cycle right-screen effect forward |
+| `Shift+M` | Toggle span mode — single monitor: one effect NOFRAME full-screen; multi-monitor: one child process per other display |
+| `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) · in span mode: cycle the shared secondary-display effect forward |
 | `F` | Toggle fullscreen (effects re-render at native resolution) |
 | `H` | Toggle HUD on / off |
 | `Shift+H` | Cycle HUD detail: full → minimal → off |
@@ -260,6 +279,8 @@ Changing modes with `←` / `→`, `Space`, number keys, or mouse click resets i
 ## Selecting an audio input device
 
 Press `D` while running to open the interactive device picker. Use `↑`/`↓` to navigate the list of available input devices, `Enter` to switch, `Esc` to cancel. The active device is shown in the HUD at the top of the screen.
+
+If no input device is available at startup, psysuals stays open in silent mode instead of crashing. The HUD shows `no input` until a device is selected successfully.
 
 To visualise music playing through your speakers rather than a microphone, first set up a loopback device on your OS:
 
@@ -273,7 +294,7 @@ Then press `D` in-app and select it from the list.
 
 ## How it works
 
-1. `sounddevice` streams raw mono PCM from the selected input device in 1 024-sample blocks at 44.1 kHz.
+1. `sounddevice` streams raw mono PCM from the selected input device in 1 024-sample blocks at 44.1 kHz. If no input stream can be opened, the app continues running against silence until a device is selected later.
 2. The audio callback applies a Blackman-windowed FFT, `log1p` scaling, and exponential smoothing (`α = 0.50`) to produce the shared spectrum used by every effect.
 3. The same callback computes a low-latency raw beat signal from spectral flux in bass bins `0..19`, plus fallback BPM from onset timestamps and independent mid / treble energy tracks.
 4. `beat_tracking.py` optionally buffers recent audio and runs `librosa` onset / beat analysis on a background thread. The render loop reads cached BPM estimates immediately and never blocks waiting for that heavier analysis.
@@ -291,6 +312,7 @@ psysuals/
 ├── settings.py               # User settings persistence (~/.config/psysuals/settings.json)
 ├── psysualizer_gl.py         # Experimental moderngl entry point
 ├── gl_renderer.py            # Shared moderngl renderer utilities
+├── requirements-gl.txt       # Optional moderngl dependency set for psysualizer_gl.py
 ├── effects/
 │   ├── __init__.py           # MODES list and package re-exports
 │   ├── utils.py              # Shared colour helpers: hsl(), _hsl_batch()
@@ -313,7 +335,8 @@ psysuals/
 │   ├── lattice.py            # Lattice effect
 │   ├── spectrum.py           # Spectrum (Bars) effect
 │   ├── waterfall.py          # Waterfall effect
-│   └── plasma_gl.py          # Shader-driven Plasma prototype
+│   ├── plasma_gl.py          # Shader-driven Plasma prototype
+│   └── shaders/              # Tracked GLSL assets used by the GL helper path
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects
 ├── requirements.txt
