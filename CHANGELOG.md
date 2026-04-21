@@ -7,20 +7,29 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.16.0] — 2026-04-21
+
 ### Added
-- **`requirements-gl.txt`** — optional GL dependency set for `psysualizer_gl.py`, keeping the CPU app install separate from the `moderngl` proof of concept
+- **Unified ModernGL architecture** — `psysualizer.py` now supports both CPU (Pygame) and GPU (ModernGL) rendering via the `--gl` flag
+- **GL/UI Compositing** — UI elements (HUD, pane, picker) are now rendered as textures and blitted over OpenGL content in GL mode
+- **`smoke_test.py`** — automated instantiation and import check for all 18 effects
+- **`requirements-gl.txt`** — optional GL dependency set for the ModernGL path
 
 ### Changed
+- **Effect Contract** — all effects now inherit from a base `Effect` class and accept an optional `renderer`
 - **Span mode** — the primary instance now spawns one child process for every non-primary monitor instead of assuming a fixed two-display layout
 - **GL shader assets** — `gl_renderer.py` now owns loading the tracked GLSL files under `effects/shaders/`
+- **Plasma** — now uses `PlasmaGL` by default, providing hardware acceleration with a transparent CPU fallback
 
 ### Fixed
+- **Process Termination** — app and all span-mode children now exit immediately and reliably on `Esc` or `Q`
 - **Saved display selection** — `display_idx` is now restored from settings on startup unless `--display N` overrides it
 - **No-input startup and device switching** — failure to open the saved or default input device now degrades to a live silent mode instead of aborting the app
 - **Background effect rebuild on display changes** — fullscreen toggles now recreate the background visualiser as well as the foreground one, avoiding stale cached geometry and surfaces
 - **Span-child recursion** — child windows launched by span mode no longer recursively enter span mode themselves
 
 ### Removed
+- **`psysualizer_gl.py`** — redundant experimental entry point removed in favour of the unified `--gl` flag
 - **Dead Particles module** — removed the unregistered `effects/rhythmic_particles.py` file so the shipped effect tree matches the live registry
 
 ---

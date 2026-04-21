@@ -334,7 +334,8 @@ class Butterflies(Effect):
     #   semi-transparent black at alpha 22 → multiply by (255-22)/255 ≈ 233/255
     _FADE_FILL  = (233, 233, 233)
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
         self._tick       = 0
         self._global_hue = random.random()

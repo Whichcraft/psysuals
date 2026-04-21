@@ -2,21 +2,18 @@
 
 Ranked on 2026-04-21 from `codebot-test` (`~/bin/codebot.sh -s`) plus local verification.
 
-1. Restore a runnable `psysualizer.py` (`P0`)
-   - Fix the current `IndentationError` and replace scaffold placeholders with real code or remove them.
-   - Evidence: `.venv/bin/python -m py_compile psysualizer.py` currently fails on line 336, and the file still contains placeholder sections like `# ... other imports ...` and `# ... (audio processing logic) ...`.
+1. ~~Restore a runnable `psysualizer.py` (`P0`)~~ [DONE]
+   - Unified entrypoint is runnable and placeholders removed.
 
-2. Resolve the split pygame/ModernGL architecture (`P0`)
-   - Choose a stable rendering contract for the desktop app, then align `psysualizer.py`, `psysualizer_gl.py`, and `gl_renderer.py` around it.
-   - Evidence: the main path currently mixes pygame surface rendering with GL-context assumptions, while the standalone GL proof of concept already exists separately.
+2. ~~Resolve the split pygame/ModernGL architecture (`P0`)~~ [DONE]
+   - Aligned around a stable rendering contract; `psysualizer.py --gl` handles both paths.
 
-3. Add a smoke-test gate for entrypoints and effects (`P0`)
-   - Add automated checks for `py_compile`, import smoke tests, and basic effect-registry invariants so broken entrypoints do not land unnoticed.
-   - Evidence: the repo currently has a hard syntax break in the primary entrypoint, while the rest of the Python files still compile.
+3. ~~Add a smoke-test gate for entrypoints and effects (`P0`)~~ [DONE]
+   - Added `smoke_test.py` for automated instantiation and import checks.
 
 4. Refresh stale architecture and user docs (`P1`)
-   - Update `ARCHITECTURE.md`, `README.md`, and related docs to match the current mode count, config defaults, and renderer status.
-   - Evidence: `ARCHITECTURE.md` still describes older file sizes, `config.py` defaults, and effect counts that no longer match the repo.
+   - Update `ARCHITECTURE.md`, `README.md`, and related docs to match the current mode count, config defaults, and renderer status. [IN PROGRESS: ARCHITECTURE.md updated]
+   - Evidence: `config.py` defaults and effect counts still need a pass in `README.md`.
 
 5. Pin or constrain runtime dependencies (`P1`)
    - Add tested version ranges for `pygame`, `sounddevice`, and `librosa`, and document the optional GL extra in `requirements-gl.txt`.

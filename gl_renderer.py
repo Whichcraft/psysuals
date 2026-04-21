@@ -77,6 +77,29 @@ class GLRenderer:
         """Return the shared rect shader pair from effects/shaders/."""
         return self.asset_program("rect.vert", "rect.frag")
 
+    def blit_program(self) -> tuple:
+        """Return a simple texture-blitting shader program."""
+        vert = """
+        #version 330
+        in vec2 in_vert;
+        out vec2 v_uv;
+        void main() {
+            v_uv = in_vert * 0.5 + 0.5;
+            v_uv.y = 1.0 - v_uv.y;
+            gl_Position = vec4(in_vert, 0.0, 1.0);
+        }
+        """
+        frag = """
+        #version 330
+        uniform sampler2D u_tex;
+        in vec2 v_uv;
+        out vec4 fragColor;
+        void main() {
+            fragColor = texture(u_tex, v_uv);
+        }
+        """
+        return self.program(vert, frag)
+
     # ── Render helpers ────────────────────────────────────────────────────────
 
     def render(self, vao, fbo=None) -> None:
@@ -87,8 +110,19 @@ class GLRenderer:
         """
         target = fbo if fbo is not None else self.ctx.screen
         target.use()
-        self.ctx.clear(0.0, 0.0, 0.0, 1.0)
+        # self.ctx.clear(0.0, 0.0, 0.0, 1.0) # Removed clear to allow layering
         vao.render(moderngl.TRIANGLE_STRIP)
+
+    def blit(self, surface: "pygame.Surface") -> None:
+        """Upload *surface* to a texture and render it as a fullscreen quad."""
+        prog, vao = self.blit_program()
+        rgba = pygame.image.tostring(surface, "RGBA")
+        tex = self.ctx.texture(surface.get_size(), 4, rgba)
+        tex.use(0)
+        prog["u_tex"] = 0
+        self.ctx.enable(moderngl.BLEND)
+        self.render(vao)
+        tex.release()
 
     # ── Offscreen / Android ───────────────────────────────────────────────────
 

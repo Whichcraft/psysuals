@@ -24,7 +24,8 @@ class Tunnel(Effect):
     Z_FAR   = 10.0
     Z_NEAR  = 0.18
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue  = 0.0
         self.time = 0.0
         spacing = (self.Z_FAR - self.Z_NEAR) / self.N_RINGS

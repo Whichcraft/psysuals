@@ -3,15 +3,15 @@
 ## Overview
 
 ```
-psysualizer.py   ← main CPU entry point: sounddevice callback + pygame loop
+psysualizer.py   ← main entry point: sounddevice callback + pygame loop
+                 (Supports --gl for hardware-accelerated ModernGL rendering)
 beat_tracking.py ← optional librosa beat/BPM refinement, off the render thread
 config.py        ← shared mutable runtime state
 effects/         ← one file per effect, registered in MODES
-psysualizer_gl.py← experimental moderngl proof-of-concept
 requirements-gl.txt ← optional dependency set for the GL path
 ```
 
-`psysualizer.py` owns the runtime: audio capture, beat/BPM extraction, device selection, saved display restoration, span mode, HUD, and render orchestration. Visual logic stays inside `effects/`.
+`psysualizer.py` owns the runtime: audio capture, beat/BPM extraction, device selection, saved display restoration, span mode, HUD, and render orchestration. It supports both a CPU/Pygame surface path and a GPU/ModernGL path.
 
 ---
 
@@ -61,18 +61,16 @@ beat = beat_decay
 
 ## Render loop
 
-Each frame in `psysualizer.py`:
+The render loop in `psysualizer.py` uses a dual-target strategy to support both CPU and GPU effects:
 
-1. Read `(waveform, fft, raw_beat, mid, treble, bpm, audio_time)` from `get_audio()`.
-2. Optionally refine BPM and beat with `LibrosaBeatTracker`.
-3. Publish shared state to `config.MID_ENERGY`, `config.TREBLE_ENERGY`, `config.BPM`, and `config.EFFECT_GAIN`.
-4. Derive `draw_beat` either from `effect_gain` or the auto-gain RMS path.
-5. Fade the frame using the active effect's `TRAIL_ALPHA`.
-6. Draw the optional background effect into `bg_surf`.
-7. Draw the foreground effect.
-8. Blend the mode-switch crossfade overlay.
-9. Draw tap-tempo flash and HUD.
-10. `pygame.display.flip()` and `clock.tick(config.FPS)`.
+1. **Target Abstraction**: All drawing operations target a `target` surface.
+   - In CPU mode: `target` is the display surface.
+   - In GL mode: `target` is an offscreen transparent surface used for UI/HUD.
+2. **Effect Execution**: Effects are instantiated with an optional `GLRenderer`.
+   - If an effect supports GL (like `PlasmaGL`), it renders directly to the GL context.
+   - Otherwise, it draws to the `target` surface.
+3. **Compositing**: In GL mode, the `target` surface is uploaded as a texture and blitted over the GL-rendered effects every frame.
+4. **Final flip**: `pygame.display.flip()` presents the frame.
 
 Mode switches recreate the effect instance and reset foreground intensity to `config.DEFAULT_EFFECT_GAIN`.
 
@@ -111,17 +109,23 @@ Fullscreen/display changes also recreate the background effect so display-bound 
 
 ## Effect contract
 
-Effects are simple classes that draw directly onto a `pygame.Surface`:
+Effects are simple classes that can draw to a `pygame.Surface` or use a `GLRenderer`:
 
 ```python
-class MyEffect:
+class MyEffect(Effect):
     TRAIL_ALPHA = 28
 
-    def __init__(self):
+    def __init__(self, renderer=None, **kwargs):
+        super().__init__(renderer=renderer, **kwargs)
         ...
 
     def draw(self, surf, waveform, fft, beat, tick):
-        ...
+        if self.renderer:
+            # GL path
+            ...
+        else:
+            # Pygame path (surf is a pygame.Surface)
+            ...
 ```
 
 Inputs passed to `draw()`:

@@ -2,7 +2,7 @@
 
 Real-time music visualizer — listens to audio input and renders animated visuals driven by the frequency spectrum and beat detection. Tuned for psytrance (138–148 BPM): aggressive beat response, long neon trails, hard kick-drum pulses.
 
-![Version](https://img.shields.io/badge/version-2.15.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-2.16.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 See [EFFECTS.md](EFFECTS.md) for a detailed reference of all current effects and their audio reactions.
@@ -11,11 +11,24 @@ See [EFFECTS.md](EFFECTS.md) for a detailed reference of all current effects and
 
 These changes are in the current worktree and docs, but are not yet released as a new tagged version:
 
+- **Unified ModernGL architecture** — `psysualizer.py` now supports both CPU (Pygame) and GPU (ModernGL) rendering via the `--gl` flag. Hardware-accelerated effects like `PlasmaGL` are used automatically when the GL path is active.
+- **Improved process termination** — the app and all its span-mode children now exit reliably on `Esc` or `Q`.
 - **Saved display selection works again** — `display_idx` is now restored from settings on startup unless `--display N` overrides it.
 - **Span mode scales beyond two monitors** — the primary instance now spawns one child process per *other* monitor, and `A` / `D` cycle the shared secondary-screen mode across all spawned children.
 - **No-input startup is safe** — if no audio capture device is available, the app stays up in silent mode, the HUD shows `no input`, and you can attach or choose a device later with `D`.
-- **GL extras are split cleanly** — `requirements.txt` covers the CPU app, while `requirements-gl.txt` installs the optional `moderngl` path used by `psysualizer_gl.py`.
-- **Tracked shader assets are owned by the GL helper** — `gl_renderer.py` now loads the checked-in GLSL files under `effects/shaders/`.
+
+---
+
+## What's new in v2.16.0 — unified ModernGL acceleration
+
+### Hardware acceleration in the main app
+The experimental ModernGL proof-of-concept has been merged into the primary `psysualizer.py` entry point. Run with `--gl` to enable hardware-accelerated effects. UI elements like the HUD and settings pane are seamlessly composited over the GL viewport.
+
+### Stable effect contract
+All effects now follow a unified interface that supports both Pygame surfaces and ModernGL renderers. Effects can detect if they are running on the GPU and provide optimized shader-based paths while maintaining high-quality CPU fallbacks.
+
+### Automated smoke testing
+Added `smoke_test.py` to ensure all 18 effects can be instantiated and that the audio pipeline imports correctly before any changes are committed.
 
 ---
 
@@ -251,6 +264,11 @@ python3 -m venv .venv
 .venv/bin/python psysualizer.py
 ```
 
+Run with ModernGL hardware acceleration:
+```bash
+.venv/bin/python psysualizer.py --gl
+```
+
 The app restores the last saved display index on startup. Use `--display N` to override that for a single launch.
 
 ### Controls
@@ -300,7 +318,7 @@ Then press `D` in-app and select it from the list.
 4. `beat_tracking.py` optionally buffers recent audio and runs `librosa` onset / beat analysis on a background thread. The render loop reads cached BPM estimates immediately and never blocks waiting for that heavier analysis.
 5. The main loop normalises raw beat energy against a rolling average, applies an exponential decay for a cleaner impulse envelope, and then feeds that beat into the active effect or auto-gain path.
 6. Genre detection runs from the accumulated spectrum and adjusts beat weights for electronic, rock, classical, or generic content.
-7. `pygame` renders the active effect, optional background layer, HUD, and crossfade overlay each frame. Mode switches restart the effect at the default intensity `0.7`.
+7. `pygame` renders the active effect, optional background layer, HUD, and crossfade overlay each frame. Mode switches restart the effect at the default intensity `0.7`. If `--gl` is enabled, effects render directly to the GPU via ModernGL, with UI elements composited on top.
 
 ## Project structure
 
@@ -310,11 +328,12 @@ psysuals/
 ├── beat_tracking.py          # Optional librosa-based BPM/beat refinement
 ├── config.py                 # Shared mutable state (WIDTH, HEIGHT, FPS, BPM, MID_ENERGY, …)
 ├── settings.py               # User settings persistence (~/.config/psysuals/settings.json)
-├── psysualizer_gl.py         # Experimental moderngl entry point
 ├── gl_renderer.py            # Shared moderngl renderer utilities
-├── requirements-gl.txt       # Optional moderngl dependency set for psysualizer_gl.py
+├── requirements-gl.txt       # Optional moderngl dependency set for the GL path
+├── smoke_test.py             # Automated instantiation and import check
 ├── effects/
 │   ├── __init__.py           # MODES list and package re-exports
+│   ├── base.py               # Effect base class and contract
 │   ├── utils.py              # Shared colour helpers: hsl(), _hsl_batch()
 │   ├── palette.py            # Shared colour palette driven by beat/mid/treble
 │   ├── yantra.py             # Yantra effect
@@ -335,7 +354,7 @@ psysuals/
 │   ├── lattice.py            # Lattice effect
 │   ├── spectrum.py           # Spectrum (Bars) effect
 │   ├── waterfall.py          # Waterfall effect
-│   ├── plasma_gl.py          # Shader-driven Plasma prototype
+│   ├── plasma_gl.py          # Shader-driven Plasma (supports GL path)
 │   └── shaders/              # Tracked GLSL assets used by the GL helper path
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects

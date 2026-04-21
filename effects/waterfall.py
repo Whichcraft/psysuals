@@ -19,7 +19,8 @@ class GlowSquares(Effect):
     ROWS = 100
     COLS = 80
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue   = 0.0
         n_bins     = config.BLOCK_SIZE // 2
         raw        = np.geomspace(2, int(n_bins * 0.85), self.COLS + 1).astype(int)

@@ -24,7 +24,8 @@ class Spiral(Effect):
     N_SYM     = 3
     RING_STEP = 8   # draw a cross-ring every N depth points
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue   = 0.0
         self.time  = 0.0
         self.scale = 1.0

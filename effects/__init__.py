@@ -1,6 +1,6 @@
 from .yantra      import Yantra
 from .cube        import Cube
-from .plasma      import Plasma
+from .plasma_gl   import PlasmaGL as Plasma
 from .tunnel      import Tunnel
 from .lissajous   import Lissajous
 from .corridor    import Corridor

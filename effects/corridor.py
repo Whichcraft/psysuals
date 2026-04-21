@@ -33,7 +33,8 @@ class Corridor(Effect):
     _CORRIDOR_FADE = 28
     _SPARK_FADE    = 10    # slower fade → longer spark trails
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.hue    = 0.0
         self.time   = 0.0
         spacing     = (self.Z_FAR - self.Z_NEAR) / self.N_FRAMES
