@@ -24,13 +24,13 @@ def test_all_effects_inherit_base():
     print("  ✅ Inheritance OK")
 
 def test_all_files_registered():
-    """Warn if there are python files in effects/ that are not in MODES."""
+    """Fail if there are python files in effects/ that are not in MODES."""
     print("Checking for unregistered effect files...")
     registered_classes = {m[1].__name__ for m in MODES}
     # Some classes might be imported with aliases or be helper files
-    ignored = {"Effect", "Palette", "palette", "utils"}
     
     files = glob.glob("effects/*.py")
+    unregistered = []
     for f in files:
         basename = os.path.basename(f)
         if basename.startswith("__") or basename in ("base.py", "utils.py", "palette.py"):
@@ -38,11 +38,21 @@ def test_all_files_registered():
             
         # Check if the class inside is registered
         module_name = f"effects.{basename[:-3]}"
-        module = importlib.import_module(module_name)
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError as e:
+            print(f"  ❌ Failed to import {module_name}: {e}")
+            unregistered.append(module_name)
+            continue
+
         for name, obj in inspect.getmembers(module, inspect.isclass):
             if obj.__module__ == module_name and issubclass(obj, Effect) and obj is not Effect:
                 if obj.__name__ not in registered_classes:
-                    print(f"  ⚠️ Warning: Class '{obj.__name__}' in {basename} is not registered in MODES")
+                    print(f"  ❌ Class '{obj.__name__}' in {basename} is not registered in MODES")
+                    unregistered.append(f"{basename}:{obj.__name__}")
+    
+    if unregistered:
+        raise AssertionError(f"Unregistered or unimportable effect modules found: {unregistered}")
     print("  ✅ Scan complete")
 
 def run_all_tests():
