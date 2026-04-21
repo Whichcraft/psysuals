@@ -41,6 +41,9 @@ class GLRenderer:
         self.ctx    = ctx if ctx is not None else moderngl.create_context()
         self._vbo   = self.ctx.buffer(self._QUAD.tobytes())
         self._program_cache: dict[tuple[str, str], tuple] = {}
+        self._blit_tex: moderngl.Texture | None = None
+        self._blit_prog: moderngl.Program | None = None
+        self._blit_vao: moderngl.VertexArray | None = None
 
     # ── Shader helpers ────────────────────────────────────────────────────────
 
@@ -115,14 +118,37 @@ class GLRenderer:
 
     def blit(self, surface: "pygame.Surface") -> None:
         """Upload *surface* to a texture and render it as a fullscreen quad."""
-        prog, vao = self.blit_program()
+        if self._blit_prog is None:
+            self._blit_prog, self._blit_vao = self.blit_program()
+        
+        size = surface.get_size()
+        if self._blit_tex is None or self._blit_tex.size != size:
+            if self._blit_tex:
+                self._blit_tex.release()
+            self._blit_tex = self.ctx.texture(size, 4)
+            
         rgba = pygame.image.tostring(surface, "RGBA")
-        tex = self.ctx.texture(surface.get_size(), 4, rgba)
-        tex.use(0)
-        prog["u_tex"] = 0
+        self._blit_tex.write(rgba)
+        self._blit_tex.use(0)
+        self._blit_prog["u_tex"] = 0
+        
         self.ctx.enable(moderngl.BLEND)
-        self.render(vao)
-        tex.release()
+        self.render(self._blit_vao)
+
+    def release(self):
+        """Release all GL resources."""
+        if self._blit_tex:
+            self._blit_tex.release()
+        self._vbo.release()
+        for prog, vao in self._program_cache.values():
+            prog.release()
+            # VAO is implicitly released when prog or buffers are? 
+            # Actually, VAO should be released too.
+            vao.release()
+        if self._blit_vao:
+            self._blit_vao.release()
+        if self._blit_prog:
+            self._blit_prog.release()
 
     # ── Offscreen / Android ───────────────────────────────────────────────────
 

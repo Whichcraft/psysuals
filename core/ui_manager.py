@@ -11,11 +11,18 @@ class UIManager:
         self.pane_sel = 0
         self.picking = False
         self.pick_sel = 0
+        
+        # Surface caches
+        self._picker_overlay: pygame.Surface | None = None
+        self._bar_surf: pygame.Surface | None = None
+        self._flash_surf: pygame.Surface | None = None
 
     def draw_device_picker(self, target: pygame.Surface, devices: list[tuple[int, str]], active_idx: int | None) -> None:
-        overlay = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 210))
-        target.blit(overlay, (0, 0))
+        if self._picker_overlay is None or self._picker_overlay.get_size() != (config.WIDTH, config.HEIGHT):
+            self._picker_overlay = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
+            self._picker_overlay.fill((0, 0, 0, 210))
+            
+        target.blit(self._picker_overlay, (0, 0))
 
         title = self.font.render(
             "SELECT INPUT DEVICE   Up/Down navigate   Enter confirm   Esc cancel",
@@ -50,6 +57,7 @@ class UIManager:
         panel_w, panel_h = 240, 160
         px = config.WIDTH - panel_w - 12
         py = 50
+        # Pane background (could be cached too, but it's small)
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         panel.fill((0, 0, 0, 185))
         target.blit(panel, (px, py))
@@ -81,7 +89,12 @@ class UIManager:
         bar_max = 120
         gap = 3
         total_w = 3 * bar_w + 2 * gap
-        bar_surf = pygame.Surface((total_w, bar_max), pygame.SRCALPHA)
+        
+        if self._bar_surf is None:
+            self._bar_surf = pygame.Surface((total_w, bar_max), pygame.SRCALPHA)
+            
+        self._bar_surf.fill((0, 0, 0, 0))
+        
         defs = [
             (beat_val, (180, 50, 50, 150)),
             (mid_val, (50, 180, 50, 150)),
@@ -91,13 +104,15 @@ class UIManager:
             h = int(bar_max * max(0.0, min(value / 3.0, 1.0)))
             x = i * (bar_w + gap)
             if h > 0:
-                pygame.draw.rect(bar_surf, color, (x, bar_max - h, bar_w, h))
-        target.blit(bar_surf, (6, config.HEIGHT - bar_max - 6))
+                pygame.draw.rect(self._bar_surf, color, (x, bar_max - h, bar_w, h))
+        target.blit(self._bar_surf, (6, config.HEIGHT - bar_max - 6))
 
     def draw_tap_flash(self, target: pygame.Surface, tap_bpm: float, alpha: int) -> None:
-        flash = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-        flash.fill((255, 255, 255, alpha // 6))
-        target.blit(flash, (0, 0))
+        if self._flash_surf is None or self._flash_surf.get_size() != (config.WIDTH, config.HEIGHT):
+            self._flash_surf = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
+            
+        self._flash_surf.fill((255, 255, 255, alpha // 6))
+        target.blit(self._flash_surf, (0, 0))
         label = self.font_big.render(f"{tap_bpm:.0f} BPM", True, (255, 255, 255, alpha))
         target.blit(
             label,
