@@ -11,17 +11,16 @@ Ranked on 2026-04-21 from `codebot-test` (`~/bin/codebot.sh -s`) plus local veri
 3. ~~Add a smoke-test gate for entrypoints and effects (`P0`)~~ [DONE]
    - Added `smoke_test.py` for automated instantiation and import checks.
 
-4. Refresh stale architecture and user docs (`P1`)
-   - Update `ARCHITECTURE.md`, `README.md`, and related docs to match the current mode count, config defaults, and renderer status. [IN PROGRESS: ARCHITECTURE.md updated]
-   - Evidence: `config.py` defaults and effect counts still need a pass in `README.md`.
+4. ~~Refresh stale architecture and user docs (`P1`)~~ [DONE]
+   - Updated `ARCHITECTURE.md`, `README.md`, `EFFECTS.md`, `CHANGELOG.md`, and `CLAUDE.md`.
+   - All docs now match the current mode count, renderer status, and OO architecture.
 
-5. Pin or constrain runtime dependencies (`P1`)
-   - Add tested version ranges for `pygame`, `sounddevice`, and `librosa`, and document the optional GL extra in `requirements-gl.txt`.
-   - Evidence: `requirements.txt` and `requirements-gl.txt` currently contain unpinned top-level packages only.
+5. ~~Pin or constrain runtime dependencies (`P1`)~~ [DONE]
+   - Pinned `requirements.txt` and `requirements-gl.txt` to known working versions.
 
-6. Break `psysualizer.py` into smaller modules (`P1`)
-   - Extract audio analysis, display/window management, HUD/input handling, and mode switching into separate units.
-   - Evidence: the main file is trying to own audio capture, event handling, display control, span mode, settings, and renderer setup all at once.
+6. ~~Break `psysualizer.py` into smaller modules (`P1`)~~ [DONE]
+   - Extracted `AudioEngine`, `DisplayManager`, and `UIManager` into `core/` package.
+   - Refactored `psysualizer.py` into an object-oriented `VisualizerApp`.
 
 7. Improve beat and BPM detection quality (`P1`)
    - Revisit the current spectral-flux pipeline and compare it against a more robust tempo/onset path before adding more effect logic on top.

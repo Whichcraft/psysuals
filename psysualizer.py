@@ -6,12 +6,19 @@ Controls:
   SPACE / click   Switch to next mode
   1-9             Jump to modes 1-9
   Left/Right      Cycle modes (or adjust pane slider when pane is open)
-  Up/Down         Intensity (or navigate pane sliders when pane is open)
-  Tab             Toggle settings pane
-  P               Save preset  |  Shift+P: cycle presets
+  Up/Down         Adjust intensity (or navigate pane sliders when pane is open)
+  Tab             Toggle real-time settings pane
+  P               Save current state as a preset
+  Shift+P         Cycle through saved presets
+  A               Toggle auto-gain (or cycle child mode backward in span mode)
+  B               Toggle background layer
+  Shift+B         Cycle background effect
+  M               Tap tempo (tap 2+ times to lock BPM for 8s)
+  Shift+M         Toggle span mode (multi-monitor extension)
+  D               Open device picker (or cycle child mode forward in span mode)
   F               Toggle fullscreen
-  H               Toggle HUD   |  Shift+H: cycle full/minimal/off
-  M               Tap tempo    |  Shift+M: toggle span mode (all monitors)
+  H               Toggle HUD visibility
+  Shift+H         Cycle HUD detail level
   Q / ESC         Quit
 """
 
@@ -22,975 +29,432 @@ __version__ = "2.16.0"
 import argparse
 import atexit
 import os
-import re as _re
-import subprocess
 import sys
-import threading
 import time as _time
 from collections import deque
 
 import numpy as np
 import pygame
-import sounddevice as sd
 
-try:
-    from gl_renderer import GLRenderer, HAS_MODERNGL
-except ImportError:
-    HAS_MODERNGL = False
-
-from beat_tracking import LibrosaBeatTracker
 import config
 import settings as sett
+from core.audio_engine import AudioEngine
+from core.display_manager import DisplayManager
+from core.ui_manager import UIManager
 from effects import MODES
 from effects.palette import palette
-
-
-# ── Audio ────────────────────────────────────────────────────────────────────
-
-_lock = threading.Lock()
-_waveform = np.zeros(config.BLOCK_SIZE, dtype=np.float32)
-_smooth_fft = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
-_raw_beat_energy = 0.0
-_mid_energy = 0.0
-_treble_energy = 0.0
-_audio_time = 0.0
-_blackman_window = np.blackman(config.BLOCK_SIZE).astype(np.float32)
-
-_prev_spectrum = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
-_flux_avg = 1e-6
-_mid_avg = 1e-6
-_treble_avg = 1e-6
-_prev_beat_energy = 0.0
-
-_beat_times = deque(maxlen=8)
-_last_onset_time = 0.0
-_bpm = 0.0
-
-_genre_weights = np.ones(20, dtype=np.float32)
-_detect_accum = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
-_detect_frames = 0
-_DETECT_MIN = 300
-
-_beat_tracker = LibrosaBeatTracker(
-    sample_rate=config.SAMPLE_RATE,
-    block_size=config.BLOCK_SIZE,
-)
-
-
-def _apply_genre_weights(genre: str) -> None:
-    weights = np.ones(20, dtype=np.float32)
-    if genre == "electronic":
-        weights[:5] = 1.5
-        weights[10:] = 0.7
-    elif genre == "rock":
-        weights[2:9] = 1.3
-    elif genre == "classical":
-        weights[:10] = 0.6
-        weights[10:] = 1.4
-    with _lock:
-        _genre_weights[:] = weights
-
-
-def detect_genre() -> str | None:
-    """Return detected genre string once enough frames are collected."""
-    global _detect_frames
-    with _lock:
-        if _detect_frames < _DETECT_MIN:
-            return None
-        avg = _detect_accum / _detect_frames
-        _detect_accum[:] = 0
-        _detect_frames = 0
-
-    sub_bass = float(avg[:5].mean())
-    bass = float(avg[:15].mean())
-    mids = float(avg[15:100].mean())
-    sub_ratio = sub_bass / (bass + 1e-6)
-    bass_ratio = bass / (bass + mids + 1e-6)
-
-    if sub_ratio > 0.55 and bass_ratio > 0.50:
-        return "electronic"
-    if bass_ratio > 0.50 and sub_ratio < 0.45:
-        return "rock"
-    if bass_ratio < 0.35:
-        return "classical"
-    return "any"
-
-
-def _audio_cb(indata, frames, time_info, status) -> None:
-    global _waveform, _smooth_fft, _raw_beat_energy, _mid_energy, _treble_energy
-    global _audio_time, _detect_frames, _prev_spectrum, _flux_avg, _mid_avg
-    global _treble_avg, _prev_beat_energy, _last_onset_time, _bpm
-
-    mono = np.asarray(indata[:, 0], dtype=np.float32)
-    _beat_tracker.push_audio(mono, time_info.currentTime)
-
-    spectrum = np.abs(np.fft.rfft(mono * _blackman_window))[: config.BLOCK_SIZE // 2]
-    spectrum = spectrum.astype(np.float32, copy=False)
-    np.log1p(spectrum, out=spectrum)
-    spectrum /= 10.0
-
-    with _lock:
-        _audio_time = float(time_info.currentTime)
-        _waveform = mono.copy()
-        _smooth_fft *= 0.50
-        _smooth_fft += spectrum * 0.50
-        _detect_accum[:] += spectrum
-        _detect_frames += 1
-
-        weights = _genre_weights
-        flux = float(
-            np.mean(
-                np.maximum(
-                    0.0,
-                    spectrum[:20] * weights - _prev_spectrum[:20] * weights,
-                )
-            )
-        )
-        _flux_avg = _flux_avg * 0.95 + flux * 0.05
-        _raw_beat_energy = flux / (_flux_avg + 1e-6)
-
-        t_now = float(time_info.currentTime)
-        if (
-            _raw_beat_energy > 2.0
-            and _prev_beat_energy <= 2.0
-            and t_now - _last_onset_time > 0.30
-        ):
-            _beat_times.append(t_now)
-            _last_onset_time = t_now
-            if len(_beat_times) >= 2:
-                intervals = np.diff(list(_beat_times))
-                median_interval = float(np.median(intervals))
-                if median_interval > 0:
-                    _bpm = max(60.0, min(200.0, 60.0 / median_interval))
-        _prev_beat_energy = _raw_beat_energy
-
-        mid = float(_smooth_fft[20:100].mean())
-        _mid_avg = _mid_avg * 0.95 + mid * 0.05
-        _mid_energy = mid / (_mid_avg + 1e-6)
-
-        treble = float(_smooth_fft[100:256].mean())
-        _treble_avg = _treble_avg * 0.95 + treble * 0.05
-        _treble_energy = treble / (_treble_avg + 1e-6)
-
-        _prev_spectrum[:] = spectrum
-
-
-def get_audio():
-    with _lock:
-        return (
-            _waveform.copy(),
-            _smooth_fft.copy(),
-            _raw_beat_energy,
-            _mid_energy,
-            _treble_energy,
-            _bpm,
-            _audio_time,
-        )
-
-
-# ── Device picker ────────────────────────────────────────────────────────────
-
-def _input_devices() -> list[tuple[int, str]]:
-    """Return list of (index, name) for all input-capable devices."""
-    try:
-        queried = sd.query_devices()
-    except Exception:
-        return []
-
-    devices = []
-    for idx, device in enumerate(queried):
-        if device["max_input_channels"] > 0:
-            devices.append((idx, device["name"]))
-    return devices
-
-
-def _draw_device_picker(target, font, devices, selected, active_idx) -> None:
-    overlay = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 210))
-    target.blit(overlay, (0, 0))
-
-    title = font.render(
-        "SELECT INPUT DEVICE   Up/Down navigate   Enter confirm   Esc cancel",
-        True,
-        (200, 200, 200),
-    )
-    target.blit(title, (40, 30))
-
-    if not devices:
-        empty = font.render("No input devices available", True, (180, 180, 180))
-        target.blit(empty, (40, 80))
-        return
-
-    row_h = 28
-    y0 = 80
-    visible = min(len(devices), (config.HEIGHT - y0 - 20) // row_h)
-    start = max(0, min(selected - visible // 2, len(devices) - visible))
-
-    for i, (dev_idx, name) in enumerate(devices[start : start + visible]):
-        row = start + i
-        y = y0 + i * row_h
-        is_selected = row == selected
-        is_active = dev_idx == active_idx
-        if is_selected:
-            pygame.draw.rect(target, (40, 80, 140), (30, y - 2, config.WIDTH - 60, row_h - 2))
-        marker = ">> " if is_active else "   "
-        label = f"{marker}{dev_idx:3d}  {name}"
-        color = (255, 255, 100) if is_selected else (140, 140, 140)
-        target.blit(font.render(label, True, color), (40, y))
-
-
-# ── Main loop ────────────────────────────────────────────────────────────────
 
 _CROSSFADE_FRAMES = 45
 _BG_MODES = 9
 
-_x11_err_handler_ref = None
-_libX11 = None
-
-
-def _install_x11_error_handler() -> None:
-    """Suppress X11 RandR errors on some multi-monitor X11 setups."""
-    global _x11_err_handler_ref, _libX11
-    try:
-        import ctypes
-
-        class _XErrorEvent(ctypes.Structure):
-            _fields_ = [
-                ("type", ctypes.c_int),
-                ("display", ctypes.c_void_p),
-                ("resourceid", ctypes.c_ulong),
-                ("serial", ctypes.c_ulong),
-                ("error_code", ctypes.c_ubyte),
-                ("request_code", ctypes.c_ubyte),
-                ("minor_code", ctypes.c_ubyte),
-            ]
-
-        handler_type = ctypes.CFUNCTYPE(
-            ctypes.c_int,
-            ctypes.c_void_p,
-            ctypes.POINTER(_XErrorEvent),
-        )
-
-        def _handler(display, event):
-            return 0
-
-        _x11_err_handler_ref = handler_type(_handler)
-        lib = ctypes.CDLL("libX11.so.6")
-        lib.XSetErrorHandler(_x11_err_handler_ref)
-        lib.XMoveWindow.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_ulong,
-            ctypes.c_int,
-            ctypes.c_int,
-        ]
-        lib.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
-        _libX11 = lib
-    except Exception:
-        pass
-
-
-def _xrandr_monitors() -> list[tuple[int, int, int, int]]:
-    """Return list of (x, y, w, h) for each physical monitor."""
-    try:
-        out = subprocess.check_output(
-            ["xrandr", "--listmonitors"],
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-        monitors = []
-        for line in out.splitlines():
-            match = _re.search(r"(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
-            if match:
-                w, h, x, y = (int(match.group(i)) for i in range(1, 5))
-                monitors.append((x, y, w, h))
-        monitors.sort(key=lambda mon: mon[0])
-        return monitors
-    except Exception:
-        return []
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="psysuals music visualizer")
-    parser.add_argument(
-        "--display",
-        type=int,
-        default=None,
-        help="Display index to open on (defaults to saved setting)",
-    )
-    parser.add_argument(
-        "--mode",
-        type=int,
-        default=None,
-        help="Start on this mode index (overrides saved setting)",
-    )
-    parser.add_argument(
-        "--gl",
-        action="store_true",
-        help="Use ModernGL for hardware-accelerated effects",
-    )
-    parser.add_argument(
-        "--span-child",
-        action="store_true",
-        help=argparse.SUPPRESS,
-    )
-    args = parser.parse_args()
-
-    settings = sett.load()
-
-    xmonitors = _xrandr_monitors()
-    num_displays = max(len(xmonitors), 1)
-    requested_display = (
-        settings.get("display_idx", 0) if args.display is None else args.display
-    )
-    display_idx = max(0, min(requested_display, num_displays - 1))
-
-    _install_x11_error_handler()
-    pygame.init()
-
-    _xmove_target = None
-    renderer: GLRenderer | None = None
-
-    def _open_display(idx: int, fullscreen: bool):
-        nonlocal _xmove_target, renderer
-        _xmove_target = None
-        flags = 0
-        if args.gl:
-            flags |= pygame.OPENGL | pygame.DOUBLEBUF
+class VisualizerApp:
+    def __init__(self):
+        self.args = self._parse_args()
+        self.settings = sett.load()
         
-        if fullscreen and idx < len(xmonitors):
-            mx, my, mw, mh = xmonitors[idx]
-            os.environ["SDL_VIDEO_WINDOW_POS"] = f"{mx},{my}"
-            screen = pygame.display.set_mode((mw, mh), flags | pygame.NOFRAME)
-            os.environ.pop("SDL_VIDEO_WINDOW_POS", None)
-            if _libX11:
-                wm = pygame.display.get_wm_info()
-                dpy = wm.get("display")
-                win = wm.get("window")
-                if isinstance(dpy, int) and dpy and win:
-                    _libX11.XMoveWindow(dpy, win, mx, my)
-                    _libX11.XSync(dpy, 0)
-                    _xmove_target = (dpy, win, mx, my)
-            config.WIDTH = mw
-            config.HEIGHT = mh
-        elif fullscreen:
-            screen = pygame.display.set_mode((0, 0), flags | pygame.FULLSCREEN)
-            config.WIDTH, config.HEIGHT = screen.get_size()
-        else:
-            screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
+        self.display = DisplayManager(self.args)
+        self.audio = AudioEngine()
         
-        if args.gl and HAS_MODERNGL:
-            renderer = GLRenderer(config.WIDTH, config.HEIGHT)
+        self._init_display()
+        self.ui = UIManager() # Init UI after display for font loading
+        self._init_audio()
         
-        return screen
+        self.mode_idx = min(self.settings.get("mode_idx", 0), len(MODES) - 1)
+        if self.args.mode is not None:
+            self.mode_idx = self.args.mode % len(MODES)
+        
+        self.name, self.VisCls = MODES[self.mode_idx]
+        self.vis = self.VisCls(renderer=self.display.renderer)
+        
+        self.bg_on = self.settings.get("bg_on", False)
+        self.bg_mode_i = self.settings.get("bg_mode_i", 0) % _BG_MODES
+        self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
+        self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+        self.bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+        self.bg_alpha = self.settings.get("bg_alpha", 102)
+        
+        self.prev_surf = None
+        self.crossfade_frame = 0
+        self.cf_frames = self.settings.get("cf_frames", _CROSSFADE_FRAMES)
+        
+        self.tick = 0
+        self.energy_hist = deque(maxlen=40)
+        self.energy_sum = 0.0
+        self.beat_decay = 0.0
+        self.effect_gain = self.settings.get("effect_gain", config.DEFAULT_EFFECT_GAIN)
+        self.current_genre = "detecting..."
+        
+        self.hud_level = self.settings.get("hud_level", 2)
+        self.show_hud = self.hud_level > 0
+        
+        self.auto_gain = self.settings.get("auto_gain", False)
+        self.rms_buf = deque(maxlen=30)
+        self.target_rms = 0.05
+        
+        self.tap_times = deque(maxlen=4)
+        self.tap_bpm = 0.0
+        self.tap_bpm_expiry = 0.0
+        self.tap_flash_end = 0.0
+        
+        self.span_vis2_idx = (self.mode_idx + 1) % len(MODES)
+        self.span_mode = len(self.display.xmonitors) >= 2 and not self.args.span_child
+        if self.span_mode:
+            self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
+            
+        self.presets = sett.load_presets()
+        self.active_preset = -1
+        self.dev_name_cache = {}
+        
+        self.clock = pygame.time.Clock()
+        self.fade_alpha = 28
+        self.fade = self._make_fade(self.fade_alpha)
+        
+        atexit.register(self.display.kill_children)
 
-    screen = _open_display(display_idx, True)
-    target = screen
-    if args.gl:
-        target = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-    fullscreen = True
+    def _parse_args(self):
+        parser = argparse.ArgumentParser(description="psysuals music visualizer")
+        parser.add_argument("--display", type=int, default=None)
+        parser.add_argument("--mode", type=int, default=None)
+        parser.add_argument("--gl", action="store_true")
+        parser.add_argument("--span-child", action="store_true", help=argparse.SUPPRESS)
+        return parser.parse_args()
 
-    pygame.display.set_caption(f"psysuals v{__version__}")
-    clock = pygame.time.Clock()
-    font = pygame.font.SysFont("monospace", 16)
-    font_s = pygame.font.SysFont("monospace", 14)
+    def _init_display(self):
+        requested_display = (self.settings.get("display_idx", 0) 
+                           if self.args.display is None else self.args.display)
+        display_idx = max(0, min(requested_display, self.display.num_displays - 1))
+        pygame.init()
+        self.display.open_display(display_idx, True)
+        pygame.display.set_caption(f"psysuals v{__version__}")
 
-    devices = _input_devices()
-    active_dev = settings["active_dev"]
-    if active_dev is not None and active_dev not in [d[0] for d in devices]:
-        active_dev = None
+    def _init_audio(self):
+        active_dev = self.settings.get("active_dev")
+        devices = self.audio.input_devices()
+        if active_dev is not None and active_dev not in [d[0] for d in devices]:
+            active_dev = None
+        self.audio.open_input_stream(active_dev, None)
 
-    def _start_input_stream(device_idx: int | None):
-        stream = sd.InputStream(
-            samplerate=config.SAMPLE_RATE,
-            blocksize=config.BLOCK_SIZE,
-            channels=config.CHANNELS,
-            device=device_idx,
-            callback=_audio_cb,
-        )
-        stream.start()
-        return stream
-
-    def _stop_input_stream(stream_obj) -> None:
-        if stream_obj is None:
-            return
-        try:
-            stream_obj.stop()
-        finally:
-            stream_obj.close()
-
-    def _open_input_stream(*candidates):
-        seen = []
-        for candidate in candidates:
-            if candidate in seen:
-                continue
-            seen.append(candidate)
-            try:
-                return _start_input_stream(candidate), candidate
-            except Exception:
-                continue
-        return None, None
-
-    stream, active_dev = _open_input_stream(active_dev, None)
-
-    mode_idx = min(settings["mode_idx"], len(MODES) - 1)
-    if args.mode is not None:
-        mode_idx = args.mode % len(MODES)
-    name, VisCls = MODES[mode_idx]
-    vis = VisCls(renderer=renderer)
-
-    tick = 0
-    energy_hist = deque(maxlen=40)
-    energy_sum = 0.0
-    beat_decay = 0.0
-    dev_name_cache = {}
-    picking = False
-    pick_sel = 0
-    effect_gain = config.DEFAULT_EFFECT_GAIN
-    current_genre = "detecting..."
-
-    hud_level = settings.get("hud_level", 2)
-    show_hud = hud_level > 0
-
-    auto_gain = settings.get("auto_gain", False)
-    rms_buf = deque(maxlen=30)
-    target_rms = 0.05
-
-    tap_times = deque(maxlen=4)
-    tap_bpm = 0.0
-    tap_bpm_expiry = 0.0
-    tap_flash_end = 0.0
-    tap_expire = 8.0
-
-    prev_surf = None
-    crossfade_frame = 0
-
-    bg_on = settings.get("bg_on", False)
-    bg_mode_i = settings.get("bg_mode_i", 0) % _BG_MODES
-    bg_name, bg_cls = MODES[bg_mode_i]
-    bg_vis = bg_cls(renderer=renderer)
-    bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-
-    presets = sett.load_presets()
-    active_preset = -1
-
-    pane_open = False
-    pane_sel = 0
-    bg_alpha = settings.get("bg_alpha", 102)
-    cf_frames = settings.get("cf_frames", _CROSSFADE_FRAMES)
-
-    span_vis2_idx = (mode_idx + 1) % len(MODES)
-    span_children: dict[int, subprocess.Popen] = {}
-
-    def _span_target_indices() -> list[int]:
-        return [idx for idx in range(num_displays) if idx != display_idx]
-
-    def _spawn_span_children(mode_i: int) -> dict[int, subprocess.Popen]:
-        children = {}
-        for child_idx in _span_target_indices():
-            children[child_idx] = subprocess.Popen(
-                [
-                    sys.executable,
-                    os.path.abspath(__file__),
-                    "--display",
-                    str(child_idx),
-                    "--mode",
-                    str(mode_i),
-                    "--span-child",
-                ]
-            )
-        return children
-
-    span_mode = len(xmonitors) >= 2 and not args.span_child
-    if span_mode:
-        span_children = _spawn_span_children(span_vis2_idx)
-
-    def _kill_children() -> None:
-        nonlocal span_children
-        for child in span_children.values():
-            if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=0.2)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-        span_children = {}
-
-    atexit.register(_kill_children)
-
-    def _quit() -> None:
-        _kill_children()
-        try:
-            pygame.display.set_mode((1, 1))
-        except Exception:
-            pass
-        _stop_input_stream(stream)
-        pygame.quit()
-        sys.exit(0)
-
-    def _save_settings() -> None:
-        if args.span_child:
-            return
-        sett.save(
-            {
-                "active_dev": active_dev,
-                "mode_idx": mode_idx,
-                "show_hud": show_hud,
-                "auto_gain": auto_gain,
-                "bg_on": bg_on,
-                "bg_mode_i": bg_mode_i,
-                "display_idx": display_idx,
-                "bg_alpha": bg_alpha,
-                "cf_frames": cf_frames,
-                "hud_level": hud_level,
-            }
-        )
-
-    def make_fade(alpha: int = 28):
+    def _make_fade(self, alpha: int):
         surf = pygame.Surface((config.WIDTH, config.HEIGHT))
         surf.set_alpha(alpha)
         surf.fill((0, 0, 0))
         return surf
 
-    fade_alpha = 28
-    fade = make_fade()
-
-    def _rebuild_display_bound_effects() -> None:
-        nonlocal vis, bg_name, bg_cls, bg_vis, bg_surf
-        if hasattr(vis, "release") and callable(vis.release):
-            vis.release()
-        if hasattr(bg_vis, "release") and callable(bg_vis.release):
-            bg_vis.release()
-        vis = VisCls(renderer=renderer)
-        bg_name, bg_cls = MODES[bg_mode_i]
-        bg_vis = bg_cls(renderer=renderer)
-        bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
-
-    def _switch_mode(new_idx: int) -> None:
-        nonlocal mode_idx, name, VisCls, vis, prev_surf, crossfade_frame, effect_gain
-        if hasattr(vis, "release") and callable(vis.release):
-            vis.release()
-        prev_surf = target.copy()
-        crossfade_frame = 0
-        mode_idx = new_idx % len(MODES)
-        name, VisCls = MODES[mode_idx]
-        vis = VisCls(renderer=renderer)
-        effect_gain = config.DEFAULT_EFFECT_GAIN
-
-    def _pane_adjust(delta: int) -> None:
-        nonlocal effect_gain, bg_alpha, cf_frames
-        if pane_sel == 0:
-            effect_gain = min(2.0, max(0.0, round(effect_gain + delta * 0.1, 1)))
-        elif pane_sel == 1:
-            bg_alpha = min(255, max(0, bg_alpha + delta * 5))
-        elif pane_sel == 2:
-            cf_frames = min(90, max(0, cf_frames + delta * 5))
-
-    def _draw_pane() -> None:
-        panel_w, panel_h = 240, 160
-        px = config.WIDTH - panel_w - 12
-        py = 50
-        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        panel.fill((0, 0, 0, 185))
-        target.blit(panel, (px, py))
-        pygame.draw.rect(target, (80, 80, 80), (px, py, panel_w, panel_h), 1)
-        title = font_s.render("Settings  (Tab: close)", True, (120, 120, 120))
-        target.blit(title, (px + 8, py + 6))
-        items = [
-            ("effect_gain", effect_gain, 2.0, f"{effect_gain:.1f}"),
-            ("bg_alpha", bg_alpha, 255, f"{bg_alpha}"),
-            ("crossfade", cf_frames, 90, f"{int(cf_frames)} fr"),
-        ]
-        for i, (label, value, max_value, value_str) in enumerate(items):
-            y = py + 30 + i * 42
-            selected = i == pane_sel
-            color = (255, 255, 100) if selected else (150, 150, 150)
-            marker = ">> " if selected else "   "
-            target.blit(
-                font_s.render(f"{marker}{label}: {value_str}", True, color),
-                (px + 10, y),
-            )
-            bar_total = panel_w - 24
-            bar_w = int(bar_total * max(0.0, min(value / max_value, 1.0)))
-            pygame.draw.rect(target, (50, 50, 50), (px + 10, y + 16, bar_total, 6))
-            if bar_w > 0:
-                pygame.draw.rect(target, color, (px + 10, y + 16, bar_w, 6))
-
-    def _draw_multiband_bars(beat_val: float, mid_val: float, treble_val: float) -> None:
-        bar_w = 8
-        bar_max = 120
-        gap = 3
-        total_w = 3 * bar_w + 2 * gap
-        bar_surf = pygame.Surface((total_w, bar_max), pygame.SRCALPHA)
-        defs = [
-            (beat_val, (180, 50, 50, 150)),
-            (mid_val, (50, 180, 50, 150)),
-            (treble_val, (130, 60, 200, 150)),
-        ]
-        for i, (value, color) in enumerate(defs):
-            h = int(bar_max * max(0.0, min(value / 3.0, 1.0)))
-            x = i * (bar_w + gap)
-            if h > 0:
-                pygame.draw.rect(bar_surf, color, (x, bar_max - h, bar_w, h))
-        target.blit(bar_surf, (6, config.HEIGHT - bar_max - 6))
-
-    hint = (
-        "  Left/Right: mode  |  Up/Down: intensity  |  A: auto-gain"
-        "  |  B: bg  |  Shift+B: bg-cycle  |  M: tap  |  Shift+M: span"
-        "  |  Tab: pane  |  P: preset  |  Shift+P: load"
-        "  |  1-{n}: jump  |  D: device  |  F: fullscreen"
-        "  |  H: HUD  |  Shift+H: detail  |  Q: quit"
-    ).format(n=len(MODES))
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                _save_settings()
-                _quit()
-                return
-
-            if event.type == pygame.KEYDOWN:
-                if picking:
-                    if not devices:
-                        if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
-                            picking = False
-                        continue
-                    if event.key == pygame.K_ESCAPE:
-                        picking = False
-                    elif event.key == pygame.K_UP:
-                        pick_sel = max(0, pick_sel - 1)
-                    elif event.key == pygame.K_DOWN:
-                        pick_sel = min(len(devices) - 1, pick_sel + 1)
-                    elif event.key == pygame.K_RETURN:
-                        new_idx = devices[pick_sel][0]
-                        if new_idx != active_dev:
-                            old_stream = stream
-                            old_dev = active_dev
-                            _stop_input_stream(old_stream)
-                            stream, active_dev = _open_input_stream(
-                                new_idx, old_dev, None
-                            )
-                        picking = False
-                    continue
-
-                shift = bool(event.mod & pygame.KMOD_SHIFT)
-
-                if event.key in (pygame.K_q, pygame.K_ESCAPE):
-                    _save_settings()
-                    _quit()
-                    return
-                if event.key == pygame.K_TAB:
-                    pane_open = not pane_open
-                elif event.key in (pygame.K_SPACE, pygame.K_RIGHT):
-                    if pane_open:
-                        _pane_adjust(+1)
-                    else:
-                        _switch_mode(mode_idx + 1)
-                elif event.key == pygame.K_LEFT:
-                    if pane_open:
-                        _pane_adjust(-1)
-                    else:
-                        _switch_mode(mode_idx - 1)
-                elif event.key == pygame.K_UP:
-                    if pane_open:
-                        pane_sel = max(0, pane_sel - 1)
-                    else:
-                        effect_gain = min(2.0, round(effect_gain + 0.1, 1))
-                elif event.key == pygame.K_DOWN:
-                    if pane_open:
-                        pane_sel = min(2, pane_sel + 1)
-                    else:
-                        effect_gain = max(0.0, round(effect_gain - 0.1, 1))
-                elif event.key == pygame.K_f:
-                    if span_mode:
-                        span_mode = False
-                        _kill_children()
-                    else:
-                        fullscreen = not fullscreen
-                    screen = _open_display(display_idx, fullscreen)
-                    target = screen
-                    if args.gl:
-                        target = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-                    config.WIDTH, config.HEIGHT = screen.get_size()
-                    prev_surf = None
-                    crossfade_frame = 0
-                    fade = make_fade(fade_alpha)
-                    _rebuild_display_bound_effects()
-                elif event.key == pygame.K_h:
-                    if shift:
-                        hud_level = (hud_level - 1) % 3
-                        show_hud = hud_level > 0
-                    else:
-                        show_hud = not show_hud
-                        hud_level = 2 if show_hud else 0
-                elif event.key == pygame.K_d:
-                    if span_mode:
-                        span_vis2_idx = (span_vis2_idx + 1) % len(MODES)
-                        _kill_children()
-                        span_children = _spawn_span_children(span_vis2_idx)
-                    else:
-                        devices = _input_devices()
-                        picking = True
-                        active_indices = [d[0] for d in devices]
-                        pick_sel = active_indices.index(active_dev) if active_dev in active_indices else 0
-                elif event.key == pygame.K_a:
-                    if span_mode:
-                        span_vis2_idx = (span_vis2_idx - 1) % len(MODES)
-                        _kill_children()
-                        span_children = _spawn_span_children(span_vis2_idx)
-                    else:
-                        auto_gain = not auto_gain
-                elif event.key == pygame.K_b:
-                    if shift:
-                        bg_mode_i = (bg_mode_i + 1) % _BG_MODES
-                        bg_name, bg_cls = MODES[bg_mode_i]
-                        bg_vis = bg_cls(renderer=renderer)
-                        bg_on = True
-                    else:
-                        bg_on = not bg_on
-                elif event.key == pygame.K_m:
-                    if shift:
-                        if args.span_child:
-                            continue
-                        span_mode = not span_mode
-                        if span_mode:
-                            if num_displays >= 2:
-                                span_children = _spawn_span_children(span_vis2_idx)
-                            else:
-                                span_mode = False
-                        else:
-                            _kill_children()
-                        prev_surf = None
-                        crossfade_frame = 0
-                    else:
-                        now = _time.monotonic()
-                        tap_times.append(now)
-                        tap_bpm_expiry = now + tap_expire
-                        tap_flash_end = now + 2.0
-                        if len(tap_times) >= 2:
-                            intervals = [
-                                tap_times[i] - tap_times[i - 1]
-                                for i in range(1, len(tap_times))
-                            ]
-                            median_interval = sorted(intervals)[len(intervals) // 2]
-                            if median_interval > 0:
-                                tap_bpm = max(60.0, min(200.0, 60.0 / median_interval))
-                elif event.key == pygame.K_p:
-                    if shift:
-                        if presets:
-                            active_preset = (active_preset + 1) % len(presets)
-                            preset = presets[active_preset]
-                            _switch_mode(preset["mode_idx"])
-                            effect_gain = preset.get(
-                                "effect_gain", config.DEFAULT_EFFECT_GAIN
-                            )
-                            bg_on = preset.get("bg_on", bg_on)
-                            bg_mode_i = preset.get("bg_mode_i", bg_mode_i)
-                            bg_name, bg_cls = MODES[bg_mode_i]
-                            bg_vis = bg_cls(renderer=renderer)
-                    else:
-                        preset_name = f"Preset {len(presets) + 1}"
-                        sett.save_preset(
-                            preset_name,
-                            {
-                                "mode_idx": mode_idx,
-                                "effect_gain": effect_gain,
-                                "bg_on": bg_on,
-                                "bg_mode_i": bg_mode_i,
-                            },
-                        )
-                        presets = sett.load_presets()
-                        active_preset = len(presets) - 1
-                else:
-                    idx = event.key - pygame.K_1
-                    if 0 <= idx < len(MODES):
-                        _switch_mode(idx)
-
-            elif event.type == pygame.MOUSEBUTTONDOWN and not picking:
-                _switch_mode(mode_idx + 1)
-
-        detected = detect_genre()
-        if detected is not None:
-            current_genre = detected
-            _apply_genre_weights(detected)
-            palette.set_genre(detected)
-
-        waveform, fft, raw_beat, mid_e, treble_e, bpm, audio_time = get_audio()
-        if _beat_tracker.enabled:
-            bpm = _beat_tracker.analyze(fallback_bpm=bpm)
-            raw_beat = _beat_tracker.refine_beat(raw_beat, audio_time)
-
-        config.MID_ENERGY = mid_e
-        config.TREBLE_ENERGY = treble_e
-        config.EFFECT_GAIN = effect_gain
-
-        if tap_bpm > 0 and _time.monotonic() < tap_bpm_expiry:
-            config.BPM = tap_bpm
-            bpm = tap_bpm
-            using_tap = True
-        else:
-            config.BPM = bpm
-            using_tap = False
-
-        if len(energy_hist) == energy_hist.maxlen:
-            energy_sum -= energy_hist[0]
-        energy_hist.append(raw_beat)
-        energy_sum += raw_beat
-        avg = energy_sum / len(energy_hist) if energy_hist else 1e-6
-
-        impulse = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
-        beat_decay = max(impulse, beat_decay * 0.90)
-        beat = beat_decay
-
-        rms_buf.append(float(np.sqrt(np.mean(waveform ** 2))))
-        if auto_gain and rms_buf:
-            cur_rms = float(np.mean(rms_buf)) + 1e-9
-            auto_scale = max(0.5, min(target_rms / cur_rms, 2.0))
-            draw_beat = beat * auto_scale
-        else:
-            draw_beat = beat * effect_gain
-
-        palette.update(beat, mid_e, treble_e, tick)
-
-        genre_alpha = palette.trail_alpha if current_genre not in ("detecting...",) else None
-        new_alpha = genre_alpha if genre_alpha is not None else getattr(vis, "TRAIL_ALPHA", 28)
-        if new_alpha != fade_alpha:
-            fade_alpha = new_alpha
-            fade = make_fade(fade_alpha)
-        target.blit(fade, (0, 0))
-
-        if bg_on:
-            bg_surf.fill((0, 0, 0))
-            bg_vis.draw(bg_surf, waveform, fft, draw_beat, tick)
-            bg_surf.set_alpha(bg_alpha)
-            target.blit(bg_surf, (0, 0))
-
-        vis.draw(target, waveform, fft, draw_beat, tick)
-
-        if prev_surf is not None:
-            frames = max(1, int(cf_frames))
-            t = crossfade_frame / frames
-            ease = t * t * (3.0 - 2.0 * t)
-            prev_surf.set_alpha(int(255 * (1.0 - ease)))
-            target.blit(prev_surf, (0, 0))
-            crossfade_frame += 1
-            if crossfade_frame >= frames:
-                prev_surf = None
-
-        now = _time.monotonic()
-        if tap_bpm > 0 and now < tap_flash_end:
-            t_left = tap_flash_end - now
-            alpha = int(180 * min(t_left, 1.0))
-            flash = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
-            flash.fill((255, 255, 255, alpha // 6))
-            target.blit(flash, (0, 0))
-            font_big = pygame.font.SysFont("monospace", 72, bold=True)
-            label = font_big.render(f"{tap_bpm:.0f} BPM", True, (255, 255, 255, alpha))
-            target.blit(
-                label,
-                (
-                    config.WIDTH // 2 - label.get_width() // 2,
-                    config.HEIGHT // 2 - label.get_height() // 2,
-                ),
-            )
-
-        if show_hud:
-            _draw_multiband_bars(beat, mid_e, treble_e)
-            if stream is None:
-                dev_name = "no input"
-            elif active_dev is None:
-                dev_name = "default"
-            else:
-                if active_dev not in dev_name_cache:
-                    try:
-                        dev_name_cache[active_dev] = sd.query_devices(active_dev)["name"]
-                    except Exception:
-                        dev_name_cache[active_dev] = f"device {active_dev}"
-                dev_name = dev_name_cache[active_dev]
-            gain_str = "auto" if auto_gain else f"{effect_gain:.1f}"
-            bg_str = f"  bg:{bg_name}" if bg_on else ""
-            disp_str = f"  disp:{display_idx}/{num_displays - 1}"
-            preset_str = (
-                f"  preset:{presets[active_preset]['name']}"
-                if 0 <= active_preset < len(presets)
-                else ""
-            )
-
-            if hud_level >= 2:
-                row1 = font.render(
-                    f"  [{mode_idx + 1}/{len(MODES)}] {name}{bg_str}  |  intensity:{gain_str}"
-                    f"  |  genre:{current_genre}{disp_str}{preset_str}  |  mic {dev_name}{hint}",
-                    True,
-                    (90, 90, 90),
-                )
-                target.blit(row1, (6, 6))
-
-                y2 = row1.get_height() + 8
-                bpm_tag = " tap" if using_tap else ""
-                bpm_label = font_s.render(
-                    f"  BPM:{bpm:5.1f}{bpm_tag}" if bpm > 0 else "  BPM: --.-",
-                    True,
-                    (70, 70, 70),
-                )
-                target.blit(bpm_label, (6, y2))
-                bx = bpm_label.get_width() + 16
-
-                def _bar(label: str, value: float, max_value: float, color, x: int) -> int:
-                    lbl = font_s.render(label, True, (70, 70, 70))
-                    target.blit(lbl, (x, y2))
-                    x2 = x + lbl.get_width() + 4
-                    width = int(80 * max(0.0, min(value / max_value, 1.0)))
-                    if width > 0:
-                        pygame.draw.rect(target, color, (x2, y2 + 2, width, 13))
-                    return x2 + 88
-
-                bx = _bar("beat", beat, 3.0, (180, 50, 50), bx)
-                bx = _bar(" mid", mid_e, 2.0, (50, 180, 50), bx)
-                bx = _bar(" tri", treble_e, 2.0, (130, 60, 200), bx)
-
-                if hasattr(vis, "_n"):
-                    target.blit(
-                        font_s.render(f"  particles: {vis._n}", True, (60, 60, 60)),
-                        (6, y2 + 20),
-                    )
-            elif hud_level == 1:
-                bpm_tag = " tap" if using_tap else ""
-                bpm_str = f"{bpm:5.1f}{bpm_tag}" if bpm > 0 else "--.-"
-                target.blit(
-                    font_s.render(
-                        f"  [{mode_idx + 1}/{len(MODES)}] {name}  |  BPM:{bpm_str}",
-                        True,
-                        (70, 70, 70),
-                    ),
-                    (6, 6),
-                )
-
-        if pane_open:
-            _draw_pane()
-
-        if picking:
-            _draw_device_picker(target, font, devices, pick_sel, active_dev)
-
-        if _xmove_target and tick < 60:
-            dpy, win, mx, my = _xmove_target
-            _libX11.XMoveWindow(dpy, win, mx, my)
-            _libX11.XSync(dpy, 0)
-
-        if args.gl and renderer is not None:
-            renderer.blit(target)
-            target.fill((0, 0, 0, 0))
-
-        pygame.display.flip()
-        clock.tick(config.FPS)
-        tick += 1
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
+    def _quit(self):
+        self.display.kill_children()
         try:
             pygame.display.set_mode((1, 1))
         except Exception:
             pass
+        self.audio.stop_input_stream()
+        pygame.quit()
+        sys.exit(0)
+
+    def _save_settings(self):
+        if self.args.span_child:
+            return
+        sett.save({
+            "active_dev": self.audio.active_dev,
+            "mode_idx": self.mode_idx,
+            "show_hud": self.show_hud,
+            "auto_gain": self.auto_gain,
+            "bg_on": self.bg_on,
+            "bg_mode_i": self.bg_mode_i,
+            "display_idx": self.display.display_idx,
+            "bg_alpha": self.bg_alpha,
+            "cf_frames": self.cf_frames,
+            "hud_level": self.hud_level,
+            "effect_gain": self.effect_gain,
+        })
+
+    def _switch_mode(self, new_idx: int):
+        if hasattr(self.vis, "release") and callable(self.vis.release):
+            self.vis.release()
+        self.prev_surf = self.display.target.copy()
+        self.crossfade_frame = 0
+        self.mode_idx = new_idx % len(MODES)
+        self.name, self.VisCls = MODES[self.mode_idx]
+        self.vis = self.VisCls(renderer=self.display.renderer)
+        self.effect_gain = config.DEFAULT_EFFECT_GAIN
+
+    def _rebuild_effects(self):
+        if hasattr(self.vis, "release") and callable(self.vis.release):
+            self.vis.release()
+        if hasattr(self.bg_vis, "release") and callable(self.bg_vis.release):
+            self.bg_vis.release()
+        self.vis = self.VisCls(renderer=self.display.renderer)
+        self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
+        self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+        self.bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+
+    def run(self):
+        while True:
+            self._handle_events()
+            self._update()
+            self._render()
+            
+            if self.args.gl and self.display.renderer:
+                self.display.renderer.blit(self.display.target)
+                self.display.target.fill((0, 0, 0, 0))
+                
+            pygame.display.flip()
+            self.clock.tick(config.FPS)
+            self.tick += 1
+
+    def _handle_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self._save_settings()
+                self._quit()
+            
+            elif event.type == pygame.KEYDOWN:
+                if self.ui.picking:
+                    if event.key == pygame.K_UP:
+                        self.ui.pick_sel = (self.ui.pick_sel - 1) % max(1, len(self.audio.input_devices()))
+                    elif event.key == pygame.K_DOWN:
+                        self.ui.pick_sel = (self.ui.pick_sel + 1) % max(1, len(self.audio.input_devices()))
+                    elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                        if event.key == pygame.K_RETURN:
+                            devs = self.audio.input_devices()
+                            if 0 <= self.ui.pick_sel < len(devs):
+                                self.audio.start_input_stream(devs[self.ui.pick_sel][0])
+                        self.ui.picking = False
+                    continue
+
+                if event.key == pygame.K_ESCAPE:
+                    self._save_settings()
+                    self._quit()
+                elif event.key == pygame.K_f:
+                    self.display.toggle_fullscreen()
+                    self._rebuild_effects()
+                    self.fade = self._make_fade(self.fade_alpha)
+                elif event.key == pygame.K_h:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self.hud_level = (self.hud_level + 1) % 3
+                        self.show_hud = self.hud_level > 0
+                    else:
+                        self.show_hud = not self.show_hud
+                elif event.key == pygame.K_TAB:
+                    self.ui.pane_open = not self.ui.pane_open
+                elif event.key == pygame.K_m:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        if self.span_mode:
+                            self.display.kill_children()
+                            self.span_mode = False
+                        elif not self.args.span_child:
+                            self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
+                            self.span_mode = True
+                    else:
+                        t = _time.monotonic()
+                        self.tap_times.append(t)
+                        if len(self.tap_times) >= 2:
+                            self.tap_bpm = 60.0 / np.median(np.diff(list(self.tap_times)))
+                            self.tap_bpm_expiry = t + 8.0
+                            self.tap_flash_end = t + 0.5
+                elif event.key == pygame.K_a:
+                    if self.span_mode:
+                        self.span_vis2_idx = (self.span_vis2_idx - 1) % len(MODES)
+                        self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
+                    else:
+                        self.auto_gain = not self.auto_gain
+                elif event.key == pygame.K_d:
+                    if self.span_mode:
+                        self.span_vis2_idx = (self.span_vis2_idx + 1) % len(MODES)
+                        self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
+                    else:
+                        self.ui.picking = True
+                        devs = self.audio.input_devices()
+                        self.ui.pick_sel = next((i for i, d in enumerate(devs) if d[0] == self.audio.active_dev), 0)
+                elif event.key == pygame.K_b:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self.bg_mode_i = (self.bg_mode_i + 1) % _BG_MODES
+                        self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
+                        self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+                    else:
+                        self.bg_on = not self.bg_on
+                elif event.key == pygame.K_p:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self.active_preset = (self.active_preset + 1) % max(1, len(self.presets))
+                        if self.presets:
+                            p = list(self.presets.values())[self.active_preset]
+                            self._switch_mode(p["mode_idx"])
+                            self.effect_gain = p.get("intensity", 0.7)
+                            self.bg_on = p.get("bg_on", False)
+                            self.bg_mode_i = p.get("bg_mode_i", 0)
+                            self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
+                            self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+                    else:
+                        preset_name = f"Preset {len(self.presets) + 1}"
+                        sett.save_preset(preset_name, {
+                            "mode_idx": self.mode_idx,
+                            "intensity": self.effect_gain,
+                            "bg_on": self.bg_on,
+                            "bg_mode_i": self.bg_mode_i,
+                        })
+                        self.presets = sett.load_presets()
+                        self.active_preset = len(self.presets) - 1
+                elif event.key == pygame.K_RIGHT:
+                    if self.ui.pane_open:
+                        self._pane_adjust(1)
+                    else:
+                        self._switch_mode(self.mode_idx + 1)
+                elif event.key == pygame.K_LEFT:
+                    if self.ui.pane_open:
+                        self._pane_adjust(-1)
+                    else:
+                        self._switch_mode(self.mode_idx - 1)
+                elif event.key == pygame.K_UP:
+                    if self.ui.pane_open:
+                        self.ui.pane_sel = (self.ui.pane_sel - 1) % 3
+                    else:
+                        self.effect_gain = min(2.0, self.effect_gain + 0.1)
+                elif event.key == pygame.K_DOWN:
+                    if self.ui.pane_open:
+                        self.ui.pane_sel = (self.ui.pane_sel + 1) % 3
+                    else:
+                        self.effect_gain = max(0.0, self.effect_gain - 0.1)
+                elif pygame.K_1 <= event.key <= pygame.K_9:
+                    self._switch_mode(event.key - pygame.K_1)
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN and not self.ui.picking:
+                self._switch_mode(self.mode_idx + 1)
+
+    def _pane_adjust(self, delta: int):
+        if self.ui.pane_sel == 0:
+            self.effect_gain = min(2.0, max(0.0, round(self.effect_gain + delta * 0.1, 1)))
+        elif self.ui.pane_sel == 1:
+            self.bg_alpha = min(255, max(0, self.bg_alpha + delta * 5))
+        elif self.ui.pane_sel == 2:
+            self.cf_frames = min(90, max(0, self.cf_frames + delta * 5))
+
+    def _update(self):
+        detected = self.audio.detect_genre()
+        if detected:
+            self.current_genre = detected
+            self.audio.apply_genre_weights(detected)
+            palette.set_genre(detected)
+            
+        self.waveform, self.fft, raw_beat, mid_e, treble_e, bpm, audio_time = self.audio.get_audio()
+        if self.audio.beat_tracker.enabled:
+            bpm = self.audio.beat_tracker.analyze(fallback_bpm=bpm)
+            raw_beat = self.audio.beat_tracker.refine_beat(raw_beat, audio_time)
+            
+        config.MID_ENERGY = mid_e
+        config.TREBLE_ENERGY = treble_e
+        config.EFFECT_GAIN = self.effect_gain
+        
+        if self.tap_bpm > 0 and _time.monotonic() < self.tap_bpm_expiry:
+            config.BPM = self.tap_bpm
+            self.bpm = self.tap_bpm
+            self.using_tap = True
+        else:
+            config.BPM = bpm
+            self.bpm = bpm
+            self.using_tap = False
+            
+        if len(self.energy_hist) == self.energy_hist.maxlen:
+            self.energy_sum -= self.energy_hist[0]
+        self.energy_hist.append(raw_beat)
+        self.energy_sum += raw_beat
+        avg = self.energy_sum / len(self.energy_hist) if self.energy_hist else 1e-6
+        impulse = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
+        self.beat_decay = max(impulse, self.beat_decay * 0.90)
+        self.beat = self.beat_decay
+        
+        self.rms_buf.append(float(np.sqrt(np.mean(self.waveform ** 2))))
+        if self.auto_gain and self.rms_buf:
+            cur_rms = float(np.mean(self.rms_buf)) + 1e-9
+            auto_scale = max(0.5, min(self.target_rms / cur_rms, 2.0))
+            self.draw_beat = self.beat * auto_scale
+        else:
+            self.draw_beat = self.beat * self.effect_gain
+            
+        palette.update(self.beat, mid_e, treble_e, self.tick)
+        
+        self.display.reposition_window_fix(self.tick)
+
+    def _render(self):
+        target = self.display.target
+        
+        genre_alpha = palette.trail_alpha if self.current_genre != "detecting..." else None
+        new_alpha = genre_alpha if genre_alpha is not None else getattr(self.vis, "TRAIL_ALPHA", 28)
+        if new_alpha != self.fade_alpha:
+            self.fade_alpha = new_alpha
+            self.fade = self._make_fade(self.fade_alpha)
+            
+        target.blit(self.fade, (0, 0))
+        
+        if self.bg_on:
+            self.bg_surf.fill((0, 0, 0))
+            self.bg_vis.draw(self.bg_surf, self.waveform, self.fft, self.draw_beat, self.tick)
+            self.bg_surf.set_alpha(self.bg_alpha)
+            target.blit(self.bg_surf, (0, 0))
+            
+        self.vis.draw(target, self.waveform, self.fft, self.draw_beat, self.tick)
+        
+        if self.prev_surf:
+            frames = max(1, int(self.cf_frames))
+            t = self.crossfade_frame / frames
+            ease = t * t * (3.0 - 2.0 * t)
+            self.prev_surf.set_alpha(int(255 * (1.0 - ease)))
+            target.blit(self.prev_surf, (0, 0))
+            self.crossfade_frame += 1
+            if self.crossfade_frame >= frames:
+                self.prev_surf = None
+                
+        now = _time.monotonic()
+        if self.tap_bpm > 0 and now < self.tap_flash_end:
+            self.ui.draw_tap_flash(target, self.tap_bpm, int(180 * min(self.tap_flash_end - now, 1.0)))
+            
+        if self.show_hud:
+            self._render_hud(target)
+            
+        if self.ui.pane_open:
+            self.ui.draw_pane(target, self.effect_gain, self.bg_alpha, self.cf_frames)
+            
+        if self.ui.picking:
+            self.ui.draw_device_picker(target, self.audio.input_devices(), self.audio.active_dev)
+
+    def _render_hud(self, target):
+        self.ui.draw_multiband_bars(target, self.beat, config.MID_ENERGY, config.TREBLE_ENERGY)
+        
+        if self.audio.stream is None:
+            dev_name = "no input"
+        elif self.audio.active_dev is None:
+            dev_name = "default"
+        else:
+            if self.audio.active_dev not in self.dev_name_cache:
+                devs = self.audio.input_devices()
+                self.dev_name_cache[self.audio.active_dev] = next((d[1] for d in devs if d[0] == self.audio.active_dev), "unknown")
+            dev_name = self.dev_name_cache[self.audio.active_dev]
+            
+        fps = self.clock.get_fps()
+        gl_tag = " | GL" if self.args.gl else ""
+        title = f"psysuals v{__version__}  [{fps:.0f} fps{gl_tag}]"
+        
+        y0 = 6
+        target.blit(self.ui.font.render(title, True, (220, 220, 220)), (6, y0))
+        
+        mode_text = f"Mode {self.mode_idx+1}: {self.name} ({self.effect_gain:.1f})"
+        if self.bg_on:
+            mode_text += f" + BG: {self.bg_name}"
+        target.blit(self.ui.font.render(mode_text, True, (200, 200, 100)), (6, y0 + 20))
+        
+        if self.hud_level > 1:
+            info = f"BPM: {self.bpm:.1f} ({self.current_genre})"
+            if self.using_tap: info += " [TAP]"
+            if self.auto_gain: info += " [AUTO]"
+            target.blit(self.ui.font_s.render(info, True, (160, 160, 160)), (6, y0 + 42))
+            target.blit(self.ui.font_s.render(f"Input: {dev_name}", True, (130, 130, 130)), (6, y0 + 58))
+            
+            if self.active_preset >= 0 and self.presets:
+                pname = list(self.presets.keys())[self.active_preset]
+                target.blit(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)), (6, y0 + 74))
+
+if __name__ == "__main__":
+    try:
+        app = VisualizerApp()
+        app.run()
+    except KeyboardInterrupt:
         pygame.quit()
         sys.exit(130)
