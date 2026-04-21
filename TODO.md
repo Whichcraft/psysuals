@@ -22,18 +22,17 @@ Ranked on 2026-04-21 from `codebot-test` (`~/bin/codebot.sh -s`) plus local veri
    - Extracted `AudioEngine`, `DisplayManager`, and `UIManager` into `core/` package.
    - Refactored `psysualizer.py` into an object-oriented `VisualizerApp`.
 
-7. Improve beat and BPM detection quality (`P1`)
-   - Revisit the current spectral-flux pipeline and compare it against a more robust tempo/onset path before adding more effect logic on top.
-   - Evidence: the old improvement list still carries beat-detection work as open, and beat/BPM quality directly affects every effect.
+7. ~~Improve beat and BPM detection quality (`P1`)~~ [DONE]
+   - Refined spectral flux normalization and smoothing in `AudioEngine`.
+   - Constrained BPM range and improved local onset detection stability.
 
-8. Harden startup/config validation and fallback behavior (`P2`)
-   - Validate display size, audio device availability, and renderer prerequisites early, with clean fallbacks when GPU or device setup fails.
-   - Evidence: `config.py` now defaults `WIDTH` and `HEIGHT` to `0`, and the app depends on runtime monitor/audio initialization to become valid.
+8. ~~Harden startup/config validation and fallback behavior (`P2`)~~ [DONE]
+   - Added geometry validation and robust fallback paths in `DisplayManager`.
+   - Improved audio device validation and silent mode degradation in `AudioEngine`.
 
-9. Add regression checks for the effect registry contract (`P2`)
-   - Guard mode ordering, mode count, and effect-instantiation rules with a lightweight test so docs and code do not drift apart again.
-   - Evidence: `effects/__init__.py` has ordering constraints (`Spectrum` and `Waterfall` last), while the docs already disagree with the live registry.
+9. ~~Add regression checks for the effect registry contract (`P2`)~~ [DONE]
+   - Created `core/regression_tester.py` and integrated it into `smoke_test.py`.
+   - Guards mode ordering (Spectrum/Waterfall last) and Effect inheritance.
 
-10. Add performance benchmarks for CPU vs GPU render paths (`P2`)
-   - Measure frame time, CPU usage, and effect coverage before expanding the ModernGL port further.
-   - Evidence: the project already invested in a GL proof of concept, but the desktop path is still mixed and there is no benchmark-driven rollout plan in the repo.
+10. ~~Add performance benchmarks for CPU vs GPU render paths (`P2`)~~ [DONE]
+    - Created `benchmarks.py` to measure and compare effect frame rates.

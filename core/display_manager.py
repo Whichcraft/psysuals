@@ -82,6 +82,10 @@ class DisplayManager:
             return []
 
     def open_display(self, idx: int, fullscreen: bool):
+        # Validate index
+        if idx < 0 or idx >= self.num_displays:
+            idx = 0
+            
         self.display_idx = idx
         self.fullscreen = fullscreen
         self._xmove_target = None
@@ -89,32 +93,49 @@ class DisplayManager:
         if self.args.gl:
             flags |= pygame.OPENGL | pygame.DOUBLEBUF
         
-        if fullscreen and idx < len(self.xmonitors):
-            mx, my, mw, mh = self.xmonitors[idx]
-            os.environ["SDL_VIDEO_WINDOW_POS"] = f"{mx},{my}"
-            self.screen = pygame.display.set_mode((mw, mh), flags | pygame.NOFRAME)
-            os.environ.pop("SDL_VIDEO_WINDOW_POS", None)
-            if self._libX11:
-                wm = pygame.display.get_wm_info()
-                dpy = wm.get("display")
-                win = wm.get("window")
-                if isinstance(dpy, int) and dpy and win:
-                    self._libX11.XMoveWindow(dpy, win, mx, my)
-                    self._libX11.XSync(dpy, 0)
-                    self._xmove_target = (dpy, win, mx, my)
-            config.WIDTH = mw
-            config.HEIGHT = mh
-        elif fullscreen:
-            self.screen = pygame.display.set_mode((0, 0), flags | pygame.FULLSCREEN)
-            config.WIDTH, config.HEIGHT = self.screen.get_size()
-        else:
-            self.screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
+        try:
+            if fullscreen and idx < len(self.xmonitors):
+                mx, my, mw, mh = self.xmonitors[idx]
+                # Sanity check geometry
+                if mw < 100 or mh < 100:
+                     raise ValueError(f"Invalid monitor geometry: {mw}x{mh}")
+                     
+                os.environ["SDL_VIDEO_WINDOW_POS"] = f"{mx},{my}"
+                self.screen = pygame.display.set_mode((mw, mh), flags | pygame.NOFRAME)
+                os.environ.pop("SDL_VIDEO_WINDOW_POS", None)
+                if self._libX11:
+                    wm = pygame.display.get_wm_info()
+                    dpy = wm.get("display")
+                    win = wm.get("window")
+                    if isinstance(dpy, int) and dpy and win:
+                        self._libX11.XMoveWindow(dpy, win, mx, my)
+                        self._libX11.XSync(dpy, 0)
+                        self._xmove_target = (dpy, win, mx, my)
+                config.WIDTH = mw
+                config.HEIGHT = mh
+            elif fullscreen:
+                self.screen = pygame.display.set_mode((0, 0), flags | pygame.FULLSCREEN)
+                config.WIDTH, config.HEIGHT = self.screen.get_size()
+            else:
+                # Default window size if config was 0
+                w = config.WIDTH or 1280
+                h = config.HEIGHT or 720
+                self.screen = pygame.display.set_mode((w, h), flags)
+                config.WIDTH, config.HEIGHT = self.screen.get_size()
+        except Exception:
+            # Last resort fallback: windowed mode
+            self.screen = pygame.display.set_mode((1280, 720), flags)
+            config.WIDTH, config.HEIGHT = 1280, 720
         
         if self.args.gl and HAS_MODERNGL:
-            self.renderer = GLRenderer(config.WIDTH, config.HEIGHT)
+            try:
+                self.renderer = GLRenderer(config.WIDTH, config.HEIGHT)
+            except Exception:
+                # If GL fails, we might want to disable it, but for now just clear renderer
+                self.renderer = None
         
         self.target = self.screen
-        if self.args.gl:
+        if self.args.gl and self.renderer:
             self.target = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
             
         return self.screen
