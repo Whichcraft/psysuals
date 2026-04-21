@@ -16,7 +16,7 @@ Ranked on 2026-04-21 from `codebot-test` (`~/bin/codebot.sh -s`) plus local veri
    - All docs now match the current mode count, renderer status, and OO architecture.
 
 5. ~~Pin or constrain runtime dependencies (`P1`)~~ [DONE]
-   - Pinned `requirements.txt` and `requirements-gl.txt` to known working versions.
+   - Constrained `requirements.txt` and `requirements-gl.txt` to known working minimum versions using ranges.
 
 6. ~~Break `psysualizer.py` into smaller modules (`P1`)~~ [DONE]
    - Extracted `AudioEngine`, `DisplayManager`, and `UIManager` into `core/` package.
