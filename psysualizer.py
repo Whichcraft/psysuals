@@ -198,6 +198,8 @@ class VisualizerApp:
             if self.args.gl and self.display.renderer:
                 self.display.renderer.ctx.screen.use()
                 self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
+                # Ensure blend is off before the main effect draws (effects may enable it)
+                self.display.renderer.ctx.disable(moderngl.BLEND)
 
             self._render()
             

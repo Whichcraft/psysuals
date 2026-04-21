@@ -134,6 +134,7 @@ class GLRenderer:
         self._blit_prog["u_tex"] = 0
         
         self.ctx.enable(moderngl.BLEND)
+        self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
         self.render(self._blit_vao)
 
     def release(self):
