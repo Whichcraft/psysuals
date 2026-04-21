@@ -2,7 +2,8 @@
 
 **Welcome to the super-duper greatest music visualizer ever made.** psysuals v3 is a massive leap forward, re-engineered from the ground up to deliver uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, v3 is built to melt your mind with precision and style.
 
-![Version](https://img.shields.io/badge/version-3.0.0-orange) ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-3.1.0-orange)
+ ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 

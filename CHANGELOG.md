@@ -7,7 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [3.0.0] — 2026-04-21
+## [3.1.0] — 2026-04-21
+
+### Added
+- **Reworked Lattice** — complete visual overhaul with a dynamic rotozoom feedback tunnel
+- **Installation Guide** — added step-by-step setup and hardware acceleration instructions to README
+
+### Changed
+- **Massive FPS Boost** — optimized Butterflies, Vortex, and FlowField (now handling 8,000 particles smoothly)
+- **Smoother Lissajous** — dampened rotation and beat response for a more stable visual flow
+- **Improved Exit Responsiveness** — app now terminates instantly and reliably with a single `Esc` or `Q` keypress
+
+### Fixed
+- **Plasma GL** — fixed blank screen issue by ensuring the GL backbuffer is cleared correctly each frame
+- **Dependency Import** — resolved `NameError: name 'pygame' is not defined` in `GLRenderer`
+- **AudioEngine Bug** — restored the missing `get_audio` method to resolve application startup crashes
 
 ### Added
 - **Super-Duper Massive Release** — Psysuals v3 is here!
