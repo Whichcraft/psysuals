@@ -24,7 +24,7 @@ from .base import Effect
 
 class Vortex(Effect):
     TRAIL_ALPHA = 0   # we manage the surface
-    RES_DIV     = 2   # Render at 1/2 resolution for FPS boost
+    RES_DIV     = 3   # Render at 1/3 resolution for FPS boost
 
     _BASE_ZOOM       = 1.0038
     _BASE_ROT        = 0.42
@@ -146,6 +146,7 @@ class Vortex(Effect):
         self._embers = live
 
         if self.RES_DIV > 1:
-            surf.blit(pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT)), (0, 0))
+            scaled = pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT))
+            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
         else:
-            surf.blit(self._trail, (0, 0))
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)

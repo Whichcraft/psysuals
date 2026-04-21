@@ -327,6 +327,7 @@ class Butterflies(Effect):
     """
 
     TRAIL_ALPHA = 0    # owns its trail surface
+    RES_DIV     = 2    # Render at 1/2 resolution
     MAX_PAIRS   = 3
     # Fade equivalent to the old TRAIL_ALPHA=22 main-loop overlay:
     #   semi-transparent black at alpha 22 → multiply by (255-22)/255 ≈ 233/255
@@ -334,7 +335,7 @@ class Butterflies(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         self._tick       = 0
         self._global_hue = random.random()
         self._trail      = pygame.Surface((W, H))
@@ -365,4 +366,8 @@ class Butterflies(Effect):
             pair.update(bass, beat, gh, self._tick)
             pair.draw(self._trail, beat, gh)
 
-        surf.blit(self._trail, (0, 0))
+        if self.RES_DIV > 1:
+            scaled = pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT))
+            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+        else:
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)

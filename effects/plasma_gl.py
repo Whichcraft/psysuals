@@ -132,6 +132,7 @@ class PlasmaGL(Effect):
     Identical audio math to the original Plasma; the pixel evaluation moves
     from a numpy CPU loop to a GLSL fragment shader executed on the GPU.
     """
+    IS_GL = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

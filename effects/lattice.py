@@ -18,7 +18,7 @@ _IDLE = 0.08
 
 class Lattice(Effect):
     TRAIL_ALPHA = 0 # Managed by internal surface
-    RES_DIV     = 2 # Render at 1/2 resolution
+    RES_DIV     = 3 # Render at 1/3 resolution
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -126,6 +126,7 @@ class Lattice(Effect):
                                    (int(sx_arr[ni]), int(sy_arr[ni])), r)
 
         if self.RES_DIV > 1:
-            surf.blit(pygame.transform.scale(self._surf, (config.WIDTH, config.HEIGHT)), (0, 0))
+            scaled = pygame.transform.scale(self._surf, (config.WIDTH, config.HEIGHT))
+            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
         else:
-            surf.blit(self._surf, (0, 0))
+            surf.blit(self._surf, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
