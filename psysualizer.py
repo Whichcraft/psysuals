@@ -221,7 +221,7 @@ class VisualizerApp:
                         self.ui.picking = False
                     continue
 
-                if event.key == pygame.K_ESCAPE:
+                if event.key in (pygame.K_ESCAPE, pygame.K_q):
                     self._save_settings()
                     self._quit()
                 elif event.key == pygame.K_f:
@@ -307,12 +307,12 @@ class VisualizerApp:
                     if self.ui.pane_open:
                         self.ui.pane_sel = (self.ui.pane_sel - 1) % 3
                     else:
-                        self.effect_gain = min(2.0, self.effect_gain + 0.1)
+                        self.effect_gain = min(2.0, round(self.effect_gain + 0.1, 1))
                 elif event.key == pygame.K_DOWN:
                     if self.ui.pane_open:
                         self.ui.pane_sel = (self.ui.pane_sel + 1) % 3
                     else:
-                        self.effect_gain = max(0.0, self.effect_gain - 0.1)
+                        self.effect_gain = max(0.0, round(self.effect_gain - 0.1, 1))
                 elif pygame.K_1 <= event.key <= pygame.K_9:
                     self._switch_mode(event.key - pygame.K_1)
             
