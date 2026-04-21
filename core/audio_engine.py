@@ -9,7 +9,7 @@ from beat_tracking import LibrosaBeatTracker
 
 class AudioEngine:
     def __init__(self):
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._waveform = np.zeros(config.BLOCK_SIZE, dtype=np.float32)
         self._smooth_fft = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
         self._raw_beat_energy = 0.0

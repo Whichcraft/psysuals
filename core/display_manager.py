@@ -167,9 +167,13 @@ class DisplayManager:
             ]
             if self.args.gl:
                 cmd.append("--gl")
-            self.span_children[child_idx] = subprocess.Popen(cmd)
+            try:
+                self.span_children[child_idx] = subprocess.Popen(cmd)
+            except Exception as e:
+                print(f"  ⚠️ Failed to spawn span child {child_idx}: {e}")
 
     def kill_children(self) -> None:
+        """Terminate all span child processes and wait for them to exit."""
         for child in self.span_children.values():
             if child.poll() is None:
                 child.terminate()
@@ -177,4 +181,9 @@ class DisplayManager:
                     child.wait(timeout=0.2)
                 except subprocess.TimeoutExpired:
                     child.kill()
+                    child.wait() # Ensure zombie cleanup
         self.span_children = {}
+
+    def __del__(self):
+        """Final cleanup of resources."""
+        self.kill_children()
