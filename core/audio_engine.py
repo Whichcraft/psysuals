@@ -77,70 +77,78 @@ class AudioEngine:
         return "any"
 
     def _audio_cb(self, indata, frames, time_info, status) -> None:
+        if status:
+            # log or handle buffer overflow/underflow if needed
+            pass
+        
         mono = np.asarray(indata[:, 0], dtype=np.float32)
         self.beat_tracker.push_audio(mono, time_info.currentTime)
 
-        spectrum = np.abs(np.fft.rfft(mono * self._blackman_window))[: config.BLOCK_SIZE // 2]
+        # Apply window and FFT
+        windowed = mono * self._blackman_window
+        spectrum = np.abs(np.fft.rfft(windowed))[: config.BLOCK_SIZE // 2]
         spectrum = spectrum.astype(np.float32, copy=False)
+        
+        # log1p scaling for better dynamic range representation
         np.log1p(spectrum, out=spectrum)
         spectrum /= 10.0
 
         with self._lock:
             self._audio_time = float(time_info.currentTime)
             self._waveform = mono.copy()
-            self._smooth_fft *= 0.50
-            self._smooth_fft += spectrum * 0.50
+            
+            # FFT Smoothing (EMA)
+            alpha = 0.50
+            self._smooth_fft = (1.0 - alpha) * self._smooth_fft + alpha * spectrum
+            
             self._detect_accum[:] += spectrum
             self._detect_frames += 1
 
+            # Enhanced Beat Detection using Spectral Flux
+            # We use genre weights to emphasize specific bands
             weights = self._genre_weights
-            flux = float(
-                np.mean(
-                    np.maximum(
-                        0.0,
-                        spectrum[:20] * weights - self._prev_spectrum[:20] * weights,
-                    )
-                )
-            )
+            
+            # Positive difference in spectrum (flux)
+            diff = spectrum[:20] * weights - self._prev_spectrum[:20] * weights
+            flux = float(np.mean(np.maximum(0.0, diff)))
+            
+            # Smooth flux for baseline normalization
             self._flux_avg = self._flux_avg * 0.95 + flux * 0.05
             self._raw_beat_energy = flux / (self._flux_avg + 1e-6)
 
+            # Local Onset/BPM detection (fallback for when librosa is slow/absent)
             t_now = float(time_info.currentTime)
+            # threshold=2.0 for onset trigger
             if (
-                self._raw_beat_energy > 2.0
-                and self._prev_beat_energy <= 2.0
-                and t_now - self._last_onset_time > 0.30
+                self._raw_beat_energy > 2.2
+                and self._prev_beat_energy <= 2.2
+                and t_now - self._last_onset_time > 0.28  # ~214 BPM max
             ):
                 self._beat_times.append(t_now)
                 self._last_onset_time = t_now
                 if len(self._beat_times) >= 2:
                     intervals = np.diff(list(self._beat_times))
                     median_interval = float(np.median(intervals))
-                    if median_interval > 0:
-                        self._bpm = max(60.0, min(200.0, 60.0 / median_interval))
+                    if 0.25 <= median_interval <= 1.2: # 50-240 BPM range
+                        self._bpm = 60.0 / median_interval
+            
             self._prev_beat_energy = self._raw_beat_energy
 
+            # Normalized Mid Energy (bins 20-100)
             mid = float(self._smooth_fft[20:100].mean())
-            self._mid_avg = self._mid_avg * 0.95 + mid * 0.05
+            self._mid_avg = self._mid_avg * 0.98 + mid * 0.02
             self._mid_energy = mid / (self._mid_avg + 1e-6)
 
+            # Normalized Treble Energy (bins 100-256)
             treble = float(self._smooth_fft[100:256].mean())
-            self._treble_avg = self._treble_avg * 0.95 + treble * 0.05
+            self._treble_avg = self._treble_avg * 0.98 + treble * 0.02
             self._treble_energy = treble / (self._treble_avg + 1e-6)
 
             self._prev_spectrum[:] = spectrum
 
-    def get_audio(self):
-        with self._lock:
-            return (
-                self._waveform.copy(),
-                self._smooth_fft.copy(),
-                self._raw_beat_energy,
-                self._mid_energy,
-                self._treble_energy,
-                self._bpm,
-                self._audio_time,
-            )
+    def is_active(self) -> bool:
+        """Return True if the audio stream is currently running."""
+        return self.stream is not None and self.stream.active
 
     def input_devices(self) -> list[tuple[int, str]]:
         """Return list of (index, name) for all input-capable devices."""

@@ -42,7 +42,17 @@ def test_effects(MODES):
     if failed > 0:
         sys.exit(1)
 
-if __name__ == "__main__":
+def run_smoke_tests():
     modes = test_imports()
     test_effects(modes)
-    print("\n✅ Smoke test PASSED")
+    
+    print("\nRunning regression checks...")
+    from core.regression_tester import test_registry_order, test_all_effects_inherit_base, test_all_files_registered
+    test_registry_order()
+    test_all_effects_inherit_base()
+    test_all_files_registered()
+    
+    print("\n✅ All smoke and regression tests PASSED")
+
+if __name__ == "__main__":
+    run_smoke_tests()
