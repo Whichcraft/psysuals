@@ -142,6 +142,8 @@ class VisualizerApp:
 
     def _quit(self):
         self.display.kill_children()
+        if self.display.renderer:
+            self.display.renderer.release()
         try:
             pygame.display.set_mode((1, 1))
         except Exception:
@@ -191,6 +193,12 @@ class VisualizerApp:
         while True:
             self._handle_events()
             self._update()
+            
+            # Clear GL screen at start of frame
+            if self.args.gl and self.display.renderer:
+                self.display.renderer.ctx.screen.use()
+                self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
+
             self._render()
             
             if self.args.gl and self.display.renderer:
@@ -222,6 +230,7 @@ class VisualizerApp:
                     continue
 
                 if event.key in (pygame.K_ESCAPE, pygame.K_q):
+                    self.display.kill_children()
                     self._save_settings()
                     self._quit()
                 elif event.key == pygame.K_f:
