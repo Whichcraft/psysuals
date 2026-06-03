@@ -93,8 +93,8 @@ class Lattice(Effect):
         self._svel *= 0.70
         self._scale = max(0.90, min(self._scale + self._svel, 1.12))
 
-        # Feedback loop at lower res
-        rotated = pygame.transform.rotozoom(self._surf, 0.5 + beat * 2.0, 1.0 + bass * 0.01)
+        # Feedback loop at lower res (zoom only, no rotation/vortex)
+        rotated = pygame.transform.rotozoom(self._surf, 0.0, 1.0 + bass * 0.01)
         rw, rh = rotated.get_size()
         self._surf.fill((0, 0, 0))
         self._surf.blit(rotated, (-((rw - W) // 2), -((rh - H) // 2)))
