@@ -193,7 +193,7 @@ class _Pair:
     def __init__(self, hue, spawn_delay=0):
         self.hue          = hue
         self._spawn_delay = spawn_delay
-        self._join_delay  = random.randint(600, 1800)
+        self._join_delay  = random.randint(120, 300)   # 2–5 seconds instead of 10–30s
         self._lifetime    = random.randint(2400, 5400)
         self._age         = -spawn_delay
         self._orbit_ang   = random.uniform(0, math.tau)
@@ -342,8 +342,8 @@ class Butterflies(Effect):
         self._trail.fill((0, 0, 0))
         self._pairs: list[_Pair] = []
         offsets = [0,
-                   random.randint(300, 700),
-                   random.randint(800, 1400)]
+                   random.randint(30, 90),     # 0.5–1.5s instead of 5–11.6s
+                   random.randint(80, 160)]    # 1.3–2.6s instead of 13.3–23.3s
         for i, off in enumerate(offsets):
             hue = (self._global_hue + i / self.MAX_PAIRS) % 1.0
             self._pairs.append(_Pair(hue, spawn_delay=off))
@@ -356,7 +356,7 @@ class Butterflies(Effect):
         self._pairs = [p for p in self._pairs if not p.dead]
         while len(self._pairs) < self.MAX_PAIRS:
             hue = (self._global_hue + random.random() * 0.5) % 1.0
-            self._pairs.append(_Pair(hue, spawn_delay=random.randint(60, 200)))
+            self._pairs.append(_Pair(hue, spawn_delay=random.randint(20, 60)))
 
         # Fade the internal trail surface each frame
         self._trail.fill(self._FADE_FILL, special_flags=pygame.BLEND_RGB_MULT)
