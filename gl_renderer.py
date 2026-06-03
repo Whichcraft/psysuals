@@ -84,7 +84,7 @@ class GLRenderer:
     def blit_program(self) -> tuple:
         """Return a simple texture-blitting shader program."""
         vert = """
-        #version 330
+        #version 330 core
         in vec2 in_vert;
         out vec2 v_uv;
         void main() {
@@ -94,7 +94,7 @@ class GLRenderer:
         }
         """
         frag = """
-        #version 330
+        #version 330 core
         uniform sampler2D u_tex;
         in vec2 v_uv;
         out vec4 fragColor;

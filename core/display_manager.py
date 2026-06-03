@@ -92,6 +92,12 @@ class DisplayManager:
         flags = 0
         if self.args.gl:
             flags |= pygame.OPENGL | pygame.DOUBLEBUF
+            try:
+                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
+                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+            except Exception as e:
+                print(f"  ⚠️ Warning: Failed to set OpenGL attributes: {e}")
         
         try:
             if fullscreen and idx < len(self.xmonitors):

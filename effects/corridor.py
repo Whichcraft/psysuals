@@ -25,7 +25,7 @@ class Corridor(Effect):
 
     N_FRAMES = 28
     Z_FAR    = 12.0
-    Z_NEAR   = 0.28
+    Z_NEAR   = 0.06
     WORLD_H  = 2.0
     ASPECT   = 1.65
 

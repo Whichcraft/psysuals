@@ -1,4 +1,4 @@
-#vertex shader
+// vertex shader
 #version 330 core
 in vec2 in_vert;
 out vec2 v_texcoord;

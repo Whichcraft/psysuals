@@ -164,14 +164,14 @@ The previous frame is zoomed, rotated, and darkened into a wormhole while firewo
 
 ## 15. Aurora
 
-Five translucent ribbon curtains sweep across the screen with additive overlap, bright edge lines, and a cyan-to-violet bias.
+Five translucent ribbon curtains sweep across the screen with additive overlap, bright edge lines, and a cyan-to-violet bias. The ribbon edges and outer glows taper to zero at the left and right screen borders to ensure a natural, organic look without straight vertical lines.
 
 - Audio: bass controls ribbon amplitude, mid changes ribbon thickness, treble drives shimmer speed, beat triggers bloom flashes and hue nudges.
 - Visual notes: the effect uses harmonic ribbon stacks rather than particles, so it feels broad and atmospheric.
 
 ## 16. Lattice
 
-A `14 × 9` crystal grid of nodes and beams maps low frequencies to the left and higher frequencies to the right, with a shockwave travelling outward from the centre on beats.
+A `14 × 9` crystal grid of nodes and beams maps low frequencies to the left and higher frequencies to the right, with a shockwave travelling outward from the centre on beats. Features a dynamic resolution-aware layout and a multi-layered soft glow on nodes and beams that scales automatically for large or high-resolution displays.
 
 - Audio: per-column FFT energy brightens nodes and beams, bass adds a subtle whole-grid scale breath, beat launches the shockwave ring.
 - Visual notes: node hue has a radial offset, so the centre stays cooler while the corners drift more violet.

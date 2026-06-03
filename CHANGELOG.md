@@ -7,6 +7,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Aurora Effect** — tapered ribbon boundaries and outer glows to zero at screen edges, eliminating straight vertical line cut-offs for a more organic look.
+- **Lattice Effect** — added resolution-aware, multi-layered soft glows to nodes and beams, dynamically scaling their sizes and properties for large/4K displays.
+- **Lattice Dynamic Resizing** — implemented real-time render surface and node layout adjustments during screen/window size changes.
+- **Lattice Robustness** — added safe FFT slicing to prevent index/range errors.
+
 ## [3.1.0] — 2026-04-21
 
 ### Added

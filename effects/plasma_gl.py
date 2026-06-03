@@ -46,7 +46,7 @@ from .base import Effect
 # ── Shaders ───────────────────────────────────────────────────────────────────
 
 _VERT = """
-#version 330
+#version 330 core
 in vec2 in_vert;
 out vec2 v_uv;
 void main() {
@@ -56,7 +56,7 @@ void main() {
 """
 
 _FRAG = """
-#version 330
+#version 330 core
 in  vec2  v_uv;
 out vec4  fragColor;
 
@@ -76,7 +76,7 @@ vec3 hsl2rgb(float h, float l) {
     float x  = c * (1.0 - abs(mod(h6, 2.0) - 1.0));
     float m  = l - c * 0.5;
     int   i  = int(h6) % 6;
-    vec3  rgb;
+    vec3  rgb = vec3(0.0);
     if      (i == 0) rgb = vec3(c, x, 0);
     else if (i == 1) rgb = vec3(x, c, 0);
     else if (i == 2) rgb = vec3(0, c, x);
