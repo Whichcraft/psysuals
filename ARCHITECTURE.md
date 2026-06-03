@@ -146,13 +146,13 @@ Effects may also read:
 - `config.EFFECT_GAIN`
 - `effects.palette.palette`
 
-Conventional band splits used across the codebase:
+Standardized audio energy parameters used across the codebase:
 
-| Band | Bins | Approx. use |
-|------|------|-------------|
-| bass | `fft[:6]` | kick, sub, low-end pulse |
-| mid | `fft[6:30]` | body, synths, melodic motion |
-| high | `fft[30:]` | hats, shimmer, edge detail |
+| Signal | Source | Approx. use / typical mapping |
+|--------|--------|------------------------------|
+| `beat` / `bass` | `beat` parameter | kick, sub, spring pulses, scale expansion |
+| `mid` | `config.MID_ENERGY` | synths, melodic lines, rotation speed, sways |
+| `high` / `treble` | `config.TREBLE_ENERGY` | hats, high-frequency transients, sparkles, vertex jitter |
 
 ---
 

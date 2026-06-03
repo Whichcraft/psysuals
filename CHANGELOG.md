@@ -5,6 +5,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.4.0] — 2026-06-03
+
+### Changed
+- **Creative Multi-band Audio Reactivity** — upgraded all 18 visualizer effects to use the new normalized audio engine parameters (`beat`, `config.MID_ENERGY`, and `config.TREBLE_ENERGY`) creatively and distinctively instead of relying on raw frequency splits. 
+
 ## [3.3.0] — 2026-06-03
 
 ### Added
