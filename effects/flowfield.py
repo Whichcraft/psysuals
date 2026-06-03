@@ -21,9 +21,9 @@ class FlowField(Effect):
         super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
         # Scale particle count dynamically based on screen area.
-        # Baseline: 12000 particles for a 1920x1080 (1080p) screen.
+        # Baseline: 25000 particles for a 1920x1080 (1080p) screen.
         area = W * H
-        self._n = int(max(3000, min(50000, 12000 * area / (1920 * 1080))))
+        self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
         self._px = np.random.uniform(0, W, self._n).astype(np.float32)
         self._py = np.random.uniform(0, H, self._n).astype(np.float32)
         self._hue = random.random()
@@ -48,7 +48,7 @@ class FlowField(Effect):
             self._trail = pygame.Surface((W, H))
             self._trail.fill((0, 0, 0))
             area = W * H
-            self._n = int(max(3000, min(50000, 12000 * area / (1920 * 1080))))
+            self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
             self._px = np.random.uniform(0, W, self._n).astype(np.float32)
             self._py = np.random.uniform(0, H, self._n).astype(np.float32)
 
@@ -68,6 +68,14 @@ class FlowField(Effect):
         
         self._px = (self._px + np.cos(angles) * spd) % W
         self._py = (self._py + np.sin(angles) * spd) % H
+
+        # Recycle a small fraction of particles randomly to maintain even screen coverage and prevent clustering
+        recycle_rate = 0.003
+        num_recycle = int(self._n * recycle_rate)
+        if num_recycle > 0:
+            recycle_indices = np.random.randint(0, self._n, num_recycle)
+            self._px[recycle_indices] = np.random.uniform(0, W, num_recycle).astype(np.float32)
+            self._py[recycle_indices] = np.random.uniform(0, H, num_recycle).astype(np.float32)
 
         # Decay trail (RGB mult is fast on 24-bit)
         self._trail.fill((240, 240, 240), special_flags=pygame.BLEND_RGB_MULT)

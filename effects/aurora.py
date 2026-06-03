@@ -77,7 +77,7 @@ class Aurora(Effect):
 
         xs = self._xs
         self._tmp.fill((0, 0, 0))
-        edge_data: list[tuple] = []   # (top_pts_array, hue) for edge lines
+
 
         for ri, (y_frac, h_off, harms) in enumerate(self._DEFS):
             phases = self._phases[ri]
@@ -127,13 +127,5 @@ class Aurora(Effect):
                                 (int(r * ci), int(g * ci), int(b * ci)),
                                 poly)
 
-            edge_data.append((top, hue))
-
         # Blit all ribbons to screen additively (overlapping ribbons bloom together)
         surf.blit(self._tmp, (0, 0), special_flags=pygame.BLEND_ADD)
-
-        # Bright sharp edge line drawn directly on surf
-        for top_arr, hue in edge_data:
-            if len(top_arr) >= 2:
-                bl = min(0.80 + self._bloom * 0.18, 0.98)
-                pygame.draw.lines(surf, hsl(hue, l=bl), False, top_arr.tolist(), 2)
