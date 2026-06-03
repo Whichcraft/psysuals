@@ -22,6 +22,14 @@ class Lattice(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Scale resolution divisor dynamically based on screen size (laptop vs TV)
+        if config.WIDTH >= 2560:
+            self.RES_DIV = 1  # Full resolution for 1440p / 4K TV screens
+        elif config.WIDTH >= 1600:
+            self.RES_DIV = 2  # Half resolution for 1080p Full HD
+        else:
+            self.RES_DIV = 3  # 1/3 resolution for laptops / small screens
+
         self._surf = None
         self._hue = 0.52
         self._shock_r = 9999.0
@@ -40,7 +48,8 @@ class Lattice(Effect):
     def _resize(self, W, H):
         self._surf = pygame.Surface((W, H))
         self._surf.fill((0, 0, 0))
-        self._shock_spd = 6.0 / self.RES_DIV * (W / 640.0)
+        # Keep shock speed relative to the internal canvas width
+        self._shock_spd = 6.0 * (W / 640.0)
 
         cx, cy = W / 2.0, H / 2.0
         self._cx, self._cy = cx, cy
