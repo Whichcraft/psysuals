@@ -74,13 +74,14 @@ class _Butterfly:
         if self._depart_ang is None:
             self._depart_ang = random.uniform(0, math.tau)
 
-    def update(self, bass, beat, t, chase_pos=None):
+    def update(self, bass, beat, mid, high, t, chase_pos=None):
         """Update position and wing phase.
 
         chase_pos: if set, the butterfly steers toward this (x, y) target
                    instead of wandering.  Used for the mutual-chase love pairs.
         """
-        self.wing_phase += 0.09 + bass * 0.16 + beat * 0.06
+        # Mids and treble accelerate wing flapping speed
+        self.wing_phase += 0.09 + bass * 0.20 + mid * 0.35 + high * 0.15
 
         if self._depart_ang is not None:
             self.heading += (self._depart_ang - self.heading + math.pi) % math.tau - math.pi
@@ -124,7 +125,8 @@ class _Butterfly:
             diff = (desired - self.heading + math.pi) % math.tau - math.pi
             self.heading += max(-0.10, min(0.10, diff * 0.14))
 
-        spd = (1.5 + bass * 0.8 + beat * 0.4) * self.scale
+        # Mids speed up flight velocity
+        spd = (1.5 + bass * 0.8 + mid * 0.60) * self.scale
         self.x += math.cos(self.heading) * spd
         self.y += math.sin(self.heading) * spd
 
@@ -213,7 +215,7 @@ class _Pair:
         b2_gone = self.love is None or self.love.off_screen
         return b1_gone and b2_gone
 
-    def update(self, bass, beat, global_hue, t):
+    def update(self, bass, beat, mid, high, global_hue, t):
         self._age += 1
 
         if self.solo is None and self._age >= 0:
@@ -253,12 +255,12 @@ class _Pair:
 
             if self._break_timer > 0:
                 # One butterfly wanders freely; the orbit pauses
-                self.solo.update(bass, beat, t)
-                self.love.update(bass, beat, t)
+                self.solo.update(bass, beat, mid, high, t)
+                self.love.update(bass, beat, mid, high, t)
             else:
                 # Mutual chase: orbit angle rotates faster as radius shrinks
                 # (conservation-of-angular-momentum feel)
-                ang_speed = 0.012 + beat * 0.020 + 0.003 * max(0.0, 1.0 - self._orbit_r / 240)
+                ang_speed = 0.012 + beat * 0.020 + mid * 0.015 + 0.003 * max(0.0, 1.0 - self._orbit_r / 240)
                 self._orbit_ang += ang_speed
                 if self._orbit_r > 40.0:
                     self._orbit_r -= 0.06
@@ -274,12 +276,12 @@ class _Pair:
                     self.solo.x + math.cos(self._orbit_ang) * r,
                     self.solo.y + math.sin(self._orbit_ang) * r,
                 )
-                self.solo.update(bass, beat, t, chase_pos=solo_target)
-                self.love.update(bass, beat, t, chase_pos=love_target)
+                self.solo.update(bass, beat, mid, high, solo_target)
+                self.love.update(bass, beat, mid, high, love_target)
         else:
-            self.solo.update(bass, beat, t)
+            self.solo.update(bass, beat, mid, high, t)
             if self.love:
-                self.love.update(bass, beat, t)
+                self.love.update(bass, beat, mid, high, t)
 
         # Wing sync when close
         if self.love is not None:
@@ -291,22 +293,25 @@ class _Pair:
                 diff = self.love.wing_phase - self.solo.wing_phase
                 self.love.wing_phase -= diff * sync * 0.12
 
-    def draw(self, surf, beat, global_hue):
+    def draw(self, surf, beat, global_hue, treble=0.0):
         if self.solo is None:
             return
 
-        if self.love and beat > 0.8 and not self._departing:
+        # Sparkles on treble transients and bass beats
+        if self.love and (beat > 0.8 or treble > 0.45) and not self._departing:
             dist = math.hypot(self.love.x - self.solo.x,
                               self.love.y - self.solo.y)
             if dist < 300:
                 mx = (self.solo.x + self.love.x) / 2
                 my = (self.solo.y + self.love.y) / 2
-                for _ in range(4):
+                sparkle_n = int(4 + beat * 6 + treble * 10)
+                for _ in range(sparkle_n):
                     sx = int(mx + random.gauss(0, 25))
                     sy = int(my + random.gauss(0, 25))
+                    r  = random.randint(2, int(5 + treble * 6))
                     pygame.draw.circle(surf,
                                        hsl((global_hue + 0.12) % 1.0, l=0.80),
-                                       (sx, sy), random.randint(2, 5))
+                                       (sx, sy), r)
 
         oc1 = hsl((global_hue + 0.05) % 1.0, l=0.20)
         oc2 = hsl((global_hue + 0.55) % 1.0, l=0.20)
@@ -351,7 +356,10 @@ class Butterflies(Effect):
     def draw(self, surf, waveform, fft, beat, tick):
         self._tick       += 1
         self._global_hue  = (self._global_hue + 0.0014) % 1.0
-        bass = float(np.mean(fft[:6]))
+        
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
 
         self._pairs = [p for p in self._pairs if not p.dead]
         while len(self._pairs) < self.MAX_PAIRS:
@@ -363,8 +371,8 @@ class Butterflies(Effect):
 
         for i, pair in enumerate(self._pairs):
             gh = (self._global_hue + i / self.MAX_PAIRS) % 1.0
-            pair.update(bass, beat, gh, self._tick)
-            pair.draw(self._trail, beat, gh)
+            pair.update(bass, beat, mid, high, gh, self._tick)
+            pair.draw(self._trail, beat, gh, treble=high)
 
         if self.RES_DIV > 1:
             scaled = pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT))

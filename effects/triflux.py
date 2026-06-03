@@ -152,8 +152,9 @@ class Attractor(Effect):
             self._build_grid()
 
         self.hue += 0.003
-        bass = float(np.mean(fft[:6]))
-        high = float(np.mean(fft[30:]))
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
 
         # Slowly rotate filled set
         self._swap_cd -= 1
@@ -165,7 +166,7 @@ class Attractor(Effect):
                 self.filled_ids[random.randrange(len(self.filled_ids))] = random.choice(candidates)
 
         # On bass beat, pop a new interior tile to front (or extend life of existing ones)
-        bass_beat = beat > 0.2 and bass > 0.25
+        bass_beat = bass > 0.25
         if bass_beat:
             if len(self.active_ids) < self.N_ACTIVE_MAX:
                 candidates = [i for i in self._interior_indices() if i not in self.active_ids]
@@ -200,9 +201,9 @@ class Attractor(Effect):
 
         W, H = config.WIDTH, config.HEIGHT
 
-        # ── Advance both sweeps ──────────────────────────────────────────────
+        # ── Advance both sweeps (speed scaled by mids) ───────────────────────
         for sw in self._sweeps:
-            sw["pos"] += sw["vel"]
+            sw["pos"] += sw["vel"] * (1.0 + mid * 1.5)
             mn, mx = self._sweep_edge_range(sw["angle"])
             if sw["pos"] > mx + self._sweep_width:
                 sw["angle"] = random.uniform(0, math.tau)
@@ -237,12 +238,12 @@ class Attractor(Effect):
                 if dist < self._sweep_width:
                     sw_t    = 1.0 - dist / self._sweep_width
                     sweep_h = (self.hue + d / self._sweep_diag) % 1.0
-                    sweep_br = 0.20 + sw_t * 0.55
+                    sweep_br = 0.20 + sw_t * 0.55 + mid * 0.15
                     pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
 
             if i in self.filled_ids:
                 h      = (tile["hue"] + self.hue) % 1.0
-                bright = min(tile["bright"] + bass * 0.20, 0.72)
+                bright = min(tile["bright"] + bass * 0.20 + mid * 0.10, 0.75)
                 pygame.draw.polygon(surf, hsl(h, l=bright), pts)
 
             self._rainbow_edges(surf, pts)
@@ -255,15 +256,15 @@ class Attractor(Effect):
 
             alive = tile["life"] > 0
             if alive:
-                # Still alive: hold at large scale, pulse hard with bass
+                # Still alive: hold at large scale, pulse hard with bass and mids
                 tile["life"] -= 1
-                target         = 4.5 + bass * 4.0     # up to ~8.5x on strong bass beat
+                target         = 4.5 + bass * 4.0 + mid * 1.5
                 tile["svel"]  += (target - tile["scale"]) * 0.22
                 tile["svel"]  *= 0.70
                 tile["scale"]  = min(tile["scale"] + tile["svel"], 12.0)
                 tile["rot"]   += tile["rot_vel"]
-                # Bass reinforces spin
-                tile["rot_vel"] += bass * 0.016 * math.copysign(1, tile["rot_vel"] or 1)
+                # Bass and treble reinforce spin
+                tile["rot_vel"] += (bass * 0.016 + high * 0.024) * math.copysign(1, tile["rot_vel"] or 1)
                 tile["rot_vel"] *= 0.96
                 # Move centroid with velocity, then let bounce handle edges
                 tile["cx"] += tile.get("cvx", 0.0)
@@ -324,14 +325,15 @@ class Attractor(Effect):
                     pts = self._screen_verts(tile)
 
             h      = (tile["hue"] + self.hue) % 1.0
-            bright = min(tile["bright"] + bass * 0.40 + 0.25, 0.92)
+            bright = min(tile["bright"] + bass * 0.40 + mid * 0.15 + 0.25, 0.92)
 
             # Solid black backing so nothing bleeds through
             pygame.draw.polygon(surf, (0, 0, 0), pts)
             # Colour fill
             pygame.draw.polygon(surf, hsl(h, l=bright), pts)
-            # Bold rainbow edges on top
-            self._rainbow_edges(surf, pts, lw=3)
+            # Bold rainbow edges on top, styled by treble
+            active_lw = max(2, int(3 + high * 3.0))
+            self._rainbow_edges(surf, pts, lw=active_lw)
 
         for i in finished:
             self.active_ids.remove(i)

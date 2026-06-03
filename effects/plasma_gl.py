@@ -163,11 +163,11 @@ class PlasmaGL(Effect):
 
     def _advance(self, fft: np.ndarray, beat: float) -> tuple[float, float, float]:
         """Tick time forward; return (bass, mid, high) scalar energies."""
-        bass = float(np.mean(fft[:6]))
-        mid  = float(np.mean(fft[6:30]))
-        high = float(np.mean(fft[30:]))
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
         self._hue  += 0.002
-        self._time += 0.018 + bass * 0.05 + beat * 0.08
+        self._time += 0.018 + bass * 0.05 + mid * 0.03 + high * 0.02
         return bass, mid, high
 
     def _set_uniforms(self, bass: float, mid: float, high: float, beat: float) -> None:

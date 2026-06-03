@@ -87,36 +87,41 @@ class Cube(Effect):
             self._init_sat_surf()
 
         self.fade_hue += 0.0018
-        bass = min(float(np.mean(fft[:5])),   1.0)
-        mid  = min(float(np.mean(fft[5:25])), 1.0)
-        high = min(float(np.mean(fft[25:])),  1.0)
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
 
-        self.rvx += 0.00025 + mid  * 0.012 + beat * 0.10
-        self.rvy += 0.00035 + bass * 0.015 + beat * 0.12
-        self.rvz += 0.00018 + high * 0.008 + beat * 0.05
+        self.rvx += 0.00025 + mid  * 0.025 + bass * 0.08
+        self.rvy += 0.00035 + bass * 0.12
+        self.rvz += 0.00018 + high * 0.035 + bass * 0.04
         self.rvx *= 0.94; self.rvy *= 0.94; self.rvz *= 0.94
         self.rx += self.rvx; self.ry += self.rvy; self.rz += self.rvz
 
-        self.svel += beat * 0.32 + (1.0 - self.scale) * 0.18
+        self.svel += bass * 0.32 + (1.0 - self.scale) * 0.18
         self.svel *= 0.68
         self.scale += self.svel
         self.scale = max(0.5, min(1.25, self.scale))
 
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
+        # High energy treble adds physical vertex jitter to the cubes
+        jitter_amp = high * 0.08
         for base_scale, hue_off in ((self.scale, 0.0), (self.scale * 0.45, 0.5)):
-            verts = (R @ (self.VERTS * base_scale).T).T
+            cube_verts = self.VERTS * base_scale
+            if jitter_amp > 0.001:
+                cube_verts = cube_verts + (np.random.normal(0, jitter_amp, cube_verts.shape))
+            verts = (R @ cube_verts.T).T
             proj  = [self._project(v) for v in verts]
             for ei, (a, b) in enumerate(self.EDGES):
                 h = (self.fade_hue + hue_off + ei / len(self.EDGES) * 0.4) % 1.0
-                lw = max(1, int(2 + self.svel * 4)) if base_scale > 0.4 else 1
-                color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25)
+                lw = max(1, int(2 + self.svel * 4 + high * 2.0)) if base_scale > 0.4 else 1
+                color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25 + mid * 0.10)
                 pygame.draw.line(surf, color, proj[a], proj[b], lw)
 
         sat_scale = min(self.scale * 0.28, 0.55)
-        ORB_R = 2.6
-        self.orb_angle += 0.012 + beat * 0.04
-        self.sat_rx += 0.018; self.sat_ry += 0.026
+        ORB_R = 2.6 + mid * 0.4
+        self.orb_angle += 0.012 + bass * 0.04 + mid * 0.03
+        self.sat_rx += 0.018 + high * 0.04; self.sat_ry += 0.026 + high * 0.03
         Rs = self._Rx(self.sat_rx) @ self._Ry(self.sat_ry)
 
         # Fade satellite trail
@@ -125,13 +130,18 @@ class Cube(Effect):
         for si in range(2):
             theta = self.orb_angle + si * math.pi
             ox, oy = ORB_R * math.cos(theta), ORB_R * math.sin(theta)
-            verts = (Rs @ (self.VERTS * sat_scale).T).T
+            sat_verts = self.VERTS * sat_scale
+            if jitter_amp > 0.001:
+                sat_verts = sat_verts + (np.random.normal(0, jitter_amp, sat_verts.shape))
+            verts = (Rs @ sat_verts.T).T
             proj  = self._project_sat(verts, ox, oy, sat_scale)
             h_off = si * 0.5
             for ei, (a, b) in enumerate(self.EDGES):
                 h = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0
-                color = hsl(h, l=0.18 + min(self.svel, 1.0) * 0.28)
-                pygame.draw.line(self.sat_surf, color, proj[a], proj[b], 1)
+                # Treble increases satellite line width shimmer
+                sat_lw = max(1, int(1 + high * 2))
+                color = hsl(h, l=0.18 + min(self.svel, 1.0) * 0.28 + mid * 0.15)
+                pygame.draw.line(self.sat_surf, color, proj[a], proj[b], sat_lw)
 
         # Use BLEND_RGBA_MAX to preserve alpha 255 from satellite lines
         surf.blit(self.sat_surf, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)

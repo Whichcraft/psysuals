@@ -39,23 +39,24 @@ class Lissajous(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.006
-        bass = float(np.mean(fft[:6]))
-        mid  = float(np.mean(fft[6:30]))
-        high = float(np.mean(fft[30:]))
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
 
-        ax = 3.0 + bass * 0.05
-        ay = 2.0 + mid  * 0.05
-        az = 5.0 + high * 0.05
+        # Creative shape distortion mapping
+        ax = 3.0 + bass * 0.20
+        ay = 2.0 + mid  * 0.35
+        az = 5.0 + high * 0.40
 
-        self.dx += 0.0003 + bass * 0.0001
-        self.dz += 0.0002 + high * 0.0001
+        self.dx += 0.0003 + bass * 0.0002
+        self.dz += 0.0002 + high * 0.0004
 
         # BPM scaling: faster knot at higher tempo (guard against BPM=0 before detection)
         bpm_scale = max(0.7, config.BPM / 138.0) if config.BPM > 60 else 1.0
         
         # Dampened beat response to prevent "wild" behavior
         clamped_beat = min(1.5, beat)
-        self.t += (0.010 + clamped_beat * 0.006) * bpm_scale
+        self.t += (0.010 + clamped_beat * 0.006 + mid * 0.004) * bpm_scale
         self.hist.append((math.sin(ax * self.t + self.dx),
                           math.sin(ay * self.t + self.dy),
                           math.sin(az * self.t + self.dz)))
@@ -68,8 +69,8 @@ class Lissajous(Effect):
 
         self.hue += clamped_beat * 0.06
 
-        self.rvx += clamped_beat * 0.0022 + 0.00005
-        self.rvy += clamped_beat * 0.0032 + 0.00007
+        self.rvx += clamped_beat * 0.0022 + mid * 0.0015 + 0.00005
+        self.rvy += clamped_beat * 0.0032 + mid * 0.0020 + 0.00007
         self.rvx *= 0.97
         self.rvy *= 0.97
         self.rx  += self.rvx
@@ -96,8 +97,9 @@ class Lissajous(Effect):
         cx, cy = config.WIDTH // 2, config.HEIGHT // 2
 
         # Treble brightens the glow: hi-hat energy makes the knot shimmer whiter
-        l1_bright = min(0.90 + beat * 0.08 + high * 0.14, 0.98)
-        PASSES = [(4, 0.08, 0.22), (1, 0.50, l1_bright)]
+        l1_bright = min(0.90 + clamped_beat * 0.08 + high * 0.14, 0.98)
+        glow_lw_mul = 4 + int(high * 6)
+        PASSES = [(glow_lw_mul, 0.08, 0.22), (1, 0.50, l1_bright)]
 
         t_arr = np.arange(n, dtype=float) / n
         lw_base = (t_arr * 4).astype(int)
@@ -125,12 +127,12 @@ class Lissajous(Effect):
             ca, sa = math.cos(a), math.sin(a)
             sx     = int(cx + hx * ca - hy * sa)
             sy_    = int(cy + hx * sa + hy * ca)
-            r      = max(3, int(7 + beat * 3.66))
+            r      = max(3, int(7 + clamped_beat * 5.0 + high * 3.0))
             pygame.draw.circle(surf,
                                hsl((self.hue + sym * 0.33) % 1.0, l=0.88), (sx, sy_), r)
             pygame.draw.circle(surf, (255, 255, 255), (sx, sy_), max(1, r // 3))
-            if beat > 0.5:
+            if clamped_beat > 0.3 or high > 0.4:
                 pygame.draw.circle(surf,
                                    hsl((self.hue + sym * 0.33 + 0.5) % 1.0,
-                                       l=0.45 + beat * 0.25),
-                                   (sx, sy_), max(2, int(r * 1.8)), 2)
+                                       l=0.45 + clamped_beat * 0.25 + high * 0.15),
+                                   (sx, sy_), max(2, int(r * (1.5 + high * 0.8))), 2)

@@ -35,10 +35,10 @@ class Branches(Effect):
         if depth == 0 or length < 1.5:
             return
 
-        # Per-branch angle jitter — two overlapping sine fields for organic feel
+        # Per-branch angle jitter — mids drive medium sway, treble drives high-frequency shiver
         jitter = (math.sin(time * 2.3 + depth * 1.7 + angle) * mid * 0.80
                   + math.cos(time * 1.1 + depth * 2.9) * mid * 0.40
-                  + math.sin(time * 3.7 + angle * 2.1) * mid * 0.25)
+                  + math.sin(time * 6.5 + angle * 3.3) * high * 0.35)
 
         # Trunk segment drawn short; children still get full length
         draw_len = length * 0.015 if depth == self.MAX_DEPTH else length
@@ -49,7 +49,8 @@ class Branches(Effect):
         depth_t = depth / self.MAX_DEPTH
         h       = (hue + (1.0 - depth_t) * 0.80) % 1.0
         bright  = 0.28 + depth_t * 0.52 + high * 0.22 + beat_flash * 0.35
-        lw      = max(1, depth // 2)
+        # Segment thickness/glow reacts to high-frequency transients
+        lw      = max(1, depth // 2) + int(high * 1.5)
 
         # Neon glow: wide dim halo first, then bright core on top
         pygame.draw.line(surf, hsl(h, l=bright * 0.30),
@@ -57,8 +58,9 @@ class Branches(Effect):
         pygame.draw.line(surf, hsl(h, l=bright),
                          (int(x), int(y)), (int(ex), int(ey)), lw)
 
-        spread = math.pi / 2.6 + mid * 0.55
-        ratio  = 0.62 + high * 0.10
+        # Mids and treble increase branch spread angle and branch decay ratio
+        spread = math.pi / 2.6 + mid * 0.55 + high * 0.20
+        ratio  = 0.62 + high * 0.12
         self._branch(surf, ex, ey, angle - spread / 2,
                      length * ratio, depth - 1,
                      hue, time, mid, high, beat_flash)
@@ -75,12 +77,12 @@ class Branches(Effect):
     # ------------------------------------------------------------------
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.012
-        bass = float(np.mean(fft[:6]))
-        mid  = float(np.mean(fft[6:30]))
-        high = float(np.mean(fft[30:]))
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
 
-        self.time       += 0.025 + bass * 0.06 + beat * 0.12
-        self.beat_flash  = self.beat_flash * 0.72 + beat * 0.28
+        self.time       += 0.025 + bass * 0.06 + mid * 0.04 + high * 0.02
+        self.beat_flash  = self.beat_flash * 0.72 + bass * 0.28
 
         cx = config.WIDTH  // 2
         cy = config.HEIGHT // 2
@@ -89,10 +91,10 @@ class Branches(Effect):
         # never exceeds half the smaller screen dimension → always on screen.
         # Base 0.22 fills ~75 % at rest; cap clamps peak to ~92 %.
         sc    = min(config.WIDTH, config.HEIGHT)
-        trunk = min(sc * 0.22 * (1.0 + bass * 0.70 + beat * 0.45), sc * 0.27)
+        trunk = min(sc * 0.22 * (1.0 + bass * 0.70 + mid * 0.25), sc * 0.27)
 
-        # Extra arms on strong beats (up to +5)
-        n_arms = self.BASE_ARMS + int(min(beat, 2.5) * 2.2)
+        # Extra arms on strong beats and high frequencies (up to +7)
+        n_arms = self.BASE_ARMS + int(min(bass, 2.5) * 2.2 + high * 1.8)
 
         # Slow rotation of the whole tree; hue spread across all arms
         base_rot = self.time * 0.06

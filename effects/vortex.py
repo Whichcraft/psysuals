@@ -57,11 +57,12 @@ class Vortex(Effect):
         h  = (self._hue + random.uniform(-0.25, 0.25)) % 1.0
         self._rockets.append([float(x), float(H), vx, vy, h, []])
 
-    def _explode(self, x, y, hue):
-        n = random.randint(80, 120)
+    def _explode(self, x, y, hue, treble=0.0):
+        # Scale ember count and velocity with treble energy
+        n = int(random.randint(80, 120) * (1.0 + treble * 1.5))
         for _ in range(n):
             ang = random.uniform(0, math.tau)
-            spd = random.gauss(4.5 / self.RES_DIV, 1.8 / self.RES_DIV)
+            spd = random.gauss(4.5 / self.RES_DIV, 1.8 / self.RES_DIV) * (1.0 + treble * 1.2)
             vx  = math.cos(ang) * spd
             vy  = math.sin(ang) * spd * 0.85 - random.uniform(0, 1.5 / self.RES_DIV)
             life = random.randint(50, 100)
@@ -73,8 +74,11 @@ class Vortex(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         W, H  = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
-        bass  = float(np.mean(fft[:6]))
-        self._hue = (self._hue + 0.0015 + bass * 0.002) % 1.0
+        bass  = beat
+        mid   = config.MID_ENERGY
+        high  = config.TREBLE_ENERGY
+        
+        self._hue = (self._hue + 0.0015 + bass * 0.002 + high * 0.001) % 1.0
 
         # Beat: launch rockets + boost
         if beat > 0.7:
@@ -93,8 +97,8 @@ class Vortex(Effect):
         # ── feedback: zoom + rotate trail ─────────────────────────────────────
         t = self._beat_t / self._BEAT_FRAMES if self._beat_t > 0 else 0.0
         self._beat_t = max(0, self._beat_t - 1)
-        zoom    = self._BASE_ZOOM + t * (self._BEAT_ZOOM - self._BASE_ZOOM) + bass * 0.002
-        rot_deg = self._BASE_ROT  + t * (self._BEAT_ROT  - self._BASE_ROT)
+        zoom    = self._BASE_ZOOM + t * (self._BEAT_ZOOM - self._BASE_ZOOM) + bass * 0.002 + high * 0.001
+        rot_deg = self._BASE_ROT  + t * (self._BEAT_ROT  - self._BASE_ROT) + mid * 0.45
 
         # Optimize: rotozoom is expensive, but faster at lower res
         rotated = pygame.transform.rotozoom(self._trail, rot_deg, zoom)
@@ -119,12 +123,12 @@ class Vortex(Effect):
                     trail.pop(0)
             rk[0], rk[1], rk[2], rk[3] = x, y, vx, vy
 
-            # Draw rocket trail core only
+            # Draw rocket trail core only (shimmers with treble)
             if trail:
-                pygame.draw.circle(self._trail, hsl(hue, l=0.8), trail[-1], 1)
+                pygame.draw.circle(self._trail, hsl(hue, l=0.8), trail[-1], max(1, int(1.0 + high * 2.0)))
 
             if vy >= 0 or y < -20:
-                self._explode(x, y, hue)
+                self._explode(x, y, hue, treble=high)
             elif -20 < x < W + 20:
                 live.append(rk)
         self._rockets = live
@@ -139,7 +143,7 @@ class Vortex(Effect):
             x += vx; y += vy
             em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life - 1
             if life > 0 and -40 < x < W + 40 and y < H + 40:
-                brightness = 0.4 + (life / max_life) * 0.5
+                brightness = 0.4 + (life / max_life) * 0.5 + high * 0.15
                 pygame.draw.circle(self._trail, hsl(hue, l=brightness),
                                    (int(x), int(y)), radius)
                 live.append(em)
