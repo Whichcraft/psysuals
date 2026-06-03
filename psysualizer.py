@@ -59,6 +59,7 @@ class VisualizerApp:
         self._setup_signals()
         self.args = self._parse_args()
         self.settings = sett.load()
+        self.fade_alpha = 28
         
         self.display = DisplayManager(self.args)
         self.audio = AudioEngine()
@@ -117,8 +118,8 @@ class VisualizerApp:
         self.dev_name_cache = {}
         
         self.clock = pygame.time.Clock()
-        self.fade_alpha = 28
-        self.fade = self._make_fade(self.fade_alpha)
+        if not hasattr(self, "fade"):
+            self.fade = self._make_fade(self.fade_alpha)
         
         atexit.register(self.display.kill_children)
 
