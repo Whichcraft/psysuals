@@ -91,9 +91,9 @@ class Cube(Effect):
         mid  = min(float(np.mean(fft[5:25])), 1.0)
         high = min(float(np.mean(fft[25:])),  1.0)
 
-        self.rvx += 0.00165 + mid  * 0.012 + beat * 0.10
-        self.rvy += 0.00248 + bass * 0.015 + beat * 0.12
-        self.rvz += 0.00083 + high * 0.008 + beat * 0.05
+        self.rvx += 0.00025 + mid  * 0.012 + beat * 0.10
+        self.rvy += 0.00035 + bass * 0.015 + beat * 0.12
+        self.rvz += 0.00018 + high * 0.008 + beat * 0.05
         self.rvx *= 0.94; self.rvy *= 0.94; self.rvz *= 0.94
         self.rx += self.rvx; self.ry += self.rvy; self.rz += self.rvz
 

@@ -49,7 +49,7 @@ class GlowSquares(Effect):
             for ci, e in enumerate(r):
                 x   = ci * bw
                 hue = (self.hue + ci / self.cols * 0.75) % 1.0
-                lit = (1 - age * 0.7) * (0.2 + e * 0.8) + row_boost
-                lit = max(0.10, lit)
-                pygame.draw.rect(surf, hsl(hue, l=min(lit, 0.95)),
+                lit = (1 - age * 0.7) * (0.15 + e * 0.85) + row_boost
+                lit = max(0.04, min(lit, 0.95))
+                pygame.draw.rect(surf, hsl(hue, l=lit),
                                  (x, y, bw - 1, bh - 1))

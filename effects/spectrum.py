@@ -27,9 +27,9 @@ class Bars(Effect):
         heights = sums / np.maximum(np.diff(self.edges), 1).astype(float)
         heights = heights[:self.n]
         heights /= (heights.max() + 1e-6)
-        lerp = 0.25 + min(beat, 1.0) * 0.75
+        lerp = max(0.05, min(0.25 + beat * 0.55, 1.0))
         self.display = self.display * (1.0 - lerp) + heights * lerp
-        self.peaks = np.maximum(self.peaks * 0.97, self.display)
+        self.peaks = np.maximum(self.peaks * 0.94, self.display)
 
         for i, h in enumerate(self.display):
             bar_h = int(h * config.HEIGHT * 0.82)
