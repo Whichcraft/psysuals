@@ -98,12 +98,11 @@ This backlog is compiled from the model findings located in the `FINDINGS-*/*` d
   - [ ] Consolidate magic constants into a configurations dictionary per effect class.
   - [ ] Integrate these parameters into the real-time configuration/settings UI.
 
-### 17. Expand Audio Reactivity Bindings
-- **Priority**: Medium (P2)
-- **Source**: [FINDINGS-REASONING.md/qwen3.6_35b-a3b-q8_0.txt](file:///home/tstocke/github.com/psysuals/FINDINGS-REASONING.md/qwen3.6_35b-a3b-q8_0.txt)
+### 17. Expand Audio Reactivity Bindings (COMPLETED)
+- **Status**: Completed
 - **Problem**: Reactivity is primarily mapped to simple `bass` amplitude or `beat` indicators.
-- **Action Items**:
-  - [ ] Bind visual parameters (such as wing-flap speed, color hue shifting, or particle scale) to more sophisticated features like spectral flatness, spectral centroid, or onset strength.
+- **Fixes Implemented**:
+  - [x] Bound visual parameters (wing-flap speed, flight velocity, camera path sway, 3-D vertex jitter, obstacle rotation speed, particle outward scatter) to the new normalized audio engine bands (`beat`, `config.MID_ENERGY`, and `config.TREBLE_ENERGY`) across all 18 effects.
 
 ---
 
