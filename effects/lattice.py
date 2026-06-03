@@ -41,7 +41,7 @@ class Lattice(Effect):
         self._cy = 0.0
         self._max_r = 1.0
         self._nodes = []
-        self._col_averages = np.ones(_COLS, dtype=np.float32) * 0.1
+        self._col_peaks = np.ones(_COLS, dtype=np.float32) * 0.2
 
         W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         self._resize(W, H)
@@ -115,13 +115,20 @@ class Lattice(Effect):
         sy_arr = np.empty(len(self._nodes), dtype=np.float32)
         bright = np.empty(len(self._nodes), dtype=np.float32)
 
-        # Dynamic frequency normalization to keep column activity balanced/even
+        # Dynamic frequency peak normalization with noise gate to keep column activity balanced/even
         raw_energies = np.zeros(_COLS, dtype=np.float32)
         for col in range(_COLS):
             raw_energies[col] = float(fft[self._bin(col, fft_len)])
-        self._col_averages = np.maximum(self._col_averages * 0.98 + raw_energies * 0.02, 0.005)
-        norm_energies = raw_energies / self._col_averages
-        scaled_energies = norm_energies * 0.15
+        
+        # Apply noise gate (subtract background noise floor)
+        raw_energies = np.maximum(raw_energies - 0.015, 0.0)
+
+        # Peak tracking: decay slowly, snap instantly to new peaks
+        self._col_peaks = np.maximum(self._col_peaks * 0.996, raw_energies)
+        self._col_peaks = np.maximum(self._col_peaks, 0.08) # clamp min peak to avoid dividing by tiny numbers
+
+        norm_energies = raw_energies / self._col_peaks
+        scaled_energies = norm_energies * 0.68
 
         for ni, nd in enumerate(self._nodes):
             sx = cx + (nd['ox'] - cx) * sc
