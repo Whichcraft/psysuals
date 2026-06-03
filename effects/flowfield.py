@@ -52,10 +52,12 @@ class FlowField(Effect):
             self._px = np.random.uniform(0, W, self._n).astype(np.float32)
             self._py = np.random.uniform(0, H, self._n).astype(np.float32)
 
-        bass = float(np.mean(fft[:6]))
-        mids = float(np.mean(fft[10:40]))
-        self._hue = (self._hue + 0.0013 + bass * 0.002) % 1.0
-        self._t += 0.007 + mids * 0.010
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
+        
+        self._hue = (self._hue + 0.0013 + bass * 0.002 + high * 0.001) % 1.0
+        self._t += 0.007 + mid * 0.010 + high * 0.005
 
         if beat > 0.55:
             self._t += 0.5 + beat * 0.4
@@ -64,10 +66,21 @@ class FlowField(Effect):
         self._boost = max(0.0, self._boost - 0.12)
 
         angles = self._field_angles(bass)
-        spd = 1.8 + bass * 1.6 + self._boost
+        spd = 1.8 + bass * 1.6 + mid * 1.2 + self._boost
         
         self._px = (self._px + np.cos(angles) * spd) % W
         self._py = (self._py + np.sin(angles) * spd) % H
+
+        # Treble transient spikes push particles outward from screen center
+        if high > 0.45:
+            cx, cy = W / 2.0, H / 2.0
+            dx = self._px - cx
+            dy = self._py - cy
+            dist = np.hypot(dx, dy) + 1e-5
+            # Push is stronger closer to center and scales with treble intensity
+            push = (high * 22.0) * (1.0 - np.minimum(dist / (min(W, H) * 0.5), 1.0))
+            self._px = (self._px + (dx / dist) * push) % W
+            self._py = (self._py + (dy / dist) * push) % H
 
         # Recycle a small fraction of particles randomly to maintain even screen coverage and prevent clustering
         recycle_rate = 0.003

@@ -46,12 +46,13 @@ class Bubbles(Effect):
         s.fill((0, 0, 0, 0))
         return s
 
-    def _spawn(self, beat, bass):
+    def _spawn(self, beat, bass, mid, high):
         beat_sel = min(beat, 1.0)
         hue_spread = 0.35 + beat_sel * 0.30
-        for _ in range(int(2 + beat_sel * 12 + bass * 6)):
+        # Spawn more bubbles on bass beats and treble transients
+        for _ in range(int(2 + beat_sel * 12 + bass * 6 + high * 8)):
             b = self._make()
-            b["vy"]  *= (1 + beat_sel * 0.8)
+            b["vy"]  *= (1 + beat_sel * 0.8 + mid * 0.6)
             b["r"]   *= (1 + bass * 1.2)
             b["hue"]  = (self.hue + random.uniform(0, hue_spread)) % 1.0
             self.pool.append(b)
@@ -62,16 +63,17 @@ class Bubbles(Effect):
                 if len(self.pool) < self.MAX:
                     b = self._make()
                     b["r"]  *= (2.2 + bass * 2.0)
-                    b["vy"] *= 1.4
+                    b["vy"] *= (1.4 + mid * 0.5)
                     b["hue"] = (self.hue + random.uniform(0, 0.5)) % 1.0
                     self.pool.append(b)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.005
-        bass = float(np.mean(fft[:6]))
-        mid  = float(np.mean(fft[6:30]))
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
 
-        self.pvel += beat * 0.75
+        self.pvel += bass * 0.75
         self.pvel += -self.pulse * 0.35
         self.pvel *= 0.52
         self.pulse += self.pvel
@@ -81,18 +83,20 @@ class Bubbles(Effect):
             self._bass_flash = max(self._bass_flash, bass * 2.8)
         self._bass_flash = max(0.0, self._bass_flash - 0.18)
 
-        self._spawn(beat, bass)
+        self._spawn(beat, bass, mid, high)
 
         alive = []
         for b in self.pool:
-            b["x"]   += b["vx"] + math.sin(tick * b["wobble"] + b["phase"]) * 0.9
-            b["y"]   += b["vy"]
+            # Treble adds horizontal high-frequency wobble/jitter to the bubble paths
+            b["x"]   += b["vx"] + math.sin(tick * b["wobble"] + b["phase"]) * 0.9 * (1.0 + high * 2.5)
+            # Mids accelerate the bubble rising speed
+            b["y"]   += b["vy"] * (1.0 + mid * 0.8)
             b["hue"]  = (b["hue"] + 0.004) % 1.0
             if b["y"] + b["r"] < 0:
                 continue
 
             life  = max(0.0, min(1.0, b["y"] / config.HEIGHT))
-            r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.15 + self._bass_flash * 0.45)))
+            r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.35 + high * 0.20 + self._bass_flash * 0.45)))
             pad   = r + 14
             alpha = int(life * 160)
             bsurf = self._get_bsurf(pad * 2)

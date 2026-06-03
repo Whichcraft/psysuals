@@ -41,31 +41,42 @@ class Yantra(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.005
-        self.time += 0.02 + beat * 0.04
+        
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
+        
+        self.time += 0.02 + mid * 0.05 + high * 0.03
 
         cx, cy  = config.WIDTH // 2, config.HEIGHT // 2
         max_r   = min(config.WIDTH, config.HEIGHT) * 0.46
 
-        bass = float(np.mean(fft[:6]))
-        mid  = float(np.mean(fft[6:30]))
-        high = float(np.mean(fft[30:]))
-        bands = [bass, (bass + mid) * 0.5, mid,
-                 (mid + high) * 0.5, high, (bass + high) * 0.5,
-                 (mid + high) * 0.5]
+        # Construct distinct bands combining different proportions of the 3 detections
+        bands = [
+            bass,
+            (bass + mid) * 0.5,
+            mid,
+            (mid + high) * 0.5,
+            high,
+            (bass + high) * 0.5,
+            (mid + high) * 0.5
+        ]
 
         for i in range(self.N_RINGS):
             e = min(bands[i], 1.0)
-            self.pvel[i] += beat * (0.24 + e * 0.12)
+            self.pvel[i] += bass * (0.24 + e * 0.12)
             self.pvel[i] += -self.poff[i] * 0.22
             self.pvel[i] *= 0.65
             self.poff[i] += self.pvel[i]
-            self.rot[i]  += self.rvel[i] * (1.0 + e * 2.8 + bass * 1.2)
+            self.rot[i]  += self.rvel[i] * (1.0 + e * 2.8 + bass * 1.2 + mid * 1.5)
 
         all_verts = []
         for i in range(self.N_RINGS):
             base_r = max_r * (0.28 + i / (self.N_RINGS - 1) * 0.62)
             r      = base_r * (1.0 + self.poff[i] * 0.38)
-            all_verts.append(self._ring_verts(i, r, cx, cy))
+            # Add high-frequency jitter to vertex positions
+            jitter = high * 6.0 * (i / self.N_RINGS)
+            all_verts.append(self._ring_verts(i, r + jitter, cx, cy))
 
         for i in range(self.N_RINGS - 1):
             v_out = all_verts[i + 1]
@@ -78,14 +89,14 @@ class Yantra(Effect):
                 nearest = round(k / n_out * n_in) % n_in
                 ix, iy  = v_in[nearest]
                 pygame.draw.line(surf,
-                                 hsl(h, l=0.30 + e * 0.20),
+                                 hsl(h, l=0.30 + e * 0.20 + mid * 0.10),
                                  (int(ox), int(oy)), (int(ix), int(iy)), 1)
 
         for i in range(self.N_RINGS - 1, -1, -1):
             e     = min(bands[i], 1.0)
             h     = (self.hue + i / self.N_RINGS * 0.55) % 1.0
-            bright = 0.52 + e * 0.32
-            lw    = max(1, int(1 + e * 1.8 + beat * 1.6))
+            bright = 0.52 + e * 0.20 + mid * 0.15
+            lw    = max(1, int(1 + e * 1.2 + high * 1.8))
             ipts  = [(int(x), int(y)) for x, y in all_verts[i]]
             pygame.draw.polygon(surf, hsl(h, l=bright), ipts, lw)
             n = len(ipts)
@@ -95,19 +106,22 @@ class Yantra(Effect):
                     pygame.draw.line(surf, hsl(h, l=bright * 0.6),
                                      ipts[k], ipts[(k + step) % n], 1)
 
-        outer_r = max_r * (1.02 + beat * 0.27)
+        outer_r = max_r * (1.02 + bass * 0.20 + mid * 0.10)
         for s in range(self.N_SPOKES):
             a   = s / self.N_SPOKES * math.tau + self.time * 0.22
-            a  += math.sin(self.time * 2.4 + s * 0.85) * (0.05 + mid * 0.10)
-            x2  = int(cx + math.cos(a) * outer_r)
-            y2  = int(cy + math.sin(a) * outer_r)
+            a  += math.sin(self.time * 2.4 + s * 0.85) * (0.05 + mid * 0.15)
+            # Treble adds a jittery radial spoke distortion
+            spoke_r = outer_r + (math.sin(self.time * 10.0 + s) * (high * 20.0))
+            x2  = int(cx + math.cos(a) * spoke_r)
+            y2  = int(cy + math.sin(a) * spoke_r)
             h   = (self.hue + s / self.N_SPOKES * 0.35 + high * 0.2) % 1.0
-            lw  = max(1, int(1 + beat * 2.5))
+            lw  = max(1, int(1 + bass * 1.5 + high * 2.0))
             pygame.draw.line(surf,
-                             hsl(h, l=0.30 + beat * 0.50 + high * 0.15),
+                             hsl(h, l=0.30 + bass * 0.30 + mid * 0.15 + high * 0.20),
                              (cx, cy), (x2, y2), lw)
 
-        cr = max(2, int(4 + bass * 12 + beat * 10))
-        pygame.draw.circle(surf, hsl(self.hue, l=0.55 + beat * 0.35), (cx, cy), cr)
+        cr = max(2, int(4 + bass * 15 + mid * 5))
+        pygame.draw.circle(surf, hsl(self.hue, l=0.55 + bass * 0.25 + mid * 0.15), (cx, cy), cr)
+        inner_cr = max(1, int((cr // 3) * (1.0 + high * 0.5)))
         pygame.draw.circle(surf, hsl((self.hue + 0.5) % 1.0, l=0.75),
-                           (cx, cy), max(1, cr // 3))
+                           (cx, cy), inner_cr)

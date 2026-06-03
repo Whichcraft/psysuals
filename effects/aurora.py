@@ -58,8 +58,8 @@ class Aurora(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         W, H   = config.WIDTH, config.HEIGHT
-        bass   = float(np.mean(fft[:6]))
-        mid    = float(np.mean(fft[6:30]))
+        bass   = beat
+        mid    = config.MID_ENERGY
         treble = config.TREBLE_ENERGY
 
         self._hue = (self._hue + 0.003 + mid * 0.002) % 1.0

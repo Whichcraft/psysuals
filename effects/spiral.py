@@ -38,8 +38,9 @@ class Spiral(Effect):
             for j   in range(self.N_PTS)
         ]
 
-    def _path(self, t):
-        return (math.sin(t * 0.18) * 0.25, math.cos(t * 0.13) * 0.20)
+    def _path(self, t, mid=0.0):
+        scale = 1.0 + mid * 0.50
+        return (math.sin(t * 0.18) * 0.25 * scale, math.cos(t * 0.13) * 0.20 * scale)
 
     def _proj(self, wx, wy, wz):
         fov = min(config.WIDTH, config.HEIGHT) * 0.72
@@ -50,11 +51,14 @@ class Spiral(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.007 + beat * 0.04
-        bass       = float(np.mean(fft[:6]))
-        dt         = 0.038 + bass * 0.10 + beat * 0.18
+        bass       = beat
+        mid        = config.MID_ENERGY
+        high       = config.TREBLE_ENERGY
+
+        dt         = 0.038 + bass * 0.10 + mid * 0.08 + high * 0.04
         self.time += dt
 
-        self.svel += beat * 0.48
+        self.svel += bass * 0.48
         self.svel += (1.0 - self.scale) * 0.25
         self.svel *= 0.81
         self.scale = max(0.4, self.scale + self.svel)
@@ -71,16 +75,19 @@ class Spiral(Effect):
 
         cx0, cy0 = config.WIDTH // 2, config.HEIGHT // 2
 
+        # Treble dynamically twists the spiral arms
+        spin_val = self.SPIN * (1.0 + high * 0.40)
+
         arm_segs = []
         for arm_idx, arm_pts in enumerate(by_arm):
             arm_pts.sort(key=lambda p: -p["z"])
             segs = []
             for p in arm_pts:
                 near_t = max(0.0, 1.0 - p["z"] / self.Z_FAR)
-                band   = min(int(near_t * len(fft) * 0.55), len(fft) - 1)
-                r_mod  = float(fft[band]) * 1.5
-                angle  = p["pt"] * self.SPIN + arm_idx / self.N_ARMS * math.tau
-                pcx, pcy = self._path(p["pt"])
+                # Helix radius reacts to mids and treble
+                r_mod  = mid * 0.70 + high * 0.40
+                angle  = p["pt"] * spin_val + arm_idx / self.N_ARMS * math.tau
+                pcx, pcy = self._path(p["pt"], mid=mid)
                 r      = (self.RADIUS + r_mod) * self.scale
                 wx     = pcx + r * math.cos(angle)
                 wy     = pcy + r * math.sin(angle)
@@ -102,13 +109,13 @@ class Spiral(Effect):
             for segs in arm_segs:
                 for sx, sy, h, bright, sc, near_t in segs:
                     rx, ry  = rot(sx, sy)
-                    r_dot   = max(1, min(int(sc * 0.028), 9))
-                    c_halo  = hsl(h, l=bright * 0.20)
-                    c_core  = hsl(h, l=min(bright * 0.90 + 0.08, 0.95))
+                    r_dot   = max(1, min(int(sc * (0.028 + high * 0.015)), 12))
+                    c_halo  = hsl(h, l=bright * 0.20 + mid * 0.08)
+                    c_core  = hsl(h, l=min(bright * 0.90 + 0.08 + high * 0.05, 0.98))
                     pygame.draw.circle(surf, c_halo, (rx, ry), r_dot * 3 + 1)
                     pygame.draw.circle(surf, c_core, (rx, ry), r_dot)
-                    if near_t > 0.80 and beat > 0.35:
-                        fr = max(3, int(r_dot * (2.2 + beat * 0.9)))
+                    if near_t > 0.80 and (bass > 0.35 or high > 0.45):
+                        fr = max(3, int(r_dot * (2.2 + bass * 0.9 + high * 1.2)))
                         pygame.draw.circle(surf, hsl(h, l=0.96), (rx, ry), fr)
 
             n = len(arm_segs[0]) if arm_segs else 0
@@ -117,8 +124,8 @@ class Spiral(Effect):
                     if j < len(a_segs):
                         sx, sy, h, bright, sc, near_t = a_segs[j]
                         rp      = rot(sx, sy)
-                        r_dot   = max(1, min(int(sc * 0.022), 7))
-                        c_halo  = hsl(h, l=bright * 0.35)
-                        c_core  = hsl(h, l=min(bright * 0.85 + 0.10, 0.92))
+                        r_dot   = max(1, min(int(sc * (0.022 + high * 0.012)), 10))
+                        c_halo  = hsl(h, l=bright * 0.35 + mid * 0.10)
+                        c_core  = hsl(h, l=min(bright * 0.85 + 0.10 + high * 0.05, 0.95))
                         pygame.draw.circle(surf, c_halo, rp, r_dot * 3)
                         pygame.draw.circle(surf, c_core, rp, r_dot + 1)

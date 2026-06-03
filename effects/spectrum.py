@@ -21,13 +21,17 @@ class Bars(Effect):
         self.display = np.zeros(self.n)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        self.hue += 0.003
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
+
+        self.hue += 0.003 + mid * 0.005
         bar_w   = config.WIDTH // self.n
         sums    = np.add.reduceat(fft[:self.edges[-1]], self.edges[:-1])
         heights = sums / np.maximum(np.diff(self.edges), 1).astype(float)
         heights = heights[:self.n]
         heights /= (heights.max() + 1e-6)
-        lerp = max(0.05, min(0.25 + beat * 0.55, 1.0))
+        lerp = max(0.05, min(0.25 + bass * 0.55, 1.0))
         self.display = self.display * (1.0 - lerp) + heights * lerp
         self.peaks = np.maximum(self.peaks * 0.94, self.display)
 
@@ -41,9 +45,12 @@ class Bars(Effect):
             pygame.draw.rect(surf, hsl(hue, l=0.9),
                              (x, config.HEIGHT - peak - 3, bar_w - 2, 3))
 
+        # Waveform amplitude and thickness react to treble transients
         step = max(1, len(waveform) // config.WIDTH)
+        amp  = 120 + high * 120
         pts  = [(int(i * config.WIDTH / (len(waveform) // step)),
-                 int(config.HEIGHT // 2 + waveform[i * step] * 120))
+                 int(config.HEIGHT // 2 + waveform[i * step] * amp))
                 for i in range(len(waveform) // step)]
         if len(pts) > 1:
-            pygame.draw.lines(surf, hsl(self.hue, l=0.75), False, pts, 2)
+            lw = max(1, int(2 + high * 3))
+            pygame.draw.lines(surf, hsl(self.hue, l=0.75 + high * 0.15), False, pts, lw)
