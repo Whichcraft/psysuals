@@ -53,10 +53,10 @@ Common band splits used in most effects:
 | 10 | `←` / `→` | Plasma | Full-screen sine-interference plasma |
 | 11 | `←` / `→` | Branches | Fractal lightning tree with audio-jittered angles |
 | 12 | `←` / `→` | Butterflies | Dancing butterfly pairs with orbit breaks |
-| 13 | `←` / `→` | FlowField | 4 000 particles surfing a shifting vector field |
+| 13 | `←` / `→` | FlowField | 12 000+ particles surfing a shifting vector field |
 | 14 | `←` / `→` | Vortex | Feedback wormhole with fireworks |
-| 15 | `←` / `→` | Aurora | Northern Lights ribbons with additive glow |
-| 16 | `←` / `→` | Lattice | Crystal grid mapped across the spectrum |
+| 15 | `←` / `→` | Aurora | Parallel Northern Lights ribbons with additive glow |
+| 16 | `←` / `→` | Lattice | Crystal grid with zoom feedback and peak-normalization |
 | 17 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
 | 18 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
 
@@ -150,7 +150,7 @@ Up to three butterfly pairs move through the screen. A solo butterfly appears fi
 
 ## 13. FlowField
 
-Four thousand particles surf a continuously changing multi-layer vector field and paint the path they take directly into a persistent trail surface.
+Twelve thousand+ particles surf a continuously changing multi-layer vector field (scaling dynamically up to 50,000 on high-res displays) and paint the path they take directly into a persistent trail surface.
 
 - Audio: bass gently pulls particles toward the screen centre, treble scatters them outward, beat phase-jumps the field and adds a speed boost.
 - Visual notes: this mode responds strongly to hats and cymbals because treble physically disperses the particles.
@@ -164,14 +164,14 @@ The previous frame is zoomed, rotated, and darkened into a wormhole while firewo
 
 ## 15. Aurora
 
-Five translucent ribbon curtains sweep across the screen with additive overlap, bright edge lines, and a cyan-to-violet bias. The ribbon edges and outer glows taper to zero at the left and right screen borders to ensure a natural, organic look without straight vertical lines.
+Five translucent ribbon curtains sweep across the screen as thick parallel bands with additive overlap, bright edge lines, and a cyan-to-violet bias.
 
 - Audio: bass controls ribbon amplitude, mid changes ribbon thickness, treble drives shimmer speed, beat triggers bloom flashes and hue nudges.
 - Visual notes: the effect uses harmonic ribbon stacks rather than particles, so it feels broad and atmospheric.
 
 ## 16. Lattice
 
-A `14 × 9` crystal grid of nodes and beams maps low frequencies to the left and higher frequencies to the right, with a shockwave travelling outward from the centre on beats. Features a dynamic resolution-aware layout and a multi-layered soft glow on nodes and beams that scales automatically for large or high-resolution displays.
+A crystal grid of nodes and beams (with the leftmost column cut out and hidden) maps low frequencies to the left and higher frequencies to the right, with a shockwave travelling outward from the centre on beats. Features a dynamic resolution-aware layout, a zoom feedback tunnel, and a dynamic peak-normalization tracking system for balanced grid column activity.
 
 - Audio: per-column FFT energy brightens nodes and beams, bass adds a subtle whole-grid scale breath, beat launches the shockwave ring.
 - Visual notes: node hue has a radial offset, so the centre stays cooler while the corners drift more violet.

@@ -5,6 +5,25 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.3.0] — 2026-06-03
+
+### Added
+- **Lattice Grid Sizing Adaption** — implemented dynamic canvas resolution divisor (`RES_DIV`) scaling (rendering at full resolution on 1440p/4K TV screens, half resolution on FHD, and 1/3 on laptops) and corrected the shockwave speed expansion formula to scale consistently with screen dimensions.
+- **Lattice Column Normalization & Noise Gate** — introduced a dynamic peak-normalization tracking algorithm and noise gate filter to ensure balanced brightness and activity across all columns.
+- **HUD Proportional Scaling** — scaled HUD font sizes dynamically based on screen width (from 20px on default windows up to 48px on 4K TV screens) and computed y-offsets dynamically to avoid overlap.
+
+### Changed
+- **Lattice Trail Rework** — removed the vortex/twisting rotation from the rotozoom feedback loop, making grid trails zoom straight back.
+- **Lattice Column Cut-out** — completely cut out and hid the leftmost column (column 0) by positioning it off-screen and skipping its rendering.
+- **Aurora Ribbons** — restored the original constant-thickness ribbon bands, reverting the edge-tapering fade logic.
+- **FlowField Particles** — boosted particle count (baseline 12,000, max 50,000) and optimized rendering with `pygame.surfarray` vectorised assignment for an 18x speedup.
+- **Butterflies Spawning** — reduced spawning offset, partner-joining, and death respawn delays for a much faster pace.
+
+### Fixed
+- **Pygame Dependency** — replaced `pygame` with `pygame-ce` in `requirements.txt` to provide precompiled wheels on Python 3.14, resolving installation and compilation errors.
+- **FlowField Boundaries** — clipped particle coordinate arrays in `FlowField` to prevent out-of-bounds `IndexError` crashes.
+- **VisualizerApp GL Initialization** — resolved an `AttributeError` by initializing `fade_alpha` before calling `_update_target_res` in OpenGL mode.
+
 ## [3.2.0] — 2026-06-03
 
 ### Changed
