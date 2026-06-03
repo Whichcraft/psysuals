@@ -64,8 +64,6 @@ class Lattice(Effect):
         for row in range(_ROWS):
             for col in range(_COLS):
                 ox = x0 + col * cw
-                if col == 0:
-                    ox = -W * 0.25  # Move leftmost column off-screen to the left
                 oy = y0 + row * ch
                 dist = math.hypot(ox - cx, oy - cy)
                 h_off = dist / self._max_r * 0.55
@@ -145,8 +143,6 @@ class Lattice(Effect):
         # Draw Beams
         for row in range(_ROWS):
             for col in range(_COLS):
-                if col == 0:
-                    continue  # Skip/make invisible the leftmost column of beams
                 ni = row * _COLS + col
                 hue = (self._hue + self._nodes[ni]['h_off']) % 1.0
                 if col < _COLS - 1:
@@ -194,8 +190,6 @@ class Lattice(Effect):
 
         # Draw Nodes
         for ni, nd in enumerate(self._nodes):
-            if nd['col'] == 0:
-                continue  # Skip/make invisible the leftmost column of nodes
             hue = (self._hue + nd['h_off']) % 1.0
 
             # Draw base faint node
