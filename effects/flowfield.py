@@ -1,12 +1,13 @@
-"""FlowField — 8 000 particles surfing a continuously-evolving noise field.
+"""FlowField — 12 000+ particles surfing a continuously-evolving noise field.
 
 Particles ride a multi-layered noise field and paint vivid rainbow trails.
-Optimized for high particle count and high frame rates.
+Optimized for high particle count and high frame rates using NumPy surfarray vectorisation.
 """
 import math
 import random
 import numpy as np
 import pygame
+import pygame.surfarray as surfarray
 import config
 from .base import Effect
 
@@ -20,9 +21,9 @@ class FlowField(Effect):
         super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
         # Scale particle count dynamically based on screen area.
-        # Baseline: 4000 particles for a 1920x1080 (1080p) screen.
+        # Baseline: 12000 particles for a 1920x1080 (1080p) screen.
         area = W * H
-        self._n = int(max(1000, min(16000, 4000 * area / (1920 * 1080))))
+        self._n = int(max(3000, min(50000, 12000 * area / (1920 * 1080))))
         self._px = np.random.uniform(0, W, self._n).astype(np.float32)
         self._py = np.random.uniform(0, H, self._n).astype(np.float32)
         self._hue = random.random()
@@ -43,6 +44,14 @@ class FlowField(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         W, H = config.WIDTH, config.HEIGHT
+        if self._trail.get_width() != W or self._trail.get_height() != H:
+            self._trail = pygame.Surface((W, H))
+            self._trail.fill((0, 0, 0))
+            area = W * H
+            self._n = int(max(3000, min(50000, 12000 * area / (1920 * 1080))))
+            self._px = np.random.uniform(0, W, self._n).astype(np.float32)
+            self._py = np.random.uniform(0, H, self._n).astype(np.float32)
+
         bass = float(np.mean(fft[:6]))
         mids = float(np.mean(fft[10:40]))
         self._hue = (self._hue + 0.0013 + bass * 0.002) % 1.0
@@ -73,11 +82,10 @@ class FlowField(Effect):
         ix = self._px.astype(np.int32)
         iy = self._py.astype(np.int32)
         
-        # PixelArray is fast for individual pixel access
-        pa = pygame.PixelArray(self._trail)
-        for i in range(self._n):
-            pa[ix[i], iy[i]] = colors[i]
-        del pa
+        # NumPy vectorized pixel assignment is extremely fast
+        pixels = surfarray.pixels2d(self._trail)
+        pixels[ix, iy] = colors
+        del pixels
 
         # Force alpha 255 to ensure visibility in GL mode
         surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
