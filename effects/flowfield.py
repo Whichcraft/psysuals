@@ -10,7 +10,6 @@ import pygame
 import config
 from .base import Effect
 
-_N = 8000
 _FS = 0.0022
 _LAYERS = 2
 
@@ -20,8 +19,12 @@ class FlowField(Effect):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
-        self._px = np.random.uniform(0, W, _N).astype(np.float32)
-        self._py = np.random.uniform(0, H, _N).astype(np.float32)
+        # Scale particle count dynamically based on screen area.
+        # Baseline: 4000 particles for a 1920x1080 (1080p) screen.
+        area = W * H
+        self._n = int(max(1000, min(16000, 4000 * area / (1920 * 1080))))
+        self._px = np.random.uniform(0, W, self._n).astype(np.float32)
+        self._py = np.random.uniform(0, H, self._n).astype(np.float32)
         self._hue = random.random()
         self._t = 0.0
         self._boost = 0.0
@@ -31,7 +34,7 @@ class FlowField(Effect):
 
     def _field_angles(self, bass):
         x, y, t = self._px, self._py, self._t
-        a = np.zeros(_N, dtype=np.float32)
+        a = np.zeros(self._n, dtype=np.float32)
         for i in range(_LAYERS):
             f = 1.6 ** i
             a += (np.sin(x * _FS * f + t * (0.29 + i * 0.08)) *
@@ -72,7 +75,7 @@ class FlowField(Effect):
         
         # PixelArray is fast for individual pixel access
         pa = pygame.PixelArray(self._trail)
-        for i in range(_N):
+        for i in range(self._n):
             pa[ix[i], iy[i]] = colors[i]
         del pa
 

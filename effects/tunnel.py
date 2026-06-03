@@ -22,7 +22,7 @@ class Tunnel(Effect):
     N_SIDES = 20
     TUBE_R  = 2.8
     Z_FAR   = 10.0
-    Z_NEAR  = 0.18
+    Z_NEAR  = 0.06
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
