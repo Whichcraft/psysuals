@@ -94,10 +94,8 @@ class Aurora(Effect):
             wave = wave / tot_w * amp
 
             cy  = y_frac * H
-            # Fade thickness to 0 at the left/right screen edges to avoid straight vertical boundaries
-            fade = np.sin(np.pi * xs / W).astype(np.float32)
-            y_t = cy + wave - (rh * fade) / 2
-            y_b = cy + wave + (rh * fade) / 2
+            y_t = cy + wave
+            y_b = cy + wave + rh
 
             xs_i = xs.astype(np.int32)
             yt_i = np.clip(y_t, -H * 0.6, H * 1.6).astype(np.int32)
@@ -107,11 +105,11 @@ class Aurora(Effect):
             bot = np.column_stack([xs_i[::-1], yb_i[::-1]])          # (N,2) reversed
             poly = np.vstack([top, bot])
 
-            # Wider glow polygon (padded outward on both sides, tapering at screen edges)
-            pad = (rh * 0.5 * fade).astype(np.int32)
+            # Wider glow polygon (padded outward on both sides)
+            pad = max(2, int(rh * 0.5))
             glow_poly = np.vstack([
                 np.column_stack([xs_i,       yt_i - pad]),
-                np.column_stack([xs_i[::-1], yb_i[::-1] + pad[::-1]]),
+                np.column_stack([xs_i[::-1], yb_i[::-1] + pad]),
             ])
 
             # Pure saturated hue for scaling

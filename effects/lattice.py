@@ -65,7 +65,11 @@ class Lattice(Effect):
                 })
 
     def _bin(self, col: int, fft_len: int) -> int:
-        return int(col / (_COLS - 1) * min(fft_len - 1, int(fft_len * _FFT_USE)))
+        start = 3  # skip DC component and sub-bass rumble
+        end = min(fft_len - 1, int(fft_len * _FFT_USE))
+        if end <= start:
+            return 0
+        return start + int(col / (_COLS - 1) * (end - start))
 
     def draw(self, surf, waveform, fft, beat, tick):
         W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
@@ -118,6 +122,13 @@ class Lattice(Effect):
                 hue = (self._hue + self._nodes[ni]['h_off']) % 1.0
                 if col < _COLS - 1:
                     ni_r = ni + 1
+                    
+                    # Draw base faint line
+                    w_base = max(1, int(1.0 * scale_factor))
+                    pygame.draw.line(self._surf, hsl(hue, s=0.25, l=0.06),
+                                     (int(sx_arr[ni]), int(sy_arr[ni])),
+                                     (int(sx_arr[ni_r]), int(sy_arr[ni_r])), w_base)
+
                     avg_b = (bright[ni] + bright[ni_r]) * 0.5
                     if avg_b > 0.1:
                         # Glow line
@@ -132,6 +143,13 @@ class Lattice(Effect):
                                          (int(sx_arr[ni_r]), int(sy_arr[ni_r])), w_core)
                 if row < _ROWS - 1:
                     ni_d = ni + _COLS
+
+                    # Draw base faint line
+                    w_base = max(1, int(1.0 * scale_factor))
+                    pygame.draw.line(self._surf, hsl(hue, s=0.25, l=0.06),
+                                     (int(sx_arr[ni]), int(sy_arr[ni])),
+                                     (int(sx_arr[ni_d]), int(sy_arr[ni_d])), w_base)
+
                     avg_b = (bright[ni] + bright[ni_d]) * 0.5
                     if avg_b > 0.1:
                         # Glow line
@@ -147,9 +165,15 @@ class Lattice(Effect):
 
         # Draw Nodes
         for ni, nd in enumerate(self._nodes):
+            hue = (self._hue + nd['h_off']) % 1.0
+
+            # Draw base faint node
+            r_base = max(1, int(2.0 * scale_factor))
+            pygame.draw.circle(self._surf, hsl(hue, s=0.25, l=0.08),
+                               (int(sx_arr[ni]), int(sy_arr[ni])), r_base)
+
             b = float(bright[ni])
             if b > 0.15:
-                hue = (self._hue + nd['h_off']) % 1.0
                 base_r = (2.0 + b * 5.0) * scale_factor
                 r_core = max(1, int(base_r))
                 r_mid = max(2, int(base_r * 1.8))
