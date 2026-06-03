@@ -102,7 +102,7 @@ class Nova(Effect):
             t_rot = self.time * t_speed
             t_r   = max_r * t_r_frac * (1.0 + self.poff[0] * 0.35 + beat * 0.25)
             t_h   = (self.hue + t_h_off) % 1.0
-            t_l   = 0.55 + bass * 0.25 + beat * 0.30
+            t_l   = 0.55 + beat * 0.35
             t_lw  = max(1, int(1 + beat * 2))
             for sym in range(3):
                 a_mid   = sym / 3 * math.tau + t_rot

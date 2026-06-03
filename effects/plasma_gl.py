@@ -166,8 +166,8 @@ class PlasmaGL(Effect):
         bass = float(np.mean(fft[:6]))
         mid  = float(np.mean(fft[6:30]))
         high = float(np.mean(fft[30:]))
-        self._hue  += 0.005
-        self._time += 0.018 + bass * 0.09 + beat * 0.14
+        self._hue  += 0.002
+        self._time += 0.018 + bass * 0.05 + beat * 0.08
         return bass, mid, high
 
     def _set_uniforms(self, bass: float, mid: float, high: float, beat: float) -> None:

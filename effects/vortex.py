@@ -58,16 +58,16 @@ class Vortex(Effect):
         self._rockets.append([float(x), float(H), vx, vy, h, []])
 
     def _explode(self, x, y, hue):
-        n = random.randint(40, 60) # Fewer embers for speed
+        n = random.randint(80, 120)
         for _ in range(n):
             ang = random.uniform(0, math.tau)
             spd = random.gauss(4.5 / self.RES_DIV, 1.8 / self.RES_DIV)
             vx  = math.cos(ang) * spd
             vy  = math.sin(ang) * spd * 0.85 - random.uniform(0, 1.5 / self.RES_DIV)
-            life = random.randint(30, 60) # Shorter life
+            life = random.randint(50, 100)
             h    = (hue + random.uniform(-0.09, 0.09)) % 1.0
-            r    = max(1, random.randint(1, 3) // self.RES_DIV)
-            self._embers.append([x, y, vx, vy, h, r, life, life])
+            r    = (2 + random.randint(0, 3)) // self.RES_DIV
+            self._embers.append([x, y, vx, vy, h, max(1, r), life, life])
 
     # ── main draw ─────────────────────────────────────────────────────────────
 

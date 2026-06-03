@@ -66,9 +66,9 @@ class Corridor(Effect):
 
         fov = min(config.WIDTH, config.HEIGHT) * 0.72
 
-        spawn_n = int(bass * 1.2 + (beat * 4.0 if beat > 0.25 else 0))
+        spawn_n = int(bass * 5.0 + beat * 4.0)
         for _ in range(spawn_n):
-            z = self.Z_FAR * random.uniform(0.55, 0.92)
+            z = self.Z_FAR * (0.55 + random.random() * 0.37)
             self.sparks.append({
                 "z":   z,
                 "hue": (self.hue + random.uniform(0, 0.6)) % 1.0,
