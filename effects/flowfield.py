@@ -79,8 +79,8 @@ class FlowField(Effect):
         ib = (np.sin((hx + 0.66) * math.tau) * 127 + 128).astype(np.uint32)
         colors = (ir << 16) | (ig << 8) | ib
 
-        ix = self._px.astype(np.int32)
-        iy = self._py.astype(np.int32)
+        ix = np.clip(self._px.astype(np.int32), 0, W - 1)
+        iy = np.clip(self._py.astype(np.int32), 0, H - 1)
         
         # NumPy vectorized pixel assignment is extremely fast
         pixels = surfarray.pixels2d(self._trail)
