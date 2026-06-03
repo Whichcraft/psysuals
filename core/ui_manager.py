@@ -4,8 +4,15 @@ import config
 
 class UIManager:
     def __init__(self):
-        self.font = pygame.font.SysFont("monospace", 16)
-        self.font_s = pygame.font.SysFont("monospace", 14)
+        # Scale font sizes dynamically based on screen width
+        # Laptops/small displays (< 1600 width): make text larger (20px / 16px) for visibility
+        # Standard/large displays: 16px / 14px
+        if config.WIDTH < 1600:
+            self.font = pygame.font.SysFont("monospace", 20)
+            self.font_s = pygame.font.SysFont("monospace", 16)
+        else:
+            self.font = pygame.font.SysFont("monospace", 16)
+            self.font_s = pygame.font.SysFont("monospace", 14)
         self.font_big = pygame.font.SysFont("monospace", 72, bold=True)
         self.pane_open = False
         self.pane_sel = 0

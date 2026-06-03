@@ -500,22 +500,27 @@ class VisualizerApp:
         
         y0 = 6
         target.blit(self.ui.font.render(title, True, (220, 220, 220)), (6, y0))
+        y0 += self.ui.font.get_height() + 2
         
         mode_text = f"Mode {self.mode_idx+1}: {self.name} ({self.effect_gain:.1f})"
         if self.bg_on:
             mode_text += f" + BG: {self.bg_name}"
-        target.blit(self.ui.font.render(mode_text, True, (200, 200, 100)), (6, y0 + 20))
+        target.blit(self.ui.font.render(mode_text, True, (200, 200, 100)), (6, y0))
+        y0 += self.ui.font.get_height() + 4
         
         if self.hud_level > 1:
             info = f"BPM: {self.bpm:.1f} ({self.current_genre})"
             if self.using_tap: info += " [TAP]"
             if self.auto_gain: info += " [AUTO]"
-            target.blit(self.ui.font_s.render(info, True, (160, 160, 160)), (6, y0 + 42))
-            target.blit(self.ui.font_s.render(f"Input: {dev_name}", True, (130, 130, 130)), (6, y0 + 58))
+            target.blit(self.ui.font_s.render(info, True, (160, 160, 160)), (6, y0))
+            y0 += self.ui.font_s.get_height() + 2
+            
+            target.blit(self.ui.font_s.render(f"Input: {dev_name}", True, (130, 130, 130)), (6, y0))
+            y0 += self.ui.font_s.get_height() + 2
             
             if self.active_preset >= 0 and self.presets:
                 pname = list(self.presets.keys())[self.active_preset]
-                target.blit(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)), (6, y0 + 74))
+                target.blit(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)), (6, y0))
 
 if __name__ == "__main__":
     try:
