@@ -105,8 +105,10 @@ class FlowField(Effect):
         
         # NumPy vectorized pixel assignment is extremely fast
         pixels = surfarray.pixels2d(self._trail)
-        pixels[ix, iy] = colors
-        del pixels
+        try:
+            pixels[ix, iy] = colors
+        finally:
+            del pixels
 
         # Force alpha 255 to ensure visibility in GL mode
         surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)

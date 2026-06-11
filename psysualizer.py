@@ -333,7 +333,7 @@ class VisualizerApp:
                     if event.mod & pygame.KMOD_SHIFT:
                         self.active_preset = (self.active_preset + 1) % max(1, len(self.presets))
                         if self.presets:
-                            p = list(self.presets.values())[self.active_preset]
+                            p = self.presets[self.active_preset]
                             self._switch_mode(p["mode_idx"])
                             self.effect_gain = p.get("intensity", 0.7)
                             self.bg_on = p.get("bg_on", False)
@@ -431,10 +431,10 @@ class VisualizerApp:
         self.display.reposition_window_fix(self.tick)
 
         if self.span_mode:
-            for child in self.display.span_children.values():
+            for child_idx, child in list(self.display.span_children.items()):
                 if child.poll() is not None:
-                    self._save_settings()
-                    self._quit()
+                    print(f"  Span child {child_idx} died, respawning...")
+                    self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
 
     def _render(self):
         target = self.display.target
@@ -519,7 +519,7 @@ class VisualizerApp:
             y0 += self.ui.font_s.get_height() + 2
             
             if self.active_preset >= 0 and self.presets:
-                pname = list(self.presets.keys())[self.active_preset]
+                pname = self.presets[self.active_preset]["name"]
                 target.blit(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)), (6, y0))
 
 if __name__ == "__main__":

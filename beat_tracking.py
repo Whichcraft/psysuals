@@ -109,7 +109,13 @@ class LibrosaBeatTracker:
                 aggregate=np.mean,
             )
             if onset_env.size < 8:
-                return self._bpm or fallback_bpm
+                with self._lock:
+                    bpm = self._bpm or fallback_bpm
+                    if bpm:
+                        self._bpm = bpm
+                    self._analysis_running = False
+                    return
+
             tempo, beat_frames = librosa.beat.beat_track(
                 onset_envelope=onset_env,
                 sr=self.sample_rate,
@@ -126,6 +132,8 @@ class LibrosaBeatTracker:
                 backtrack=False,
             )
         except Exception:
+            with self._lock:
+                self._analysis_running = False
             return
 
         frame_seconds = self.hop_length / float(self.sample_rate)
