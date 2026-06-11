@@ -111,4 +111,4 @@ class FlowField(Effect):
             del pixels
 
         # Force alpha 255 to ensure visibility in GL mode
-        surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+        surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

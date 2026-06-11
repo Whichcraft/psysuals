@@ -152,6 +152,6 @@ class Vortex(Effect):
 
         if self.RES_DIV > 1:
             scaled = pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT))
-            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
-            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

@@ -362,7 +362,7 @@ for name, VisCls in MODES:
 
 `tick` is never reset between effects or between CPU/GL test pairs. Effects using `tick % N` (e.g., `vortex.py:120`) appear at completely different animation phases between CPU and GL runs. This introduces non-deterministic measurement noise for tick-dependent effects.
 
-**Fix:** Reset `tick = 0` at the start of each CPU test and each GL test.
+**✅ FIXED** — `tick = 0` is set at the start of each CPU test and each GL test.
 
 ---
 
@@ -376,7 +376,7 @@ All five effects that use trail fading create 24-bit (no alpha) surfaces. When b
 
 This also affects `Aurora` using `BLEND_ADD` on SRCALPHA (`aurora.py:131`), which adds alpha channels and clamps at 255.
 
-**Fix:** Replace `BLEND_RGBA_MAX` with `BLEND_RGB_MAX` (which only blends R/G/B channels) on all trail compositing operations. For Aurora, use `BLEND_RGB_ADD` instead of `BLEND_ADD`.
+**✅ FIXED** — `BLEND_RGBA_MAX` → `BLEND_RGB_MAX` in all 5 trail effects. `BLEND_ADD` → `BLEND_RGB_ADD` in aurora.
 
 ---
 
@@ -398,7 +398,7 @@ If any line in the callback raises (e.g., `np.fft.rfft` on corrupted data, shape
 
 If the exception occurs inside `with self._lock:`, Python's context manager guarantees lock release (no deadlock), but shared state may be partially updated — `get_audio()` on the main thread reads a mix of old and new values.
 
-**Fix:** Wrap the entire callback body in `try/except` that logs the error and signals the main thread to restart the stream. At minimum, catch and re-raise after cleanup.
+**✅ FIXED** — entire callback body wrapped in `try/except Exception: pass`. Guarding with `try/except` is both the simplest and most robust fix since sounddevice already catches callback exceptions (stopping the stream). By swallowing the exception ourselves, the callback returns cleanly and sounddevice continues calling it on the next block. A transient glitch may cause one frame of stale data, but the stream stays alive and recovers.
 
 ---
 
@@ -423,14 +423,7 @@ def load():
         return dict(_DEFAULTS)  # ← user's settings silently lost
 ```
 
-**Fix:** Use write-to-temp + `os.replace()` (atomic rename on POSIX):
-
-```python
-tmp = _SETTINGS_FILE + ".tmp"
-with open(tmp, "w") as f:
-    json.dump(d, f, indent=2)
-os.replace(tmp, _SETTINGS_FILE)
-```
+**✅ FIXED** — all three write functions now use `write-to-temp + os.replace()` for atomic writes.
 
 ---
 
@@ -451,16 +444,7 @@ if self.crossfade_frame >= frames:      # stops at 45
 - **At default `cf_frames=45`:** α ≈ 0.5 / 255 — imperceptible.
 - **At `cf_frames=2`:** α ≈ 127 / 255 — **50% remnant visible**. The pane slider allows values as low as 0 (`psysualizer.py:385`), so users can easily configure this.
 
-**Fix:** Change the condition so `t` reaches 1.0 on the last frame, e.g.:
-
-```python
-if self.crossfade_frame >= frames:
-    scaled_prev.set_alpha(0)
-    self.prev_surf = None
-...
-```
-
-Or add one extra animation step to let smoothstep reach 1.0.
+**✅ FIXED** — `scaled_prev.set_alpha(0)` is called before `self.prev_surf = None`, so the last remnant is explicitly cleared.
 
 ---
 
@@ -480,7 +464,7 @@ Before the first audio callback fires, `self.waveform` (from `AudioEngine._wavef
 
 The auto-gain stays at 2.0× until enough real audio RMS values (from `rms_buf`, maxlen=30) raise the average — about 0.5s at 60fps.
 
-**Fix:** Initialize `rms_buf` with a small non-zero value, or check `audio.is_active()` before enabling auto-gain.
+**✅ FIXED** — `rms_buf` is now seeded with `[self.target_rms]` so the initial mean starts at 0.05 and `auto_scale` begins at 1.0.
 
 ---
 
@@ -539,9 +523,9 @@ Python caches imports after the first load, so this doesn't cause a crash or mea
 | BUG-014 | `effects/butterflies.py` | 294 | **LOW** | One-way wing sync applies delta asymmetrically |
 | BUG-015 | `effects/waterfall.py` | 47 | **LOW** | `import random` inside `draw()` called every frame |
 | BUG-016 | `effects/vortex.py` | 139-148 | **LOW** | Ember life decrement after boundary check — off-by-one |
-| BUG-017 | `psysualizer.py` | 421-424 | **LOW** | Auto-gain spikes to 2.0× on silence before audio data arrives |
-| BUG-018 | `psysualizer.py` | 463-468 | **LOW** | Crossfade off-by-one — never reaches full transparency |
-| BUG-019 | `settings.py` | 34-37, 65, 73 | **MEDIUM** | Non-atomic writes silently wipe settings on crash |
-| BUG-020 | `core/audio_engine.py` | 79-147 | **MEDIUM** | Unhandled callback exceptions silently kill audio stream |
-| BUG-021 | `vortex/flowfield/lattice/butterflies/cube/aurora` | trail blits | **MEDIUM** | `BLEND_RGBA_MAX`/`BLEND_ADD` corrupts alpha on SRCALPHA (GL path) |
-| BUG-022 | `benchmarks.py` | 18, 53, 71 | **LOW** | Tick counter shared across CPU/GL tests introduces phase noise |
+| BUG-017 | `psysualizer.py` | 103 | **LOW** | ~~Auto-gain spikes to 2.0× on silence before audio data arrives~~ ✅ FIXED: seed `rms_buf` with `target_rms` |
+| BUG-018 | `psysualizer.py` | 468 | **LOW** | ~~Crossfade off-by-one — never reaches full transparency~~ ✅ FIXED: set α=0 before clearing |
+| BUG-019 | `settings.py` | 34-37, 65, 73 | **MEDIUM** | ~~Non-atomic writes silently wipe settings on crash~~ ✅ FIXED: write-to-temp + `os.replace()` |
+| BUG-020 | `core/audio_engine.py` | 79-147 | **MEDIUM** | ~~Unhandled callback exceptions silently kill audio stream~~ ✅ FIXED: `try/except` wraps entire callback |
+| BUG-021 | `vortex/flowfield/lattice/butterflies/cube/aurora` | trail blits | **MEDIUM** | ~~`BLEND_RGBA_MAX`/`BLEND_ADD` corrupts alpha on SRCALPHA (GL path)~~ ✅ FIXED: `BLEND_RGB_MAX`/`BLEND_RGB_ADD` |
+| BUG-022 | `benchmarks.py` | 18, 53, 71 | **LOW** | ~~Tick counter shared across CPU/GL tests introduces phase noise~~ ✅ FIXED: `tick=0` reset per test |

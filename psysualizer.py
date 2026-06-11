@@ -24,7 +24,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.5.1"
+__version__ = "3.5.2"
 
 import argparse
 import atexit
@@ -100,8 +100,8 @@ class VisualizerApp:
         self.show_hud = self.hud_level > 0
         
         self.auto_gain = self.settings.get("auto_gain", False)
-        self.rms_buf = deque(maxlen=30)
         self.target_rms = 0.05
+        self.rms_buf = deque(maxlen=30, iterable=[self.target_rms])
         
         self.tap_times = deque(maxlen=4)
         self.tap_bpm = 0.0
@@ -466,6 +466,7 @@ class VisualizerApp:
             target.blit(scaled_prev, (0, 0))
             self.crossfade_frame += 1
             if self.crossfade_frame >= frames:
+                scaled_prev.set_alpha(0)
                 self.prev_surf = None
                 
         now = _time.monotonic()

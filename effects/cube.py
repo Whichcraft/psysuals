@@ -144,4 +144,4 @@ class Cube(Effect):
                 pygame.draw.line(self.sat_surf, color, proj[a], proj[b], sat_lw)
 
         # Use BLEND_RGBA_MAX to preserve alpha 255 from satellite lines
-        surf.blit(self.sat_surf, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+        surf.blit(self.sat_surf, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

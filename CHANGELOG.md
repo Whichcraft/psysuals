@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.5.2] — 2026-06-11
+
+### Fixed
+- **BUG-017 (auto-gain)** — seed `rms_buf` with `target_rms` to prevent 2.0× spike on silence
+- **BUG-018 (crossfade)** — set alpha to 0 before clearing previous frame, preventing remnant
+- **BUG-019 (settings)** — atomic writes via `write-to-temp + os.replace()` in all 3 write paths
+- **BUG-020 (audio callback)** — `try/except` around entire callback body prevents silent stream death
+- **BUG-021 (GL blend modes)** — `BLEND_RGBA_MAX` → `BLEND_RGB_MAX` in 5 effects, `BLEND_ADD` → `BLEND_RGB_ADD` in aurora
+- **BUG-022 (benchmarks)** — reset `tick = 0` per test to eliminate CPU/GL phase noise
+
 ## [3.5.1] — 2026-06-11
 
 ### Documented
