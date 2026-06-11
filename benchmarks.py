@@ -44,6 +44,7 @@ def run_benchmark(duration_s=2.0):
         
         # CPU Test
         vis_cpu = VisCls()
+        tick = 0
         start = time.perf_counter()
         frames = 0
         end_time = start + duration_s
@@ -57,14 +58,12 @@ def run_benchmark(duration_s=2.0):
         gl_fps = None
         if renderer:
             vis_gl = VisCls(renderer=renderer)
+            tick = 0
             start = time.perf_counter()
             frames = 0
             end_time = start + duration_s
             while time.perf_counter() < end_time:
-                # In our app, even GL mode draws UI to a surface
-                # But effects draw to context.
                 vis_gl.draw(gl_target, waveform, fft, beat, tick)
-                # Composite (as in main loop)
                 renderer.blit(gl_target)
                 gl_target.fill((0, 0, 0, 0))
                 frames += 1

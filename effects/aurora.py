@@ -128,4 +128,4 @@ class Aurora(Effect):
                                 poly)
 
         # Blit all ribbons to screen additively (overlapping ribbons bloom together)
-        surf.blit(self._tmp, (0, 0), special_flags=pygame.BLEND_ADD)
+        surf.blit(self._tmp, (0, 0), special_flags=pygame.BLEND_RGB_ADD)

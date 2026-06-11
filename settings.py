@@ -33,8 +33,10 @@ def load() -> dict:
 
 def save(d: dict) -> None:
     os.makedirs(_CONFIG_DIR, exist_ok=True)
-    with open(_SETTINGS_FILE, "w") as f:
+    tmp = _SETTINGS_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(d, f, indent=2)
+    os.replace(tmp, _SETTINGS_FILE)
 
 
 # ── Presets ───────────────────────────────────────────────────────────────────
@@ -62,13 +64,17 @@ def save_preset(name: str, data: dict) -> None:
             break
     else:
         presets.append(entry)
-    with open(_PRESETS_FILE, "w") as f:
+    tmp = _PRESETS_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(presets, f, indent=2)
+    os.replace(tmp, _PRESETS_FILE)
 
 
 def delete_preset(name: str) -> None:
     """Remove a preset by name (no-op if not found)."""
     os.makedirs(_CONFIG_DIR, exist_ok=True)
     presets = [p for p in load_presets() if p.get("name") != name]
-    with open(_PRESETS_FILE, "w") as f:
+    tmp = _PRESETS_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(presets, f, indent=2)
+    os.replace(tmp, _PRESETS_FILE)
