@@ -3,6 +3,7 @@
 > Round 1: Analysis across ETH codebot models (`mistral-small:24b-instruct-2501-q8_0`, `qwen3.6:35b-a3b-q8_0`, `llama3.3:70b`).
 > Round 2: Manual review of all 33 source files + targeted queries to `mistral-small:24b-instruct-2501-q8_0` and `qwen3.6:27b`.
 > Round 3: Manual review of remaining files (vortex.py) + targeted queries to `mistral-small:24b-instruct-2501-q8_0`.
+> Round 4: Runtime analysis (benchmark run + edge-case search + targeted queries to `mistral-small:24b-instruct-2501-q8_0`).
 
 ---
 
@@ -341,6 +342,26 @@ self.solo.wing_phase += diff * sync * 0.12
 
 ---
 
+### BUG-017: `psysualizer.py:421-424` — Auto-gain spikes to max on silence before audio arrives
+
+```python
+self.rms_buf.append(float(np.sqrt(np.mean(self.waveform ** 2))))
+if self.auto_gain and self.rms_buf:
+    cur_rms = float(np.mean(self.rms_buf)) + 1e-9
+    auto_scale = max(0.5, min(self.target_rms / cur_rms, 2.0))
+```
+
+Before the first audio callback fires, `self.waveform` (from `AudioEngine._waveform`) is still the initial `np.zeros(config.BLOCK_SIZE, dtype=np.float32)`. This means:
+1. RMS of zeros = 0.0
+2. `cur_rms = 0.0 + 1e-9 = 1e-9`
+3. `auto_scale = min(2.0, 0.05 / 1e-9) = 2.0`
+
+The auto-gain stays at 2.0× until enough real audio RMS values (from `rms_buf`, maxlen=30) raise the average — about 0.5s at 60fps.
+
+**Fix:** Initialize `rms_buf` with a small non-zero value, or check `audio.is_active()` before enabling auto-gain.
+
+---
+
 ### BUG-016: `effects/vortex.py:139-148` — Ember life decrement after boundary check causes off-by-one
 
 ```python
@@ -396,3 +417,4 @@ Python caches imports after the first load, so this doesn't cause a crash or mea
 | BUG-014 | `effects/butterflies.py` | 294 | **LOW** | One-way wing sync applies delta asymmetrically |
 | BUG-015 | `effects/waterfall.py` | 47 | **LOW** | `import random` inside `draw()` called every frame |
 | BUG-016 | `effects/vortex.py` | 139-148 | **LOW** | Ember life decrement after boundary check — off-by-one |
+| BUG-017 | `psysualizer.py` | 421-424 | **LOW** | Auto-gain spikes to 2.0× on silence before audio data arrives |
