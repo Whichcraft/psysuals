@@ -5,6 +5,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.5.0] — 2026-06-11
+
+### Fixed
+- **BUG-016 (vortex.py)** — ember life off-by-one: decrement now applied to local variable before boundary check, preventing one extra frame of life and incorrect brightness on the last frame
+- **BUG-017 (psysualizer.py)** — auto-gain spike on silence: documented (no code fix)
+
 ## [3.4.0] — 2026-06-03
 
 ### Changed
