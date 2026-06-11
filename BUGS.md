@@ -2,6 +2,7 @@
 
 > Round 1: Analysis across ETH codebot models (`mistral-small:24b-instruct-2501-q8_0`, `qwen3.6:35b-a3b-q8_0`, `llama3.3:70b`).
 > Round 2: Manual review of all 33 source files + targeted queries to `mistral-small:24b-instruct-2501-q8_0` and `qwen3.6:27b`.
+> Round 3: Manual review of remaining files (vortex.py) + targeted queries to `mistral-small:24b-instruct-2501-q8_0`.
 
 ---
 
@@ -340,6 +341,28 @@ self.solo.wing_phase += diff * sync * 0.12
 
 ---
 
+### BUG-016: `effects/vortex.py:139-148` — Ember life decrement after boundary check causes off-by-one
+
+```python
+em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life - 1
+if life > 0 and ... :
+    brightness = 0.4 + (life / max_life) * 0.5 + high * 0.15
+```
+
+The local variable `life` is decremented in the list assignment (`em[6] = life - 1`), but the condition on the next line reads the **old** `life` value from the local scope, which hasn't been updated. This means:
+1. Embers live one frame longer than `max_life`
+2. The brightness calculation on the last visual frame uses the wrong `life` ratio
+
+**Fix:** Decrement the local variable before the check:
+
+```python
+life -= 1
+em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life
+if life > 0 and ... :
+```
+
+---
+
 ### BUG-015: `effects/waterfall.py:47` — `import random` inside `draw()` called every frame
 
 ```python
@@ -372,3 +395,4 @@ Python caches imports after the first load, so this doesn't cause a crash or mea
 | BUG-013 | `core/display_manager.py` + `psysualizer.py` | 433-437 | **MEDIUM** | Span child respawn kills all healthy children |
 | BUG-014 | `effects/butterflies.py` | 294 | **LOW** | One-way wing sync applies delta asymmetrically |
 | BUG-015 | `effects/waterfall.py` | 47 | **LOW** | `import random` inside `draw()` called every frame |
+| BUG-016 | `effects/vortex.py` | 139-148 | **LOW** | Ember life decrement after boundary check — off-by-one |

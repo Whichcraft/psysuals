@@ -141,7 +141,8 @@ class Vortex(Effect):
             vx *= _DRAG
             vy *= _DRAG
             x += vx; y += vy
-            em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life - 1
+            life -= 1
+            em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life
             if life > 0 and -40 < x < W + 40 and y < H + 40:
                 brightness = 0.4 + (life / max_life) * 0.5 + high * 0.15
                 pygame.draw.circle(self._trail, hsl(hue, l=brightness),
