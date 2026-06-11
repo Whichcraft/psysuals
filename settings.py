@@ -44,6 +44,8 @@ def load_presets() -> list:
     try:
         with open(_PRESETS_FILE) as f:
             data = json.load(f)
+        if isinstance(data, dict):
+            return [{"name": k, **v} for k, v in data.items()]
         return data if isinstance(data, list) else []
     except (FileNotFoundError, json.JSONDecodeError):
         return []

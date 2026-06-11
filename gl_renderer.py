@@ -142,11 +142,9 @@ class GLRenderer:
         if self._blit_tex:
             self._blit_tex.release()
         self._vbo.release()
-        for prog, vao in self._program_cache.values():
-            prog.release()
-            # VAO is implicitly released when prog or buffers are? 
-            # Actually, VAO should be released too.
+        for prog, vao in list(self._program_cache.values()):
             vao.release()
+            prog.release()
         if self._blit_vao:
             self._blit_vao.release()
         if self._blit_prog:

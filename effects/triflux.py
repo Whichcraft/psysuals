@@ -226,10 +226,9 @@ class Attractor(Effect):
             tile["rot"]     += tile["rot_vel"]
 
             pts = self._screen_verts(tile)
-            if all(p[0] < 0 or p[0] >= W or p[1] < 0 or p[1] >= H for p in pts):
-                continue
+            on_screen = not all(p[0] < 0 or p[0] >= W or p[1] < 0 or p[1] >= H for p in pts)
 
-            # Sweep glows — drawn first so tile fill and edges render on top
+            # Sweep glows — drawn even for off-screen tiles (light shaft effect)
             for sw in self._sweeps:
                 sw_cos = math.cos(sw["angle"])
                 sw_sin = math.sin(sw["angle"])
@@ -240,6 +239,9 @@ class Attractor(Effect):
                     sweep_h = (self.hue + d / self._sweep_diag) % 1.0
                     sweep_br = 0.20 + sw_t * 0.55 + mid * 0.15
                     pygame.draw.polygon(surf, hsl(sweep_h, s=1.0, l=sweep_br), pts)
+
+            if not on_screen:
+                continue
 
             if i in self.filled_ids:
                 h      = (tile["hue"] + self.hue) % 1.0

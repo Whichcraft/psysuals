@@ -51,8 +51,8 @@ class Corridor(Effect):
 
     def _init_surfs(self):
         W, H = config.WIDTH, config.HEIGHT
-        self.corridor_surf = pygame.Surface((W, H)); self.corridor_surf.fill((0, 0, 0))
-        self.spark_surf    = pygame.Surface((W, H)); self.spark_surf.fill((0, 0, 0))
+        self.corridor_surf = pygame.Surface((W, H), pygame.SRCALPHA); self.corridor_surf.fill((0, 0, 0, 255))
+        self.spark_surf    = pygame.Surface((W, H), pygame.SRCALPHA); self.spark_surf.fill((0, 0, 0, 255))
         self._cfade = pygame.Surface((W, H)); self._cfade.set_alpha(self._CORRIDOR_FADE); self._cfade.fill((0, 0, 0))
         self._sfade = pygame.Surface((W, H)); self._sfade.set_alpha(self._SPARK_FADE);    self._sfade.fill((0, 0, 0))
 
