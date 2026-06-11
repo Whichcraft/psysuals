@@ -292,6 +292,7 @@ class _Pair:
                 sync = 1.0 - dist / sync_range
                 diff = self.love.wing_phase - self.solo.wing_phase
                 self.love.wing_phase -= diff * sync * 0.12
+                self.solo.wing_phase += diff * sync * 0.12
 
     def draw(self, surf, beat, global_hue, treble=0.0):
         if self.solo is None:

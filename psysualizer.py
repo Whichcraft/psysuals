@@ -434,7 +434,7 @@ class VisualizerApp:
             for child_idx, child in list(self.display.span_children.items()):
                 if child.poll() is not None:
                     print(f"  Span child {child_idx} died, respawning...")
-                    self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
+                    self.display._spawn_child(child_idx, self.span_vis2_idx, os.path.abspath(__file__))
 
     def _render(self):
         target = self.display.target

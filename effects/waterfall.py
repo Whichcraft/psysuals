@@ -1,3 +1,4 @@
+import random
 from collections import deque
 
 import numpy as np
@@ -44,7 +45,6 @@ class GlowSquares(Effect):
         bh    = max(4, config.HEIGHT // self.ROWS)
         flash = bass * 0.35
 
-        import random
         for ri, r in enumerate(self.buf):
             y = ri * bh
             if y > config.HEIGHT:
