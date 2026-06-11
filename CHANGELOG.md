@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.5.1] — 2026-06-11
+
+### Documented
+- **BUG-018 (crossfade)** — off-by-one prevents full transparency on last frame
+- **BUG-019 (settings)** — non-atomic writes silently reset user config on crash
+- **BUG-020 (audio callback)** — unhandled exceptions silently kill audio stream
+- **BUG-021 (GL blend modes)** — `BLEND_RGBA_MAX`/`BLEND_ADD` corrupt alpha on SRCALPHA targets
+- **BUG-022 (benchmarks)** — shared tick counter introduces phase noise between CPU/GL tests
+
 ## [3.5.0] — 2026-06-11
 
 ### Fixed

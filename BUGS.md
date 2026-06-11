@@ -4,6 +4,7 @@
 > Round 2: Manual review of all 33 source files + targeted queries to `mistral-small:24b-instruct-2501-q8_0` and `qwen3.6:27b`.
 > Round 3: Manual review of remaining files (vortex.py) + targeted queries to `mistral-small:24b-instruct-2501-q8_0`.
 > Round 4: Runtime analysis (benchmark run + edge-case search + targeted queries to `mistral-small:24b-instruct-2501-q8_0`).
+> Round 5: Architecture-level review (crossfade, settings I/O, audio callback safety, GL blend modes, benchmarks) + targeted queries to `mistral-small:24b-instruct-2501-q8_0`.
 
 ---
 
@@ -342,6 +343,127 @@ self.solo.wing_phase += diff * sync * 0.12
 
 ---
 
+### BUG-022: `benchmarks.py:18,53,71` — Tick counter shared across all CPU/GL tests
+
+```python
+tick = 0  # initialized once at module level
+
+for name, VisCls in MODES:
+    # CPU test: tick increments by ~2800 for fast effects
+    while time.perf_counter() < end_time:
+        vis_cpu.draw(cpu_surf, waveform, fft, beat, tick)
+        tick += 1
+    # GL test: continues from CPU's final tick
+    vis_gl = VisCls(renderer=renderer)
+    while time.perf_counter() < end_time:
+        vis_gl.draw(gl_target, waveform, fft, beat, tick)
+        tick += 1
+```
+
+`tick` is never reset between effects or between CPU/GL test pairs. Effects using `tick % N` (e.g., `vortex.py:120`) appear at completely different animation phases between CPU and GL runs. This introduces non-deterministic measurement noise for tick-dependent effects.
+
+**Fix:** Reset `tick = 0` at the start of each CPU test and each GL test.
+
+---
+
+### BUG-021: `effects/vortex.py:155`, `flowfield.py:114`, `lattice.py:220`, `butterflies.py:380`, `cube.py:147` — `BLEND_RGBA_MAX` corrupts alpha on SRCALPHA targets (GL path)
+
+```python
+surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+```
+
+All five effects that use trail fading create 24-bit (no alpha) surfaces. When blitted with `BLEND_RGBA_MAX`, pygame treats the missing alpha as 255, so `max(255, dst_alpha) = 255`. On SRCALPHA targets (used in GL mode at `psysualizer.py:181`), this unconditionally raises destination alpha to 255 wherever the trail has content, destroying any semi-transparency for composited elements.
+
+This also affects `Aurora` using `BLEND_ADD` on SRCALPHA (`aurora.py:131`), which adds alpha channels and clamps at 255.
+
+**Fix:** Replace `BLEND_RGBA_MAX` with `BLEND_RGB_MAX` (which only blends R/G/B channels) on all trail compositing operations. For Aurora, use `BLEND_RGB_ADD` instead of `BLEND_ADD`.
+
+---
+
+### BUG-020: `core/audio_engine.py:79-147` — Audio callback unhandled exceptions silently kill the stream
+
+```python
+def _audio_cb(self, indata, frames, time_info, status) -> None:
+    mono = np.asarray(indata[:, 0], dtype=np.float32)
+    self.beat_tracker.push_audio(mono, time_info.currentTime)
+    windowed = mono * self._blackman_window
+    spectrum = np.abs(np.fft.rfft(windowed))
+    ...  # no try/except around any of this
+    with self._lock:
+        self._waveform = mono.copy()
+        ...
+```
+
+If any line in the callback raises (e.g., `np.fft.rfft` on corrupted data, shape mismatch), sounddevice catches the exception, logs it, and **stops the audio stream** without notifying the main thread. The visualizer continues running with stale/frozen audio data, and the user sees the visuals stop reacting to music.
+
+If the exception occurs inside `with self._lock:`, Python's context manager guarantees lock release (no deadlock), but shared state may be partially updated — `get_audio()` on the main thread reads a mix of old and new values.
+
+**Fix:** Wrap the entire callback body in `try/except` that logs the error and signals the main thread to restart the stream. At minimum, catch and re-raise after cleanup.
+
+---
+
+### BUG-019: `settings.py:34-37` — Non-atomic writes silently wipe settings on crash
+
+```python
+def save(d):
+    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    with open(_SETTINGS_FILE, "w") as f:
+        json.dump(d, f, indent=2)
+```
+
+Same for `save_preset()` (line 65) and `delete_preset()` (line 73). If the process crashes or is killed mid-write, the JSON file is truncated or contains partial data. On next load, `json.JSONDecodeError` is caught and defaults silently replace the user's configuration:
+
+```python
+def load():
+    try:
+        with open(_SETTINGS_FILE) as f:
+            data = json.load(f)
+        return {**_DEFAULTS, **data}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return dict(_DEFAULTS)  # ← user's settings silently lost
+```
+
+**Fix:** Use write-to-temp + `os.replace()` (atomic rename on POSIX):
+
+```python
+tmp = _SETTINGS_FILE + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(d, f, indent=2)
+os.replace(tmp, _SETTINGS_FILE)
+```
+
+---
+
+### BUG-018: `psysualizer.py:463-468` — Crossfade off-by-one prevents full transparency
+
+```python
+frames = max(1, int(self.cf_frames))   # default: 45
+t = self.crossfade_frame / frames       # 0/45, 1/45, ..., 44/45
+ease = t * t * (3.0 - 2.0 * t)         # smoothstep
+scaled_prev.set_alpha(int(255 * (1.0 - ease)))
+self.crossfade_frame += 1
+if self.crossfade_frame >= frames:      # stops at 45
+    self.prev_surf = None
+```
+
+`crossfade_frame` iterates 0..44 (45 steps), so the last `t = 44/45 ≈ 0.978`. Smoothstep(0.978) ≈ 0.998, giving `alpha = 255 × (1 − 0.998) ≈ 0.5`. The previous frame is cleared while still at alpha ≈ 0.5 — it never reaches full transparency.
+
+- **At default `cf_frames=45`:** α ≈ 0.5 / 255 — imperceptible.
+- **At `cf_frames=2`:** α ≈ 127 / 255 — **50% remnant visible**. The pane slider allows values as low as 0 (`psysualizer.py:385`), so users can easily configure this.
+
+**Fix:** Change the condition so `t` reaches 1.0 on the last frame, e.g.:
+
+```python
+if self.crossfade_frame >= frames:
+    scaled_prev.set_alpha(0)
+    self.prev_surf = None
+...
+```
+
+Or add one extra animation step to let smoothstep reach 1.0.
+
+---
+
 ### BUG-017: `psysualizer.py:421-424` — Auto-gain spikes to max on silence before audio arrives
 
 ```python
@@ -418,3 +540,8 @@ Python caches imports after the first load, so this doesn't cause a crash or mea
 | BUG-015 | `effects/waterfall.py` | 47 | **LOW** | `import random` inside `draw()` called every frame |
 | BUG-016 | `effects/vortex.py` | 139-148 | **LOW** | Ember life decrement after boundary check — off-by-one |
 | BUG-017 | `psysualizer.py` | 421-424 | **LOW** | Auto-gain spikes to 2.0× on silence before audio data arrives |
+| BUG-018 | `psysualizer.py` | 463-468 | **LOW** | Crossfade off-by-one — never reaches full transparency |
+| BUG-019 | `settings.py` | 34-37, 65, 73 | **MEDIUM** | Non-atomic writes silently wipe settings on crash |
+| BUG-020 | `core/audio_engine.py` | 79-147 | **MEDIUM** | Unhandled callback exceptions silently kill audio stream |
+| BUG-021 | `vortex/flowfield/lattice/butterflies/cube/aurora` | trail blits | **MEDIUM** | `BLEND_RGBA_MAX`/`BLEND_ADD` corrupts alpha on SRCALPHA (GL path) |
+| BUG-022 | `benchmarks.py` | 18, 53, 71 | **LOW** | Tick counter shared across CPU/GL tests introduces phase noise |
