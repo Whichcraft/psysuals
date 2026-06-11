@@ -107,8 +107,10 @@ class DisplayManager:
                      raise ValueError(f"Invalid monitor geometry: {mw}x{mh}")
                      
                 os.environ["SDL_VIDEO_WINDOW_POS"] = f"{mx},{my}"
-                self.screen = pygame.display.set_mode((mw, mh), flags | pygame.NOFRAME)
-                os.environ.pop("SDL_VIDEO_WINDOW_POS", None)
+                try:
+                    self.screen = pygame.display.set_mode((mw, mh), flags | pygame.NOFRAME)
+                finally:
+                    os.environ.pop("SDL_VIDEO_WINDOW_POS", None)
                 if self._libX11:
                     wm = pygame.display.get_wm_info()
                     dpy = wm.get("display")
@@ -154,26 +156,29 @@ class DisplayManager:
             self._libX11.XMoveWindow(dpy, win, mx, my)
             self._libX11.XSync(dpy, 0)
 
+    def _spawn_child(self, child_idx: int, mode_i: int, entry_script: str) -> None:
+        cmd = [
+            sys.executable,
+            entry_script,
+            "--display",
+            str(child_idx),
+            "--mode",
+            str(mode_i),
+            "--span-child",
+        ]
+        if self.args.gl:
+            cmd.append("--gl")
+        try:
+            self.span_children[child_idx] = subprocess.Popen(cmd)
+        except Exception as e:
+            print(f"  \u26a0\ufe0f Failed to spawn span child {child_idx}: {e}")
+
     def spawn_span_children(self, mode_i: int, entry_script: str):
         self.kill_children()
         for child_idx in range(self.num_displays):
             if child_idx == self.display_idx:
                 continue
-            cmd = [
-                sys.executable,
-                entry_script,
-                "--display",
-                str(child_idx),
-                "--mode",
-                str(mode_i),
-                "--span-child",
-            ]
-            if self.args.gl:
-                cmd.append("--gl")
-            try:
-                self.span_children[child_idx] = subprocess.Popen(cmd)
-            except Exception as e:
-                print(f"  ⚠️ Failed to spawn span child {child_idx}: {e}")
+            self._spawn_child(child_idx, mode_i, entry_script)
 
     def kill_children(self) -> None:
         """Terminate all span child processes and wait for them to exit."""
