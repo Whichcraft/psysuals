@@ -1,6 +1,6 @@
 # TODO
 
-Ranked on 2026-04-21 from `codebot-test` (`~/bin/codebot.sh -s`) plus local verification.
+Ranked on 2026-04-21 from `codebot` (`~/bin/codebot.sh -s`) plus local verification.
 
 1. ~~Restore a runnable `psysualizer.py` (`P0`)~~ [DONE]
    - Unified entrypoint is runnable and placeholders removed.
