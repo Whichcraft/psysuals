@@ -55,12 +55,12 @@ class Tunnel(Effect):
         mid        = config.MID_ENERGY
         high       = config.TREBLE_ENERGY
 
-        dt         = 0.03 + bass * 0.09 + mid * 0.06 + high * 0.03
+        dt         = 0.022 + bass * 0.09 + mid * 0.04 + high * 0.03
         self.time += dt
 
         # Spawn only in the far third of the tube and cap the live count so the
         # mid-range doesn't fill up with spinning triangles.
-        spawn_n = int(bass * 2.0 + (mid * 3.0 if mid > 0.4 else 0))
+        spawn_n = int(bass * 1.2 + (mid * 1.5 if mid > 0.5 else 0))
         for _ in range(spawn_n):
             z = self.Z_FAR * random.uniform(0.80, 0.98)
             self.tris.append({
@@ -144,4 +144,4 @@ class Tunnel(Effect):
             pygame.draw.polygon(surf, hsl(h, l=bright * 0.30), pts, lw + 4)
             pygame.draw.polygon(surf, hsl(h, l=bright),         pts, lw)
             live.append(tri)
-        self.tris = live[-50:]
+        self.tris = live[-30:]

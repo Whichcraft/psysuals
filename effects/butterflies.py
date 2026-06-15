@@ -178,9 +178,22 @@ def _edge_spawn():
     return random.uniform(m, config.WIDTH - m), float(config.HEIGHT - m)
 
 
-# Scale is 70 % of the original 7.2 / 6.84
-_SOLO_SCALE = round(7.2  * 0.70, 2)   # 5.04
-_LOVE_SCALE = round(6.84 * 0.70, 2)   # 4.79
+# Scale is 70 % of the original 7.2 / 6.84 (big); small is 35 % of original
+_BIG_SOLO_SCALE   = round(7.2  * 0.70, 2)   # 5.04
+_BIG_LOVE_SCALE   = round(6.84 * 0.70, 2)   # 4.79
+_SMALL_SOLO_SCALE = round(7.2  * 0.35, 2)   # 2.52
+_SMALL_LOVE_SCALE = round(6.84 * 0.35, 2)   # 2.39
+
+# Per-pair size assignments: [big, small, big] — rotated for replacement pairs
+_PAIR_SIZES = [
+    (_BIG_SOLO_SCALE,   _BIG_LOVE_SCALE),
+    (_SMALL_SOLO_SCALE, _SMALL_LOVE_SCALE),
+    (_BIG_SOLO_SCALE,   _BIG_LOVE_SCALE),
+]
+
+# Keep old names as aliases so any external references continue to work
+_SOLO_SCALE = _BIG_SOLO_SCALE
+_LOVE_SCALE = _BIG_LOVE_SCALE
 
 
 class _Pair:
@@ -192,14 +205,17 @@ class _Pair:
     spiral pursuit that eventually settles into a tight mutual orbit.
     """
 
-    def __init__(self, hue, spawn_delay=0):
+    def __init__(self, hue, spawn_delay=0,
+                 solo_scale=_BIG_SOLO_SCALE, love_scale=_BIG_LOVE_SCALE):
         self.hue          = hue
         self._spawn_delay = spawn_delay
+        self._solo_scale  = solo_scale
+        self._love_scale  = love_scale
         self._join_delay  = random.randint(120, 300)   # 2–5 seconds instead of 10–30s
         self._lifetime    = random.randint(2400, 5400)
         self._age         = -spawn_delay
         self._orbit_ang   = random.uniform(0, math.tau)
-        self._orbit_r     = 240.0    # starts wide, shrinks to ~40
+        self._orbit_r     = 120.0    # starts moderate, shrinks to ~40
         self.solo         = None
         self.love         = None
         self._departing   = False
@@ -220,7 +236,7 @@ class _Pair:
 
         if self.solo is None and self._age >= 0:
             x, y = _edge_spawn()
-            self.solo = _Butterfly(x, y, hue=global_hue, scale=_SOLO_SCALE)
+            self.solo = _Butterfly(x, y, hue=global_hue, scale=self._solo_scale)
 
         if self.solo is None:
             return
@@ -233,7 +249,7 @@ class _Pair:
             x, y = _edge_spawn()
             self.love = _Butterfly(x, y,
                                    hue=(global_hue + 0.50) % 1.0,
-                                   scale=_LOVE_SCALE)
+                                   scale=self._love_scale)
 
         if self._age >= self._lifetime and not self._departing:
             self._departing = True
@@ -276,8 +292,8 @@ class _Pair:
                     self.solo.x + math.cos(self._orbit_ang) * r,
                     self.solo.y + math.sin(self._orbit_ang) * r,
                 )
-                self.solo.update(bass, beat, mid, high, solo_target)
-                self.love.update(bass, beat, mid, high, love_target)
+                self.solo.update(bass, beat, mid, high, t, chase_pos=solo_target)
+                self.love.update(bass, beat, mid, high, t, chase_pos=love_target)
         else:
             self.solo.update(bass, beat, mid, high, t)
             if self.love:
@@ -287,7 +303,7 @@ class _Pair:
         if self.love is not None:
             dist = math.hypot(self.love.x - self.solo.x,
                               self.love.y - self.solo.y)
-            sync_range = 130 * _SOLO_SCALE
+            sync_range = 130 * self._solo_scale
             if dist < sync_range:
                 sync = 1.0 - dist / sync_range
                 diff = self.love.wing_phase - self.solo.wing_phase
@@ -352,7 +368,8 @@ class Butterflies(Effect):
                    random.randint(80, 160)]    # 1.3–2.6s instead of 13.3–23.3s
         for i, off in enumerate(offsets):
             hue = (self._global_hue + i / self.MAX_PAIRS) % 1.0
-            self._pairs.append(_Pair(hue, spawn_delay=off))
+            ss, ls = _PAIR_SIZES[i % len(_PAIR_SIZES)]
+            self._pairs.append(_Pair(hue, spawn_delay=off, solo_scale=ss, love_scale=ls))
 
     def draw(self, surf, waveform, fft, beat, tick):
         self._tick       += 1
@@ -364,8 +381,11 @@ class Butterflies(Effect):
 
         self._pairs = [p for p in self._pairs if not p.dead]
         while len(self._pairs) < self.MAX_PAIRS:
+            i = len(self._pairs)
+            ss, ls = _PAIR_SIZES[i % len(_PAIR_SIZES)]
             hue = (self._global_hue + random.random() * 0.5) % 1.0
-            self._pairs.append(_Pair(hue, spawn_delay=random.randint(20, 60)))
+            self._pairs.append(_Pair(hue, spawn_delay=random.randint(20, 60),
+                                     solo_scale=ss, love_scale=ls))
 
         # Fade the internal trail surface each frame
         self._trail.fill(self._FADE_FILL, special_flags=pygame.BLEND_RGB_MULT)

@@ -503,6 +503,33 @@ Python caches imports after the first load, so this doesn't cause a crash or mea
 
 ---
 
+## MEDIUM
+
+### BUG-023: `effects/butterflies.py:295-296` — Mutual butterfly orbit/chase is non-functional
+
+`_Butterfly.update(self, bass, beat, mid, high, t, chase_pos=None)` has `t` as the 5th positional parameter (unused in the body) and `chase_pos` as the 6th keyword parameter. In the orbit/chase block of `_Pair.update`, both callers pass the target tuple as the 5th argument:
+
+```python
+# butterflies.py:295-296 — t=solo_target (a tuple), chase_pos=None (never steers)
+self.solo.update(bass, beat, mid, high, solo_target)
+self.love.update(bass, beat, mid, high, love_target)
+```
+
+Since `_Butterfly.update` only changes steering direction when `chase_pos is not None`, and `chase_pos` is never passed, the butterflies always wander in orbit mode — the mutual-chase mechanic documented in the class docstring is completely broken.
+
+**Impact:** The orbit/approach spiral described in `Butterflies.__doc__` never activates. Butterfly pairs wander independently throughout their entire lifetime instead of chasing each other.
+
+**Fix:**
+
+```python
+self.solo.update(bass, beat, mid, high, t, chase_pos=solo_target)
+self.love.update(bass, beat, mid, high, t, chase_pos=love_target)
+```
+
+**✅ FIXED** — `chase_pos` keyword argument now passed correctly. Also reduced initial `_orbit_r` from 240 → 120 to prevent overly wide initial orbits, and made `sync_range` scale with each pair's butterfly size.
+
+---
+
 ## Summary
 
 | ID | File | Line | Severity | Description |
@@ -529,3 +556,4 @@ Python caches imports after the first load, so this doesn't cause a crash or mea
 | BUG-020 | `core/audio_engine.py` | 79-147 | **MEDIUM** | ~~Unhandled callback exceptions silently kill audio stream~~ ✅ FIXED: `try/except` wraps entire callback |
 | BUG-021 | `vortex/flowfield/lattice/butterflies/cube/aurora` | trail blits | **MEDIUM** | ~~`BLEND_RGBA_MAX`/`BLEND_ADD` corrupts alpha on SRCALPHA (GL path)~~ ✅ FIXED: `BLEND_RGB_MAX`/`BLEND_RGB_ADD` |
 | BUG-022 | `benchmarks.py` | 18, 53, 71 | **LOW** | ~~Tick counter shared across CPU/GL tests introduces phase noise~~ ✅ FIXED: `tick=0` reset per test |
+| BUG-023 | `effects/butterflies.py` | 295-296 | **MEDIUM** | ~~Mutual butterfly orbit/chase non-functional — target passed as `t` instead of `chase_pos`~~ ✅ FIXED: `chase_pos=` keyword arg now passed correctly |

@@ -1,7 +1,9 @@
 """Lattice — crystal grid of glowing nodes and beam lines with feedback.
 
-A 14×9 grid of nodes glows according to their assigned FFT frequency bin.
-This version uses a rotozoom feedback loop to create a trailing 'tunnel' effect.
+A dynamic-resolution grid of nodes glows according to their assigned FFT frequency bin,
+using a center-out frequency mapping (center columns = bass, edge columns = treble).
+Grid density scales up on larger displays. Features a rotozoom feedback loop
+creating a trailing tunnel effect.
 """
 import math
 import numpy as np
@@ -10,14 +12,13 @@ import config
 from .utils import hsl
 from .base import Effect
 
-_COLS = 14
-_ROWS = 9
 _FFT_USE = 0.55
 _SHOCK_W = 22
 _IDLE = 0.08
 
 class Lattice(Effect):
     TRAIL_ALPHA = 0 # Managed by internal surface
+
     @property
     def RES_DIV(self):
         if config.WIDTH >= 2560:
@@ -25,6 +26,22 @@ class Lattice(Effect):
         elif config.WIDTH >= 1600:
             return 2
         return 3
+
+    @property
+    def _grid_cols(self):
+        if config.WIDTH >= 2560:
+            return 22
+        elif config.WIDTH >= 1600:
+            return 18
+        return 14
+
+    @property
+    def _grid_rows(self):
+        if config.WIDTH >= 2560:
+            return 14
+        elif config.WIDTH >= 1600:
+            return 12
+        return 9
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -40,12 +57,14 @@ class Lattice(Effect):
         self._cy = 0.0
         self._max_r = 1.0
         self._nodes = []
-        self._col_peaks = np.ones(_COLS, dtype=np.float32) * 0.2
+        self._col_peaks = np.ones(self._grid_cols, dtype=np.float32) * 0.2
 
         W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         self._resize(W, H)
 
     def _resize(self, W, H):
+        n_cols = self._grid_cols
+        n_rows = self._grid_rows
         self._surf = pygame.Surface((W, H))
         self._surf.fill((0, 0, 0))
         # Keep shock speed relative to the internal canvas width
@@ -56,12 +75,12 @@ class Lattice(Effect):
         self._max_r = math.hypot(cx, cy)
 
         x0, y0 = W * 0.08, H * 0.10
-        cw = W * 0.84 / max(_COLS - 1, 1)
-        ch = H * 0.80 / max(_ROWS - 1, 1)
+        cw = W * 0.84 / max(n_cols - 1, 1)
+        ch = H * 0.80 / max(n_rows - 1, 1)
 
         self._nodes = []
-        for row in range(_ROWS):
-            for col in range(_COLS):
+        for row in range(n_rows):
+            for col in range(n_cols):
                 ox = x0 + col * cw
                 oy = y0 + row * ch
                 dist = math.hypot(ox - cx, oy - cy)
@@ -73,14 +92,22 @@ class Lattice(Effect):
                     'h_off': h_off,
                 })
 
-    def _bin(self, col: int, fft_len: int) -> int:
+        # Reset column peaks for the new grid size
+        self._col_peaks = np.ones(n_cols, dtype=np.float32) * 0.2
+
+    def _bin(self, col: int, n_cols: int, fft_len: int) -> int:
         start = 3  # skip DC component and sub-bass rumble
         end = min(fft_len - 1, int(fft_len * _FFT_USE))
         if end <= start:
             return 0
-        return start + int(col / (_COLS - 1) * (end - start))
+        # Center-out mapping: center columns → low frequencies, edge columns → high
+        center = (n_cols - 1) / 2.0
+        normalized = abs(col - center) / max(center, 1.0)
+        return start + int(normalized * (end - start))
 
     def draw(self, surf, waveform, fft, beat, tick):
+        n_cols = self._grid_cols
+        n_rows = self._grid_rows
         W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
         if self._surf is None or self._surf.get_width() != W or self._surf.get_height() != H:
             self._resize(W, H)
@@ -115,17 +142,21 @@ class Lattice(Effect):
         sy_arr = np.empty(len(self._nodes), dtype=np.float32)
         bright = np.empty(len(self._nodes), dtype=np.float32)
 
-        # Dynamic frequency peak normalization with noise gate to keep column activity balanced/even
-        raw_energies = np.zeros(_COLS, dtype=np.float32)
-        for col in range(_COLS):
-            raw_energies[col] = float(fft[self._bin(col, fft_len)])
-        
+        # Dynamic frequency peak normalization with noise gate to keep column activity balanced
+        raw_energies = np.zeros(n_cols, dtype=np.float32)
+        for col in range(n_cols):
+            raw_energies[col] = float(fft[self._bin(col, n_cols, fft_len)])
+
         # Apply noise gate (subtract background noise floor)
         raw_energies = np.maximum(raw_energies - 0.015, 0.0)
 
+        # Guard against size mismatch after a grid resize
+        if len(self._col_peaks) != n_cols:
+            self._col_peaks = np.ones(n_cols, dtype=np.float32) * 0.2
+
         # Peak tracking: decay slowly, snap instantly to new peaks
         self._col_peaks = np.maximum(self._col_peaks * 0.996, raw_energies)
-        self._col_peaks = np.maximum(self._col_peaks, 0.08) # clamp min peak to avoid dividing by tiny numbers
+        self._col_peaks = np.maximum(self._col_peaks, 0.08)
 
         norm_energies = raw_energies / self._col_peaks
         # Node column brightness scaled by mids and raw energy
@@ -142,13 +173,13 @@ class Lattice(Effect):
             bright[ni] = min(energy + shock * (0.6 + bass * 0.4 + high * 0.3), 1.8)
 
         # Draw Beams
-        for row in range(_ROWS):
-            for col in range(_COLS):
-                ni = row * _COLS + col
+        for row in range(n_rows):
+            for col in range(n_cols):
+                ni = row * n_cols + col
                 hue = (self._hue + self._nodes[ni]['h_off']) % 1.0
-                if col < _COLS - 1:
+                if col < n_cols - 1:
                     ni_r = ni + 1
-                    
+
                     # Draw base faint line
                     w_base = max(1, int(1.0 * scale_factor))
                     pygame.draw.line(self._surf, hsl(hue, s=0.25, l=0.06),
@@ -167,8 +198,8 @@ class Lattice(Effect):
                         pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.4, 0.7)),
                                          (int(sx_arr[ni]), int(sy_arr[ni])),
                                          (int(sx_arr[ni_r]), int(sy_arr[ni_r])), w_core)
-                if row < _ROWS - 1:
-                    ni_d = ni + _COLS
+                if row < n_rows - 1:
+                    ni_d = ni + n_cols
 
                     # Draw base faint line
                     w_base = max(1, int(1.0 * scale_factor))

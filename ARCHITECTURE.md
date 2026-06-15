@@ -191,7 +191,7 @@ Rules that matter in this repo:
 
 | File | Lines | Role |
 |------|-------|------|
-| `psysualizer.py` | `~340` | thin orchestrator |
+| `psysualizer.py` | `~532` | thin orchestrator |
 | `core/audio_engine.py` | `~160` | audio logic |
 | `core/display_manager.py` | `~130` | window/span logic |
 | `core/ui_manager.py` | `~90` | UI rendering |

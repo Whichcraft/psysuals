@@ -45,11 +45,11 @@ class Lissajous(Effect):
 
         # Creative shape distortion mapping
         ax = 3.0 + bass * 0.20
-        ay = 2.0 + mid  * 0.35
-        az = 5.0 + high * 0.40
+        ay = 2.0 + mid  * 0.18
+        az = 5.0 + high * 0.22
 
         self.dx += 0.0003 + bass * 0.0002
-        self.dz += 0.0002 + high * 0.0004
+        self.dz += 0.0002 + high * 0.0002
 
         # BPM scaling: faster knot at higher tempo (guard against BPM=0 before detection)
         bpm_scale = max(0.7, config.BPM / 138.0) if config.BPM > 60 else 1.0
@@ -69,10 +69,10 @@ class Lissajous(Effect):
 
         self.hue += clamped_beat * 0.06
 
-        self.rvx += clamped_beat * 0.0022 + mid * 0.0015 + 0.00005
-        self.rvy += clamped_beat * 0.0032 + mid * 0.0020 + 0.00007
-        self.rvx *= 0.97
-        self.rvy *= 0.97
+        self.rvx += clamped_beat * 0.0022 + mid * 0.0007 + 0.00005
+        self.rvy += clamped_beat * 0.0032 + mid * 0.0010 + 0.00007
+        self.rvx *= 0.94
+        self.rvy *= 0.94
         self.rx  += self.rvx
         self.ry  += self.rvy
 

@@ -36,9 +36,9 @@ class Branches(Effect):
             return
 
         # Per-branch angle jitter — mids drive medium sway, treble drives high-frequency shiver
-        jitter = (math.sin(time * 2.3 + depth * 1.7 + angle) * mid * 0.80
-                  + math.cos(time * 1.1 + depth * 2.9) * mid * 0.40
-                  + math.sin(time * 6.5 + angle * 3.3) * high * 0.35)
+        jitter = (math.sin(time * 2.3 + depth * 1.7 + angle) * mid * 0.45
+                  + math.cos(time * 1.1 + depth * 2.9) * mid * 0.22
+                  + math.sin(time * 6.5 + angle * 3.3) * high * 0.18)
 
         # Trunk segment drawn short; children still get full length
         draw_len = length * 0.015 if depth == self.MAX_DEPTH else length
@@ -59,8 +59,8 @@ class Branches(Effect):
                          (int(x), int(y)), (int(ex), int(ey)), lw)
 
         # Mids and treble increase branch spread angle and branch decay ratio
-        spread = math.pi / 2.6 + mid * 0.55 + high * 0.20
-        ratio  = 0.62 + high * 0.12
+        spread = math.pi / 2.6 + mid * 0.28 + high * 0.10
+        ratio  = 0.62 + high * 0.06
         self._branch(surf, ex, ey, angle - spread / 2,
                      length * ratio, depth - 1,
                      hue, time, mid, high, beat_flash)
@@ -93,8 +93,8 @@ class Branches(Effect):
         sc    = min(config.WIDTH, config.HEIGHT)
         trunk = min(sc * 0.22 * (1.0 + bass * 0.70 + mid * 0.25), sc * 0.27)
 
-        # Extra arms on strong beats and high frequencies (up to +7)
-        n_arms = self.BASE_ARMS + int(min(bass, 2.5) * 2.2 + high * 1.8)
+        # Extra arms on strong beats (up to +5); treble has minimal influence
+        n_arms = self.BASE_ARMS + int(min(bass, 2.5) * 2.2 + high * 0.8)
 
         # Slow rotation of the whole tree; hue spread across all arms
         base_rot = self.time * 0.06

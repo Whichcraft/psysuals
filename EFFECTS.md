@@ -89,15 +89,15 @@ An equilateral triangle wall fills the screen with rainbow wireframe tiles. Sele
 
 A neon 3-D knot traces a dense trail with threefold rotational symmetry and a glowing head point.
 
-- Audio: beat, MID_ENERGY, and TREBLE_ENERGY modulate the X, Y, and Z shape coefficients; MID_ENERGY increases rotation speed; TREBLE_ENERGY expands neon glow halos and shimmers trails and node circles.
-- Visual notes: motion also reacts to live BPM, so faster tracks tighten and accelerate the knot.
+- Audio: beat, MID_ENERGY, and TREBLE_ENERGY modulate the X, Y, and Z shape coefficients with reduced influence for a calmer, more fluid motion; MID_ENERGY gently increases rotation speed; TREBLE_ENERGY expands neon glow halos and shimmers trails and node circles.
+- Visual notes: motion also reacts to live BPM, so faster tracks tighten and accelerate the knot. Rotation damping is tighter so the knot settles smoothly after beats.
 
 ## 5. Tunnel
 
 A first-person ride through a curving polygon tube, with incoming triangles flying toward the viewer from the far end.
 
-- Audio: beat (bass) increases tunnel travel velocity and ring flares; MID_ENERGY drives obstacle spawn rates and rotation speeds; TREBLE_ENERGY drives camera path curvature wobble amplitude and central star size.
-- Visual notes: the tube bends continuously, and the nearest rings flare hard on strong kicks.
+- Audio: beat (bass) increases tunnel travel velocity and ring flares; MID_ENERGY modestly drives obstacle spawn rates and rotation speeds; TREBLE_ENERGY drives camera path curvature wobble amplitude and central star size.
+- Visual notes: the tube bends continuously, the nearest rings flare hard on strong kicks, and the triangle count is kept lean (max 30 live) so the mid-tunnel stays uncluttered.
 
 ## 6. Corridor
 
@@ -138,22 +138,22 @@ Four sine-wave fields interfere into a full-screen psychedelic texture. When run
 
 A recursive lightning tree radiates from the screen centre with multiple branching levels and short trunk stubs, so the structure explodes outward immediately.
 
-- Audio: beat (bass) drives trunk scale and extra arm counts; MID_ENERGY drives medium branch sway angles and spreads; TREBLE_ENERGY drives high-frequency lightning jitter, branch length decay ratios, and segment thicknesses.
-- Visual notes: the tree rotates slowly as a whole, but the branch jitter provides most of the motion.
+- Audio: beat (bass) drives trunk scale and extra arm counts; MID_ENERGY subtly drives branch sway angles and spreads; TREBLE_ENERGY adds modest high-frequency lightning jitter and small branch length decay ratios.
+- Visual notes: the tree rotates slowly as a whole. Mid and treble reactivity is deliberately moderate so the structure stays readable even at high energy levels.
 
 ## 12. Butterflies
 
-Up to three butterfly pairs move through the screen. A solo butterfly appears first, then a partner joins and the two chase each other in a tightening orbit before occasionally breaking away.
+Up to three butterfly pairs move through the screen. A solo butterfly appears first, then a partner joins and the two chase each other in a tightening mutual orbit before occasionally breaking away to wander freely. Pairs come in two sizes: large (default) and small (roughly half the size), mixed in a large/small/large rotation.
 
 - Audio: beat (bass) drives wing flapping speed and sparkle triggers; MID_ENERGY increases flight velocities and mutual orbit chase rates; TREBLE_ENERGY speeds up wing flaps and triggers dense close-proximity sparkle bursts.
-- Visual notes: trails are managed on an internal surface so the effect survives backends that do not preserve the display backbuffer between frames.
+- Visual notes: trails are managed on an internal surface so the effect survives backends that do not preserve the display backbuffer between frames. Wing-phase sync distance scales with each pair's butterfly size.
 
 ## 13. FlowField
 
 Twelve thousand+ particles surf a continuously changing multi-layer vector field (scaling dynamically up to 50,000 on high-res displays) and paint the path they take directly into a persistent trail surface.
 
 - Audio: beat (bass) drives particle speeds and field angle scales; MID_ENERGY accelerates field evolution; TREBLE_ENERGY triggers a vectorized center-outward push on particle positions during transients.
-- Visual notes: this mode responds strongly to hats and cymbals because treble physically disperses the particles.
+- Visual notes: particles that drift to within 8% of any screen edge are recycled back into a random position within the central 60% of the screen, keeping the flow concentrated and avoiding edge clustering.
 
 ## 14. Vortex
 
@@ -171,10 +171,10 @@ Five translucent ribbon curtains sweep across the screen as thick parallel bands
 
 ## 16. Lattice
 
-A crystal grid of nodes and beams (with the leftmost column cut out and hidden) maps low frequencies to the left and higher frequencies to the right, with a shockwave travelling outward from the centre on beats. Features a dynamic resolution-aware layout, a zoom feedback tunnel, and a dynamic peak-normalization tracking system for balanced grid column activity.
+A dynamic crystal grid of nodes and beams uses a center-out frequency mapping: center columns glow on bass, edge columns glow on treble, creating a symmetric bloom on beats. Grid density scales with display size (14×9 on 1080p, 18×12 on 1440p, 22×14 on 4K+). Features a zoom feedback tunnel and dynamic peak-normalization for balanced column activity.
 
 - Audio: column activity is peak-normalized; beat drives shockwave expansion; MID_ENERGY drives grid feedback rotozoom scales; TREBLE_ENERGY shimmers node base radius and core brightness.
-- Visual notes: node hue has a radial offset, so the centre stays cooler while the corners drift more violet.
+- Visual notes: node hue has a radial offset, so the centre stays cooler while the corners drift more violet. Bass hits now bloom symmetrically outward from both sides of centre.
 
 ## 17. Spectrum
 

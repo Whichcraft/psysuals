@@ -5,6 +5,30 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.0] — 2026-06-15
+
+### Changed
+- **Lissajous — calmer motion** — reduced mid influence on rotation velocity (`mid * 0.0015` → `0.0007`, `mid * 0.0020` → `0.0010`), tightened damping (`0.97` → `0.94`), and halved shape-distortion coefficients from mid/treble (`mid * 0.35` → `0.18`, `high * 0.40` → `0.22`, `high * 0.0004` → `0.0002`).
+- **Tunnel — fewer triangles, lower speed** — reduced base travel speed (`0.03` → `0.022`), cut mid speed contribution (`0.06` → `0.04`), lowered triangle spawn rate (bass factor `2.0` → `1.2`, mid factor `3.0` → `1.5`, threshold `0.4` → `0.5`), and capped live triangles at 30 (was 50).
+- **FlowField — edge recycling into cloud** — replaced random recycling with edge-proximity detection: particles within 8% of any screen edge are relocated to a random position within the central 60% of the screen, preventing edge clustering.
+- **Branches — less reactive to mid/treble** — reduced mid jitter coefficients (`0.80` → `0.45`, `0.40` → `0.22`), treble jitter (`0.35` → `0.18`), spread (`mid * 0.55` → `0.28`, `high * 0.20` → `0.10`), ratio (`high * 0.12` → `0.06`), and extra arms from treble (`high * 1.8` → `0.8`).
+- **Lattice — center-out frequency mapping** — changed column-to-frequency assignment from monotonic left→right to center-out: center columns respond to bass, edge columns respond to treble, creating a symmetric bloom on beats.
+- **Lattice — dynamic grid density** — grid size now scales with display resolution: 14×9 on ≤1440p, 18×12 on 1440p–4K, 22×14 on 4K+. Column peak-normalization resets automatically on resize.
+
+---
+
+## [3.6.0] — 2026-06-15
+
+### Added
+- **Butterflies — two butterfly sizes** — each session now contains a mix of large (scale 5.04/4.79) and small (scale 2.52/2.39, half size) butterfly pairs in a big/small/big rotation. Total pair count unchanged (3 pairs, 6 butterflies).
+
+### Fixed
+- **BUG-023 (butterflies.py)** — mutual butterfly orbit/chase was completely non-functional: `solo_target`/`love_target` were being passed as the unused `t` parameter of `_Butterfly.update` instead of `chase_pos`, so butterflies always wandered. Orbit/chase now activates correctly.
+- **Butterflies — smaller initial orbit radius** — reduced `_orbit_r` from 240 → 120 on pair creation, preventing overly wide initial sweeps when orbit first activates.
+- **Butterflies — per-pair sync range** — wing-phase sync distance now scales with each pair's actual butterfly size instead of the hardcoded big-butterfly constant.
+
+---
+
 ## [3.5.2] — 2026-06-11
 
 ### Fixed
