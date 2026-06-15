@@ -14,6 +14,18 @@ from .flowfield          import FlowField
 from .vortex             import Vortex
 from .aurora             import Aurora
 from .lattice            import Lattice
+from .mycelium    import Mycelium
+from .magnetar    import Magnetar
+from .slimemold   import SlimeMold
+from .droste      import Droste
+from .clifford    import Clifford
+from .mobius      import Mobius
+from .chromatic   import Chromatic
+from .persistence import Persistence
+from .oilslick    import OilSlick
+from .synapse     import Synapse
+from .coral       import Coral
+from .heartbeat   import Heartbeat
 from .spectrum           import Bars
 from .waterfall   import GlowSquares
 
@@ -29,11 +41,23 @@ MODES = [
     ("Bubbles",     Bubbles),     # 9
     ("Plasma",      Plasma),      # ←/→ only
     ("Branches",    Branches),    # ←/→ only
-    ("Butterflies", Butterflies),      # ←/→ only
-    ("FlowField",   FlowField),         # ←/→ only
-    ("Vortex",      Vortex),   # ←/→ only
-    ("Aurora",      Aurora),   # ←/→ only
-    ("Lattice",     Lattice),  # ←/→ only
+    ("Butterflies", Butterflies), # ←/→ only
+    ("FlowField",   FlowField),   # ←/→ only
+    ("Vortex",      Vortex),      # ←/→ only
+    ("Aurora",      Aurora),      # ←/→ only
+    ("Lattice",     Lattice),     # ←/→ only
+    ("Mycelium",    Mycelium),    # ←/→ only
+    ("Magnetar",    Magnetar),    # ←/→ only
+    ("SlimeMold",   SlimeMold),   # ←/→ only
+    ("Droste",      Droste),      # ←/→ only
+    ("Clifford",    Clifford),    # ←/→ only
+    ("Mobius",      Mobius),      # ←/→ only
+    ("Chromatic",   Chromatic),   # ←/→ only
+    ("Persistence", Persistence), # ←/→ only
+    ("OilSlick",    OilSlick),    # ←/→ only
+    ("Synapse",     Synapse),     # ←/→ only
+    ("Coral",       Coral),       # ←/→ only
+    ("Heartbeat",   Heartbeat),   # ←/→ only
     # ── Spectrum and Waterfall must always be the final two entries ──
     ("Spectrum",    Bars),        # ←/→ only — always second-to-last
     ("Waterfall",   GlowSquares), # ←/→ only — always last

@@ -5,6 +5,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.8.0] — 2026-06-15
+
+### Added
+- **Mycelium** — spreading fungal hyphal network; tips grow outward leaving decaying filament segments; beat fires a central bloom burst.
+- **Magnetar** — ~6 000 particles riding an analytical rotating magnetic dipole field; beat fires an equatorial shockwave.
+- **SlimeMold** — Physarum-style multi-agent trail simulation; self-organising vein network that pulses and reforms with the music.
+- **Droste** — infinite self-similar recursive zoom portal with spiralling geometry fed into the feedback loop.
+- **Clifford** — 40 000-walker strange attractor with audio-morphing parameters (a, b, c, d); beat jumps to a new attractor shape.
+- **Möbius** — perspective-projected 3-D Möbius strip wireframe with twist shiver on beat.
+- **Chromatic** — expanding ring waves that split red, green, and blue channels outward, creating prismatic aberration halos.
+- **Persistence** — nested counter-rotating polygons with very long trail persistence for wagon-wheel moiré accumulation.
+- **OilSlick** — full-screen thin-film interference pattern; two wave families mapped continuously to hue across the pixel grid.
+- **Synapse** — neural graph with ~55 nodes and visible signal pulses cascading along edges on beat.
+- **Coral** — bioluminescent fractal coral growing upward from the bottom edge with gravitropic branching and bloom pulse.
+- **Heartbeat** — concentric pressure waves morphing between circle and polygon depending on bass intensity.
+
+---
+
 ## [3.7.0] — 2026-06-15
 
 ### Changed

@@ -1,0 +1,140 @@
+"""SlimeMold — Physarum-style multi-agent slime simulation.
+
+Thousands of agents deposit chemical trails, sense ahead-left / ahead /
+ahead-right, and steer toward the strongest signal.  The result is a
+self-organising vein network that pulses and reforms with the music.
+
+  Bass   → agent speed + trail deposit strength
+  Mid    → sensor sensitivity (sharper gradient response)
+  Treble → sensor angle (wider = more meandering)
+  Beat   → teleport burst + trail strength spike
+"""
+import math
+
+import numpy as np
+import pygame
+import pygame.surfarray as surfarray
+
+import config
+from .base import Effect
+
+_BASE_SA = math.radians(30)   # sensor angle offset from heading
+_BASE_SD = 7                   # sensor distance in sim pixels
+
+
+class SlimeMold(Effect):
+    TRAIL_ALPHA = 0
+    RES_DIV     = 4   # simulation runs at 1/4 resolution
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        W = config.WIDTH  // self.RES_DIV
+        H = config.HEIGHT // self.RES_DIV
+        self._W, self._H = W, H
+        area     = W * H
+        self._n  = max(3000, min(15000, int(10000 * area / (480 * 270))))
+        cx, cy   = W / 2.0, H / 2.0
+        r_spread = min(W, H) * 0.25
+        self._px  = np.clip(
+            np.random.normal(cx, r_spread * 0.3, self._n),
+            0, W - 1).astype(np.float32)
+        self._py  = np.clip(
+            np.random.normal(cy, r_spread * 0.3, self._n),
+            0, H - 1).astype(np.float32)
+        self._ang = np.random.uniform(0, math.tau, self._n).astype(np.float32)
+        self._trail = np.zeros((W, H), dtype=np.float32)
+        self._surf  = pygame.Surface((W, H))
+        self._hue   = 0.30
+
+    def _sense(self, offset_ang, dist):
+        W, H = self._W, self._H
+        sx = np.clip(
+            (self._px + np.cos(self._ang + offset_ang) * dist).astype(np.int32),
+            0, W - 1)
+        sy = np.clip(
+            (self._py + np.sin(self._ang + offset_ang) * dist).astype(np.int32),
+            0, H - 1)
+        return self._trail[sx, sy]
+
+    def draw(self, surf, waveform, fft, beat, tick):
+        W, H = self._W, self._H
+        bass = beat
+        mid  = config.MID_ENERGY
+        high = config.TREBLE_ENERGY
+
+        self._hue = (self._hue + 0.002 + mid * 0.003) % 1.0
+
+        sa  = _BASE_SA + high * 0.40
+        sd  = _BASE_SD + bass * 5.0
+        spd = 0.7 + bass * 1.5
+
+        # Beat: teleport a fraction of agents back toward center
+        if bass > 0.7:
+            n_tp = int(self._n * 0.05)
+            idx  = np.random.randint(0, self._n, n_tp)
+            cx, cy = W / 2.0, H / 2.0
+            r_spread = min(W, H) * 0.20
+            self._px[idx]  = np.clip(
+                np.random.normal(cx, r_spread, n_tp), 0, W - 1).astype(np.float32)
+            self._py[idx]  = np.clip(
+                np.random.normal(cy, r_spread, n_tp), 0, H - 1).astype(np.float32)
+            self._ang[idx] = np.random.uniform(0, math.tau, n_tp).astype(np.float32)
+
+        fwd   = self._sense(0.0,  sd)
+        left  = self._sense(-sa,  sd)
+        right = self._sense(+sa,  sd)
+
+        rot = 0.18 + high * 0.15
+
+        go_left  = (left  > fwd) & (left  >= right)
+        go_right = (right > fwd) & (right >  left)
+        go_rand  = (~go_left) & (~go_right) & (
+            np.random.random(self._n) < 0.05)
+
+        d_ang = np.zeros(self._n, dtype=np.float32)
+        d_ang[go_left]  = -rot
+        d_ang[go_right] = +rot
+        rnd_n = int(go_rand.sum())
+        if rnd_n:
+            d_ang[go_rand] = (
+                (np.random.random(rnd_n) - 0.5) * rot * 2).astype(np.float32)
+        self._ang += d_ang
+
+        self._px = (self._px + np.cos(self._ang) * spd) % W
+        self._py = (self._py + np.sin(self._ang) * spd) % H
+
+        # Deposit trail
+        ix = self._px.astype(np.int32)
+        iy = self._py.astype(np.int32)
+        np.add.at(self._trail, (ix, iy), 0.8 + bass * 0.6)
+
+        # Diffuse (approximate 3×3 box blur)
+        t = self._trail
+        diffused = (np.roll(t, 1, 0) + np.roll(t, -1, 0)
+                    + np.roll(t, 1, 1) + np.roll(t, -1, 1)
+                    + t * 4.0) / 8.0
+        self._trail = diffused * (0.94 - bass * 0.01)
+
+        # Render: map trail intensity to hue
+        t_norm = np.clip(self._trail / 5.0, 0.0, 1.0)
+        h_val  = (self._hue + t_norm * 0.5) % 1.0
+        r_arr  = np.clip(
+            (np.sin(h_val * math.tau) * 127 + 128) * t_norm * 2, 0, 255
+        ).astype(np.uint32)
+        g_arr  = np.clip(
+            (np.sin((h_val + 0.333) * math.tau) * 127 + 128) * t_norm * 2, 0, 255
+        ).astype(np.uint32)
+        b_arr  = np.clip(
+            (np.sin((h_val + 0.667) * math.tau) * 127 + 128) * t_norm * 2, 0, 255
+        ).astype(np.uint32)
+        colors = (r_arr << 16) | (g_arr << 8) | b_arr
+
+        pix = surfarray.pixels2d(self._surf)
+        try:
+            pix[:] = colors
+        finally:
+            del pix
+
+        scaled = pygame.transform.scale(self._surf,
+                                        (config.WIDTH, config.HEIGHT))
+        surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
