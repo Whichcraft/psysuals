@@ -13,7 +13,7 @@
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
 - **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. v3 scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
 - **🔊 Battle-Hardened Audio Pipeline** — Bulletproof audio capture that never crashes. v3 features intelligent no-input fallback, live device switching, and a refined spectral-flux beat detection system tuned for maximum response.
-- **⚖️ Built-in Benchmarking & Regression Gates** — Measure your speed with `benchmarks.py` and sleep easy knowing our automated smoke tests guard all 18 effects from regressions.
+- **⚖️ Built-in Benchmarking & Regression Gates** — Measure your speed with `benchmarks.py` and sleep easy knowing our automated smoke tests guard all 30 effects from regressions.
 
 ---
 

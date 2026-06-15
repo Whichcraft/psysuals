@@ -196,10 +196,10 @@ Rules that matter in this repo:
 | `core/display_manager.py` | `~130` | window/span logic |
 | `core/ui_manager.py` | `~90` | UI rendering |
 | `config.py` | `20` | shared runtime state |
-| `effects/__init__.py` | `40` | mode registry |
+| `effects/__init__.py` | `64` | mode registry |
 | `effects/utils.py` | `27` | colour helpers |
 | `gl_renderer.py` | `144` | GL helper and shader-asset loader |
 | `settings.py` | `72` | settings and preset persistence |
-| `effects/*.py` | `18` modes + shared helpers | visual implementations |
+| `effects/*.py` | `30` modes + shared helpers | visual implementations |
 
 
