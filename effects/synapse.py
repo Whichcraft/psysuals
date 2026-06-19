@@ -13,6 +13,7 @@ baseline auto-fire rate.
 import math
 import random
 
+import numpy as np
 import pygame
 
 import config
@@ -30,15 +31,16 @@ class Synapse(Effect):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         W, H = config.WIDTH, config.HEIGHT
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
         self._hue = random.random()
 
         # Place nodes in a loose elliptical scatter
         self._nodes: list = []
         for i in range(_N_NODES):
-            ang = random.uniform(0, math.tau)
-            r   = random.uniform(0.10, 0.44) * min(W, H)
-            x   = W / 2 + math.cos(ang) * r * (0.80 + random.uniform(0, 0.40))
-            y   = H / 2 + math.sin(ang) * r * (0.60 + random.uniform(0, 0.30))
+            ang = float(self._rng.uniform(0, math.tau))
+            r   = float(self._rng.uniform(0.10, 0.44) * min(W, H))
+            x   = W / 2 + math.cos(ang) * r * float(0.80 + self._rng.uniform(0, 0.40))
+            y   = H / 2 + math.sin(ang) * r * float(0.60 + self._rng.uniform(0, 0.30))
             self._nodes.append([x, y])   # [x, y]
 
         # Connect each node to _EDGES_PER_NODE nearest neighbours
@@ -74,10 +76,11 @@ class Synapse(Effect):
         if not outgoing or len(self._signals) >= _MAX_SIGNALS:
             return
         fanout = max(1, min(fanout, len(outgoing)))
-        for ei in random.sample(outgoing, fanout):
+        picks = self._rng.choice(outgoing, size=fanout, replace=False)
+        for ei in np.atleast_1d(picks):
             if len(self._signals) >= _MAX_SIGNALS:
                 break
-            spd = 0.020 + random.uniform(0, 0.010)
+            spd = 0.020 + float(self._rng.uniform(0, 0.010))
             self._signals.append([ei, 0.0, spd, h])
 
     # ------------------------------------------------------------------
@@ -93,13 +96,13 @@ class Synapse(Effect):
         # Beat cascade
         if bass > 0.65 and self._beat_prev <= 0.65:
             for _ in range(int(1 + bass * 3)):
-                self._fire(random.randint(0, _N_NODES - 1), fanout=2 + int(high * 2))
+                self._fire(int(self._rng.integers(0, _N_NODES)), fanout=2 + int(high * 2))
         self._beat_prev = bass
 
         # Auto-fire
         self._auto_fire_cd -= 1
         if self._auto_fire_cd <= 0:
-            self._fire(random.randint(0, _N_NODES - 1), fanout=1)
+            self._fire(int(self._rng.integers(0, _N_NODES)), fanout=1)
             self._auto_fire_cd = max(8, int(25 - mid * 15))
 
         # Advance signals

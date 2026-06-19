@@ -2,6 +2,7 @@
 import math
 import random
 
+import numpy as np
 import pygame
 
 import config
@@ -24,6 +25,7 @@ class Mycelium(Effect):
         self._segs: list = []
         self._tips: list = []
         self._cores: list[tuple[float, float, float]] = []
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
         self._build_cores()
         self._seed_tips(28)
 
@@ -32,9 +34,10 @@ class Mycelium(Effect):
         cx, cy = W / 2.0, H / 2.0
         rad = min(W, H) * 0.22
         self._cores = []
-        for i in range(_CORE_COUNT):
-            ang = i / _CORE_COUNT * math.tau + random.uniform(-0.22, 0.22)
-            dist = rad * random.uniform(0.55, 1.15)
+        base = np.linspace(0.0, math.tau, _CORE_COUNT, endpoint=False, dtype=np.float32)
+        angs = base + self._rng.uniform(-0.22, 0.22, _CORE_COUNT)
+        dists = rad * self._rng.uniform(0.55, 1.15, _CORE_COUNT)
+        for i, (ang, dist) in enumerate(zip(angs, dists)):
             self._cores.append((
                 cx + math.cos(ang) * dist,
                 cy + math.sin(ang) * dist,
@@ -44,20 +47,25 @@ class Mycelium(Effect):
     def _seed_tips(self, count, core_idx=None):
         if not self._cores:
             self._build_cores()
-        for _ in range(count):
-            if len(self._tips) >= _MAX_TIPS:
-                return
-            idx = core_idx if core_idx is not None else random.randrange(len(self._cores))
-            cx, cy, h_off = self._cores[idx]
-            ang = random.uniform(0.0, math.tau)
-            radius = random.uniform(4.0, min(config.WIDTH, config.HEIGHT) * 0.035)
+        n = min(count, _MAX_TIPS - len(self._tips))
+        if n <= 0:
+            return
+        if core_idx is None:
+            idxs = self._rng.integers(0, len(self._cores), size=n)
+        else:
+            idxs = np.full(n, core_idx, dtype=np.int32)
+        angs = self._rng.uniform(0.0, math.tau, n)
+        radii = self._rng.uniform(4.0, min(config.WIDTH, config.HEIGHT) * 0.035, n)
+        hoffs = self._rng.uniform(0.0, 0.15, n)
+        for idx, ang, radius, hoff in zip(idxs, angs, radii, hoffs):
+            cx, cy, h_off = self._cores[int(idx)]
             self._tips.append([
                 cx + math.cos(ang) * radius,
                 cy + math.sin(ang) * radius,
                 ang,
                 0,
-                (h_off + random.uniform(0.0, 0.15)) % 1.0,
-                idx,
+                (h_off + float(hoff)) % 1.0,
+                int(idx),
             ])
 
     def draw(self, surf, waveform, fft, beat, tick):
@@ -76,7 +84,7 @@ class Mycelium(Effect):
         if bass > 0.65 and len(self._tips) < _MAX_TIPS:
             self._pulse = 1.0
             for _ in range(1 + int(bass * 2.5)):
-                self._seed_tips(int(5 + bass * 6), random.randrange(len(self._cores)))
+                self._seed_tips(int(5 + bass * 6), int(self._rng.integers(0, len(self._cores))))
 
         speed = 6.5 + bass * 18.0 + mid * 5.0
         spread = 0.20 + mid * 0.30 + high * 0.10
@@ -84,27 +92,37 @@ class Mycelium(Effect):
         seg_life = 90 + int(bass * 55 + high * 20)
 
         next_tips: list = []
-        for tx, ty, ta, depth, h_off, core_idx in self._tips:
-            if depth >= 18:
-                continue
-            cx, cy, _ = self._cores[core_idx]
-            swirl = math.atan2(ty - cy, tx - cx) + math.pi * 0.5
-            field = (
-                math.sin(tx * 0.013 + self._phase + core_idx * 0.7) * 0.55
-                + math.cos(ty * 0.011 - self._phase * 1.2 + depth * 0.25) * 0.35
-            )
-            ta2 = ta + (swirl + field - ta) * 0.22 + random.gauss(0, spread * 0.16)
-            length = max(2.5, speed * (1.0 - depth * 0.030) * random.uniform(0.72, 1.22))
-            ex = (tx + math.cos(ta2) * length) % W
-            ey = (ty + math.sin(ta2) * length) % H
-            if len(self._segs) < _MAX_SEGS:
-                self._segs.append([tx, ty, ex, ey, 0, seg_life + random.randint(-16, 55), depth, h_off])
-            if len(next_tips) < _MAX_TIPS:
-                next_tips.append([ex, ey, ta2, depth + 1, h_off, core_idx])
-            if random.random() < branch_p and depth < 13 and len(next_tips) < _MAX_TIPS:
-                b_ang = ta2 + random.choice([-1, 1]) * random.uniform(0.35, 0.95 + spread)
-                b_core = core_idx if random.random() > 0.18 else random.randrange(len(self._cores))
-                next_tips.append([ex, ey, b_ang, depth + 1, (h_off + 0.10) % 1.0, b_core])
+        tips = self._tips
+        tip_count = len(tips)
+        if tip_count:
+            gauss = self._rng.normal(0.0, spread * 0.16, tip_count)
+            len_mul = self._rng.uniform(0.72, 1.22, tip_count)
+            branch_roll = self._rng.random(tip_count)
+            branch_sign = self._rng.integers(0, 2, tip_count) * 2 - 1
+            branch_angle = self._rng.uniform(0.35, 0.95 + spread, tip_count)
+            branch_core = self._rng.integers(0, len(self._cores), tip_count)
+            seg_jitter = self._rng.integers(-16, 56, tip_count)
+            for idx, (tx, ty, ta, depth, h_off, core_idx) in enumerate(tips):
+                if depth >= 18:
+                    continue
+                cx, cy, _ = self._cores[core_idx]
+                swirl = math.atan2(ty - cy, tx - cx) + math.pi * 0.5
+                field = (
+                    math.sin(tx * 0.013 + self._phase + core_idx * 0.7) * 0.55
+                    + math.cos(ty * 0.011 - self._phase * 1.2 + depth * 0.25) * 0.35
+                )
+                ta2 = ta + (swirl + field - ta) * 0.22 + float(gauss[idx])
+                length = max(2.5, speed * (1.0 - depth * 0.030) * float(len_mul[idx]))
+                ex = (tx + math.cos(ta2) * length) % W
+                ey = (ty + math.sin(ta2) * length) % H
+                if len(self._segs) < _MAX_SEGS:
+                    self._segs.append([tx, ty, ex, ey, 0, seg_life + int(seg_jitter[idx]), depth, h_off])
+                if len(next_tips) < _MAX_TIPS:
+                    next_tips.append([ex, ey, ta2, depth + 1, h_off, core_idx])
+                if branch_roll[idx] < branch_p and depth < 13 and len(next_tips) < _MAX_TIPS:
+                    b_ang = ta2 + float(branch_sign[idx]) * float(branch_angle[idx])
+                    b_core = core_idx if self._rng.random() > 0.18 else int(branch_core[idx])
+                    next_tips.append([ex, ey, b_ang, depth + 1, (h_off + 0.10) % 1.0, b_core])
 
         self._tips = next_tips[:_MAX_TIPS]
 

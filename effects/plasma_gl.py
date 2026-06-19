@@ -243,3 +243,7 @@ class PlasmaGL(Effect):
 
         r.render(self._vao, fbo)
         return r.read_pixels(fbo)
+
+    def release(self) -> None:
+        """Drop cached offscreen framebuffers owned by this effect."""
+        self._fbo_cache.clear()

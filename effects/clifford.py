@@ -42,8 +42,7 @@ class Clifford(Effect):
         self._reset_state()
 
     def _reset_state(self):
-        W = max(1, config.WIDTH // self.RES_DIV)
-        H = max(1, config.HEIGHT // self.RES_DIV)
+        W, H, RD = self._render_size()
         self._W, self._H = W, H
         self._trail = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
@@ -65,8 +64,7 @@ class Clifford(Effect):
         self._td = np.float32(base[3] + random.uniform(-jitter, jitter))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W = max(1, config.WIDTH // self.RES_DIV)
-        H = max(1, config.HEIGHT // self.RES_DIV)
+        W, H, RD = self._render_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY

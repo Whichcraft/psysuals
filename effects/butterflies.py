@@ -14,6 +14,7 @@ backbuffer is not guaranteed between frames.
 import math
 import random
 
+import numpy as np
 import pygame
 
 import config
@@ -49,6 +50,18 @@ def _wing_poly(x, y, heading, side, upper, flap, scale):
             (int(tip_x), int(tip_y)), (int(re_x), int(re_y))]
 
 
+def _wing_mask_frame(scale, flap, size):
+    """Build one cached wing-mask frame for a given scale and flap amount."""
+    upper_surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    lower_surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    center = size // 2
+    for upper, surf in ((1, upper_surf), (-1, lower_surf)):
+        for side in (-1, 1):
+            pts = _wing_poly(center, center, 0.0, side, upper, flap, scale)
+            pygame.draw.polygon(surf, (255, 255, 255, 255), pts)
+    return upper_surf, lower_surf
+
+
 # ── Single butterfly ──────────────────────────────────────────────────────────
 
 class _Butterfly:
@@ -76,6 +89,8 @@ class _Butterfly:
     FLIGHT_BASE = 1.5
     FLIGHT_BASS_GAIN = 0.8
     FLIGHT_MID_GAIN = 0.60
+    WING_FRAME_COUNT = 16
+    _WING_FRAME_CACHE = {}
 
     def __init__(self, x, y, hue, scale=4.0):
         self.x           = float(x)
@@ -87,6 +102,10 @@ class _Butterfly:
         self._wander_des = self.heading
         self._wander_cd  = 0
         self._depart_ang = None
+        self._wing_cache_key = None
+        self._wing_frames = None
+        self._wing_layers = None
+        self._ensure_wing_cache()
 
     @property
     def off_screen(self):
@@ -97,6 +116,32 @@ class _Butterfly:
     def start_depart(self):
         if self._depart_ang is None:
             self._depart_ang = random.uniform(0, math.tau)
+
+    @classmethod
+    def _get_wing_frames(cls, scale):
+        key = round(float(scale), 2)
+        frames = cls._WING_FRAME_CACHE.get(key)
+        if frames is None:
+            size = max(32, int(scale * 36) + 18)
+            if cls.WING_FRAME_COUNT <= 1:
+                flaps = [0.0]
+            else:
+                flaps = [i / (cls.WING_FRAME_COUNT - 1) for i in range(cls.WING_FRAME_COUNT)]
+            frames = [_wing_mask_frame(scale, flap, size) for flap in flaps]
+            cls._WING_FRAME_CACHE[key] = frames
+        return frames
+
+    def _ensure_wing_cache(self):
+        key = round(float(self.scale), 2)
+        if self._wing_cache_key == key and self._wing_frames is not None:
+            return
+        self._wing_cache_key = key
+        self._wing_frames = self._get_wing_frames(self.scale)
+        frame_size = self._wing_frames[0][0].get_size()
+        self._wing_layers = [
+            pygame.Surface(frame_size, pygame.SRCALPHA),
+            pygame.Surface(frame_size, pygame.SRCALPHA),
+        ]
 
     def _bounce_from_bounds(self):
         cl = float(int(self.BOUNDARY_CLAMP_SCALE * self.scale))
@@ -193,21 +238,27 @@ class _Butterfly:
         self._bounce_from_bounds()
 
     def draw(self, surf, outline_col=None):
+        self._ensure_wing_cache()
         flap     = math.sin(self.wing_phase) * 0.5 + 0.5
         body_col = hsl(self.hue, l=0.28)
         wc1      = hsl(self.hue, l=0.58)
         wc2      = hsl((self.hue + 0.10) % 1.0, l=0.46)
-        
-        # Consolidate wing drawing - fewer polygon calls
-        for upper in (-1, 1):
-            col = wc1 if upper == 1 else wc2
-            for side in (-1, 1):
-                pts = _wing_poly(self.x, self.y, self.heading,
-                                 side, upper, flap, self.scale)
-                pygame.draw.polygon(surf, col, pts)
-                # Skip outline when scale is small or just draw one
-                if self.scale > self.OUTLINE_SCALE_THRESHOLD:
-                    pygame.draw.polygon(surf, (20, 20, 20), pts, 1)
+        frame_idx = min(self.WING_FRAME_COUNT - 1,
+                        max(0, int(round(flap * (self.WING_FRAME_COUNT - 1)))))
+        upper_mask, lower_mask = self._wing_frames[frame_idx]
+        angle_deg = -math.degrees(self.heading)
+        center = (int(self.x), int(self.y))
+
+        for layer, mask, col in (
+            (self._wing_layers[0], upper_mask, wc1),
+            (self._wing_layers[1], lower_mask, wc2),
+        ):
+            layer.fill((0, 0, 0, 0))
+            layer.blit(mask, (0, 0))
+            layer.fill((*col, 255), special_flags=pygame.BLEND_RGBA_MULT)
+            rotated = pygame.transform.rotate(layer, angle_deg)
+            rect = rotated.get_rect(center=center)
+            surf.blit(rotated, rect)
 
         ca, sa = math.cos(self.heading), math.sin(self.heading)
         bl = int(self.BODY_LEN_SCALE * self.scale) # Slightly shorter body
@@ -409,19 +460,17 @@ class _Pair:
                 mx = (self.solo.x + self.love.x) / 2
                 my = (self.solo.y + self.love.y) / 2
                 sparkle_n = int(self.SPARKLE_BASE + beat * self.SPARKLE_BEAT_GAIN + treble * self.SPARKLE_TREBLE_GAIN)
-                for _ in range(sparkle_n):
-                    sx = int(mx + random.gauss(0, self.SPARKLE_SIGMA))
-                    sy = int(my + random.gauss(0, self.SPARKLE_SIGMA))
-                    r  = random.randint(2, int(self.SPARKLE_RADIUS_BASE + treble * 6))
+                sx_arr = self._rng.normal(mx, self.SPARKLE_SIGMA, sparkle_n)
+                sy_arr = self._rng.normal(my, self.SPARKLE_SIGMA, sparkle_n)
+                r_arr = self._rng.integers(2, int(self.SPARKLE_RADIUS_BASE + treble * 6) + 1, sparkle_n)
+                for sx, sy, r in zip(sx_arr, sy_arr, r_arr):
                     pygame.draw.circle(surf,
                                        hsl((global_hue + 0.12) % 1.0, l=0.80),
-                                       (sx, sy), r)
+                                       (int(sx), int(sy)), int(r))
 
-        oc1 = hsl((global_hue + 0.05) % 1.0, l=0.20)
-        oc2 = hsl((global_hue + 0.55) % 1.0, l=0.20)
-        self.solo.draw(surf, outline_col=oc1)
+        self.solo.draw(surf)
         if self.love:
-            self.love.draw(surf, outline_col=oc2)
+            self.love.draw(surf)
 
 
 # ── Main effect ───────────────────────────────────────────────────────────────
@@ -460,7 +509,8 @@ class Butterflies(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        W, H, RD = self._render_size()
         self._tick       = 0
         self._global_hue = random.random()
         self._trail      = pygame.Surface((W, H))
@@ -554,7 +604,7 @@ class Butterflies(Effect):
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
 
-        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
+        W, H, RD = self._render_size()
         if self._trail.get_width() != W or self._trail.get_height() != H:
             self._trail = pygame.Surface((W, H))
             self._trail.fill((0, 0, 0))
@@ -584,7 +634,7 @@ class Butterflies(Effect):
             gh = (self._global_hue + i / self.MAX_PAIRS) % 1.0
             pair.draw(self._trail, beat, gh, treble=high)
 
-        if self.RES_DIV > 1:
+        if RD > 1:
             pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT), self._scaled)
             surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:

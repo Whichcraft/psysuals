@@ -38,7 +38,7 @@ class Cube(Effect):
         self._sat_fade  = None
 
     def _target_size(self):
-        return config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
+        return self._render_size()[:2]
 
     def _project(self, v, fov=680):
         W, H = self._target_size()

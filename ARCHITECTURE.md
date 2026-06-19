@@ -194,7 +194,7 @@ Rules that matter in this repo:
 | `effects/utils.py` | `hsl()` and `_hsl_batch()` colour helpers |
 | `effects/palette.py` | shared hue/saturation/lightness palette driven by audio |
 | `settings.py` | persistent settings and preset storage under `~/.config/psysuals/` |
-| `gl_renderer.py` | moderngl helper for the experimental GL path, loaded lazily by the display manager |
+| `gl_renderer.py` | moderngl helper for the experimental GL path, including fullscreen blits and feedback transforms, loaded lazily by the display manager |
 | `effects/shaders/` | tracked GLSL assets loaded by `gl_renderer.py` |
 | `requirements-gl.txt` | optional dependency set for the GL path |
 

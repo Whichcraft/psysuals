@@ -166,8 +166,11 @@ class VisualizerApp:
 
     def _update_target_res(self):
         div = 1
-        if hasattr(self, "vis"):
-            div = getattr(self.vis, "RES_DIV", 1)
+        if hasattr(self, "vis") and self.vis is not None:
+            if hasattr(self.vis, "_render_div"):
+                div = self.vis._render_div()
+            else:
+                div = getattr(self.vis, "RES_DIV", 1)
         
         if not self.args.gl:
             self.display.target = self.display.screen

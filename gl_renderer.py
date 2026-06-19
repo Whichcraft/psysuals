@@ -45,6 +45,10 @@ class GLRenderer:
         self._blit_tex: moderngl.Texture | None = None
         self._blit_prog: moderngl.Program | None = None
         self._blit_vao: moderngl.VertexArray | None = None
+        self._feedback_tex: moderngl.Texture | None = None
+        self._feedback_prog: moderngl.Program | None = None
+        self._feedback_vao: moderngl.VertexArray | None = None
+        self._offscreen_cache: dict[tuple[int, int], tuple[moderngl.Texture, moderngl.Framebuffer]] = {}
 
     # ── Shader helpers ────────────────────────────────────────────────────────
 
@@ -104,6 +108,40 @@ class GLRenderer:
         """
         return self.program(vert, frag)
 
+    def feedback_program(self) -> tuple:
+        """Return a texture feedback shader with zoom/rotation sampling."""
+        vert = """
+        #version 330 core
+        in vec2 in_vert;
+        out vec2 v_uv;
+        void main() {
+            v_uv = in_vert * 0.5 + 0.5;
+            gl_Position = vec4(in_vert, 0.0, 1.0);
+        }
+        """
+        frag = """
+        #version 330 core
+        uniform sampler2D u_tex;
+        uniform float u_zoom;
+        uniform float u_rot;
+        uniform vec2 u_center;
+        in vec2 v_uv;
+        out vec4 fragColor;
+        void main() {
+            vec2 p = v_uv - u_center;
+            float c = cos(u_rot);
+            float s = sin(u_rot);
+            p = mat2(c, -s, s, c) * (p / max(u_zoom, 0.0001));
+            vec2 uv = p + u_center;
+            if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+                fragColor = vec4(0.0);
+            } else {
+                fragColor = texture(u_tex, uv);
+            }
+        }
+        """
+        return self.program(vert, frag)
+
     # ── Render helpers ────────────────────────────────────────────────────────
 
     def render(self, vao, fbo=None) -> None:
@@ -137,10 +175,44 @@ class GLRenderer:
         self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
         self.render(self._blit_vao)
 
+    def surface_texture(self, surface: "pygame.Surface") -> "moderngl.Texture":
+        """Upload a pygame surface to a reusable texture."""
+        size = surface.get_size()
+        if self._feedback_tex is None or self._feedback_tex.size != size:
+            if self._feedback_tex:
+                self._feedback_tex.release()
+            self._feedback_tex = self.ctx.texture(size, 4)
+            self._feedback_tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            self._feedback_tex.repeat_x = False
+            self._feedback_tex.repeat_y = False
+
+        rgba = pygame.image.tostring(surface, "RGBA")
+        self._feedback_tex.write(rgba)
+        self._feedback_tex.use(0)
+        return self._feedback_tex
+
+    def feedback_transform(self, surface: "pygame.Surface", fbo, zoom: float, rot: float) -> None:
+        """Render *surface* through the feedback shader into *fbo*."""
+        if self._feedback_prog is None:
+            self._feedback_prog, self._feedback_vao = self.feedback_program()
+
+        tex = self.surface_texture(surface)
+        fbo.use()
+        fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self.ctx.disable(moderngl.BLEND)
+        tex.use(0)
+        self._feedback_prog["u_tex"] = 0
+        self._feedback_prog["u_zoom"] = float(zoom)
+        self._feedback_prog["u_rot"] = float(rot)
+        self._feedback_prog["u_center"] = (0.5, 0.5)
+        self.render(self._feedback_vao, fbo)
+
     def release(self):
         """Release all GL resources."""
         if self._blit_tex:
             self._blit_tex.release()
+        if self._feedback_tex:
+            self._feedback_tex.release()
         self._vbo.release()
         for prog, vao in list(self._program_cache.values()):
             vao.release()
@@ -149,16 +221,27 @@ class GLRenderer:
             self._blit_vao.release()
         if self._blit_prog:
             self._blit_prog.release()
+        if self._feedback_vao:
+            self._feedback_vao.release()
+        if self._feedback_prog:
+            self._feedback_prog.release()
+        for tex, fbo in self._offscreen_cache.values():
+            fbo.release()
+            tex.release()
+        self._offscreen_cache.clear()
 
     # ── Offscreen / Android ───────────────────────────────────────────────────
 
     def offscreen(self, width: int = 0, height: int = 0) -> "moderngl.Framebuffer":
-        """Return a fresh RGBA framebuffer (allocates each call — cache if hot)."""
+        """Return a cached RGBA framebuffer for the requested size."""
         w = width  or self.width
         h = height or self.height
-        return self.ctx.framebuffer(
-            color_attachments=[self.ctx.texture((w, h), 4)]
-        )
+        key = (w, h)
+        if key not in self._offscreen_cache:
+            tex = self.ctx.texture((w, h), 4)
+            fbo = self.ctx.framebuffer(color_attachments=[tex])
+            self._offscreen_cache[key] = (tex, fbo)
+        return self._offscreen_cache[key][1]
 
     def read_pixels(self, fbo: "moderngl.Framebuffer") -> np.ndarray:
         """

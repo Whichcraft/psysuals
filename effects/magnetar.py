@@ -36,8 +36,7 @@ class Magnetar(Effect):
         self._reset_particles()
 
     def _reset_particles(self):
-        W = max(1, config.WIDTH // self.RES_DIV)
-        H = max(1, config.HEIGHT // self.RES_DIV)
+        W, H, RD = self._render_size()
         area = W * H
         self._n = max(6000, min(40000, int(10000 * area / (960 * 540))))
         self._px = np.random.uniform(0, W, self._n).astype(np.float32)
@@ -49,9 +48,7 @@ class Magnetar(Effect):
         self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        RD       = self.RES_DIV
-        W        = config.WIDTH  // RD
-        H        = config.HEIGHT // RD
+        W, H, RD = self._render_size()
         bass     = beat
         mid      = config.MID_ENERGY
         high     = config.TREBLE_ENERGY

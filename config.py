@@ -3,6 +3,11 @@ init time (psysualizer.py reads the actual monitor geometry from xrandr).
 These defaults are placeholders only; effects must not be instantiated before
 the display is opened."""
 
+import os
+import random
+
+import numpy as np
+
 WIDTH  = 0
 HEIGHT = 0
 FPS    = 60
@@ -30,3 +35,8 @@ SILENCE_FRAMES_ENTER = 6
 SILENCE_BEAT_FLOOR   = 0.015
 SILENCE_MID_FLOOR    = 0.020
 SILENCE_TREBLE_FLOOR = 0.018
+
+RNG_SEED = int(os.environ.get("PSYSUALS_SEED", "0") or 0)
+if RNG_SEED:
+    random.seed(RNG_SEED)
+    np.random.seed(RNG_SEED)

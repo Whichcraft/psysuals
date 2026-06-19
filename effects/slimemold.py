@@ -37,8 +37,7 @@ class SlimeMold(Effect):
         self._reset_sim()
 
     def _reset_sim(self):
-        W = max(1, config.WIDTH // self.RES_DIV)
-        H = max(1, config.HEIGHT // self.RES_DIV)
+        W, H, RD = self._render_size()
         self._W, self._H = W, H
         area = W * H
         self._n = max(5000, min(26000, int(13000 * area / (640 * 360))))
@@ -66,8 +65,10 @@ class SlimeMold(Effect):
         return self._trail[sx, sy]
 
     def draw(self, surf, waveform, fft, beat, tick):
-        if self._W != max(1, config.WIDTH // self.RES_DIV) or self._H != max(1, config.HEIGHT // self.RES_DIV):
+        W, H, RD = self._render_size()
+        if self._W != W or self._H != H:
             self._reset_sim()
+            W, H, RD = self._render_size()
         W, H = self._W, self._H
         if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
             self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
