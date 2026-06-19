@@ -12,6 +12,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [3.9.0] — 2026-06-19
 
 ### Changed
+- **Lightweight Dependencies** — Moved `librosa` from core requirements to an optional setup step. The visualizer and beat engine remain fully functional without it, drastically reducing installation size and time.
 - **HUD Readability** — Added a semi-transparent black background panel behind both the top-left HUD text lines and the bottom-left multiband energy bars to guarantee visibility during dark, bright, or chaotic visuals.
 - **Silence & No-input Modulations** — Added dynamic LFO (low-frequency oscillator) and soft heartbeat BPM-based modulation to visual idle parameters (beat decay, mid/treble floors) when silent or when no audio device is active, keeping visuals organic and avoiding static freezing.
 - **Performance `--low-spec` Mode** — Added a `--low-spec` command-line argument that caps frame rate at 30 FPS and dynamically halves the active particle, slime agent, neural node/signal, and Mycelium growth budgets in performance-heavy effects (FlowField, SlimeMold, Vortex, Bubbles, Mycelium, Synapse).

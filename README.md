@@ -34,7 +34,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Hardware Acceleration (Optional)
+### 3. Advanced Beat Tracking (Optional)
+To enable high-accuracy Librosa-based beat tracking and BPM estimation:
+```bash
+pip install librosa
+```
+
+### 4. Hardware Acceleration (Optional)
 To enable the high-performance ModernGL path:
 ```bash
 pip install -r requirements-gl.txt
