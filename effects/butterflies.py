@@ -338,7 +338,8 @@ class _Pair:
     SPARKLE_RADIUS_BASE = 5
 
     def __init__(self, hue, spawn_delay=0,
-                 solo_scale=_BIG_SOLO_SCALE, love_scale=_BIG_LOVE_SCALE):
+                 solo_scale=_BIG_SOLO_SCALE, love_scale=_BIG_LOVE_SCALE,
+                 rng=None):
         self.hue          = hue
         self._spawn_delay = spawn_delay
         self._solo_scale  = solo_scale
@@ -354,6 +355,7 @@ class _Pair:
         # Wander-break: occasionally one butterfly leaves the orbit briefly
         self._break_cd    = random.randint(*self.BREAK_CD)
         self._break_timer = 0                          # counts down during break
+        self._rng         = rng if rng is not None else np.random.default_rng(config.RNG_SEED or None)
 
     @property
     def dead(self):
@@ -525,7 +527,7 @@ class Butterflies(Effect):
         for i, off in enumerate(offsets):
             hue = (self._global_hue + i / self.MAX_PAIRS) % 1.0
             ss, ls = _PAIR_SIZES[i % len(_PAIR_SIZES)]
-            self._pairs.append(_Pair(hue, spawn_delay=off, solo_scale=ss, love_scale=ls))
+            self._pairs.append(_Pair(hue, spawn_delay=off, solo_scale=ss, love_scale=ls, rng=self._rng))
 
     def _apply_swarm_forces(self, beat):
         entries = []
@@ -619,7 +621,7 @@ class Butterflies(Effect):
             ss, ls = _PAIR_SIZES[i % len(_PAIR_SIZES)]
             hue = (self._global_hue + random.random() * 0.5) % 1.0
             self._pairs.append(_Pair(hue, spawn_delay=random.randint(*self.RESPAWN_DELAY),
-                                     solo_scale=ss, love_scale=ls))
+                                     solo_scale=ss, love_scale=ls, rng=self._rng))
 
         # Fade with alpha overlay so color trails stay cleaner over time.
         self._trail.blit(self._fade, (0, 0))
