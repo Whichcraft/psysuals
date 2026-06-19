@@ -57,8 +57,20 @@ Standardized audio energy parameters used across all effects:
 | 14 | `←` / `→` | Vortex | Feedback wormhole with fireworks |
 | 15 | `←` / `→` | Aurora | Parallel Northern Lights ribbons with additive glow |
 | 16 | `←` / `→` | Lattice | Crystal grid with zoom feedback and peak-normalization |
-| 17 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
-| 18 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
+| 17 | `←` / `→` | Mycelium | Fungal hyphae network with beat-driven bloom bursts |
+| 18 | `←` / `→` | Magnetar | Magnetic-dipole particle field with equatorial shockwaves |
+| 19 | `←` / `→` | SlimeMold | Physarum trail simulation with self-organising veins |
+| 20 | `←` / `→` | Droste | Recursive zoom portal with spiralling overlays |
+| 21 | `←` / `→` | Clifford | Strange-attractor walkers that remorph on beats |
+| 22 | `←` / `→` | Möbius | Rotating wireframe strip with topology-revealing hue sweep |
+| 23 | `←` / `→` | Chromatic | Additive RGB ring waves with prismatic aberration |
+| 24 | `←` / `→` | Persistence | Long-trail polygon moiré mandala |
+| 25 | `←` / `→` | OilSlick | Rainbow interference field with flowing shimmer |
+| 26 | `←` / `→` | Synapse | Neural graph with travelling light pulses |
+| 27 | `←` / `→` | Coral | Bottom-grown bioluminescent fractal coral |
+| 28 | `←` / `→` | Heartbeat | Centre-out shockwave rings morphing circle to polygon |
+| 29 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
+| 30 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
 
 `Spectrum` and `Waterfall` are intentionally the final two registry entries.
 
@@ -176,20 +188,6 @@ A dynamic crystal grid of nodes and beams uses a center-out frequency mapping: c
 - Audio: column activity is peak-normalized; beat drives shockwave expansion; MID_ENERGY drives grid feedback rotozoom scales; TREBLE_ENERGY shimmers node base radius and core brightness.
 - Visual notes: node hue has a radial offset, so the centre stays cooler while the corners drift more violet. Bass hits now bloom symmetrically outward from both sides of centre.
 
-## 17. Spectrum
-
-Classic analyser bars are spaced logarithmically, with peak markers and a waveform line layered over the centre of the screen.
-
-- Audio: per-bin FFT controls bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
-- Visual notes: this is the plainest diagnostic mode and is useful for checking input levels quickly.
-
-## 18. Waterfall
-
-A scrolling spectrogram stores recent history as rows, with hue encoding frequency and brightness encoding energy.
-
-- Audio: FFT energy fills scrolling rows; beat/mids add row brightness boosts; TREBLE_ENERGY adds a heat-shimmer jitter/offset to newly scrolled rows.
-- Visual notes: because it accumulates history, this is the best mode for spotting rhythmic patterns and sustained tonal bands.
-
 ## 17. Mycelium
 
 A spreading fungal hyphal network: active tips grow outward leaving decaying filament segments behind. Beat triggers an explosive central bloom that spawns new tip clusters simultaneously.
@@ -273,6 +271,20 @@ Rhythmic pressure waves expand from the screen centre. Each beat spawns concentr
 
 - Audio: bass drives wave speed and polygon morphing (low bass = circle, high bass = triangle); mid modulates propagation speed; treble adds shimmer; beat spawns new ring(s).
 - Visual notes: strong beats at high bass produce stark polygonal shockwaves; gentle beats produce soft circular ripples. Rings are drawn with polygon outlines for smooth morphing.
+
+## 29. Spectrum
+
+Classic analyser bars are spaced logarithmically, with peak markers and a waveform line layered over the centre of the screen.
+
+- Audio: per-bin FFT controls bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
+- Visual notes: this is the plainest diagnostic mode and is useful for checking input levels quickly.
+
+## 30. Waterfall
+
+A scrolling spectrogram stores recent history as rows, with hue encoding frequency and brightness encoding energy.
+
+- Audio: FFT energy fills scrolling rows; beat/mids add row brightness boosts; TREBLE_ENERGY adds a heat-shimmer jitter/offset to newly scrolled rows.
+- Visual notes: because it accumulates history, this is the best mode for spotting rhythmic patterns and sustained tonal bands.
 
 ---
 
