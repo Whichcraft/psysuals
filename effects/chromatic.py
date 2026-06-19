@@ -1,14 +1,4 @@
-"""Chromatic — cascading chromatic aberration wave rings.
-
-Each beat spawns an expanding ring that splits red, green, and blue channels
-outward by a small pixel offset proportional to wave intensity, creating
-prismatic rainbow halos as rings overlap and interfere.
-
-  Bass   → wave expansion speed + intensity
-  Mid    → hue drift speed
-  Treble → RGB split radius (aberration amount)
-  Beat   → spawn new ring
-"""
+"""Chromatic — prismatic raindrop ripples with RGB-separated outlines."""
 import math
 import random
 
@@ -22,27 +12,25 @@ _MAX_RINGS = 14
 
 class Chromatic(Effect):
     TRAIL_ALPHA = 0
-    RES_DIV     = 2
+    RES_DIV     = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W = config.WIDTH  // self.RES_DIV
-        H = config.HEIGHT // self.RES_DIV
+        W = config.WIDTH
+        H = config.HEIGHT
         self._trail = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
-        # Ring: [cx, cy, r, max_r, speed, intensity]
+        # Ring: [cx, cy, r, max_r, speed, intensity, phase]
         self._rings: list = []
-        self._hue  = 0.0
-        self._t    = 0
+        self._hue = 0.0
         self._beat_prev = 0.0
-        self._auto_cd   = 45
+        self._auto_cd = 45
 
     def draw(self, surf, waveform, fft, beat, tick):
-        RD   = self.RES_DIV
-        W    = config.WIDTH  // RD
-        H    = config.HEIGHT // RD
+        W = config.WIDTH
+        H = config.HEIGHT
         bass = beat
-        mid  = config.MID_ENERGY
+        mid = config.MID_ENERGY
         high = config.TREBLE_ENERGY
 
         if self._trail.get_width() != W or self._trail.get_height() != H:
@@ -50,61 +38,70 @@ class Chromatic(Effect):
             self._trail.fill((0, 0, 0))
 
         self._hue = (self._hue + 0.004 + mid * 0.003) % 1.0
-        self._t  += 1
 
-        # Spawn ring on beat
         if bass > 0.60 and self._beat_prev <= 0.60:
             self._spawn(bass, W, H)
         self._beat_prev = bass
 
-        # Auto-spawn so screen is never empty
         self._auto_cd -= 1
         if self._auto_cd <= 0 and len(self._rings) < 3:
             self._spawn(mid * 0.5, W, H)
             self._auto_cd = 55
 
-        # Trail decay
-        self._trail.fill((226, 222, 226), special_flags=pygame.BLEND_RGB_MULT)
-
-        # Chromatic split amount driven by treble
-        split = max(1, int(3 + high * 14))
+        self._trail.fill((232, 228, 236), special_flags=pygame.BLEND_RGB_MULT)
+        split = 2.0 + high * 12.0
 
         for ring in self._rings[:]:
-            cx, cy, r, max_r, speed, intensity = ring
+            cx, cy, r, max_r, speed, intensity, phase = ring
             if r > max_r:
                 self._rings.remove(ring)
                 continue
-            ring[2] += speed + bass * 3.0
 
-            fade   = max(0.0, 1.0 - r / max_r)
-            alpha  = int(intensity * fade * 220)
-            if alpha < 5:
+            ring[2] += speed + bass * 3.0
+            ring[6] += 0.08 + high * 0.22 + mid * 0.05
+
+            fade = max(0.0, 1.0 - r / max_r)
+            bright = intensity * fade
+            if bright < 0.04:
                 continue
 
-            thick = max(1, int(3 * fade))
-            ri    = max(1, int(r))
+            thick = max(1, int(2 + fade * 4))
+            warp = (2.5 + high * 11.0 + bass * 5.0) * (0.45 + fade * 0.9)
+            base_r = max(1.0, r)
+            channels = (
+                ((255, 40, 80), -split, phase),
+                ((60, 255, 80), 0.0, phase + 1.5),
+                ((80, 120, 255), split, phase + 3.1),
+            )
+            for color, offset, ring_phase in channels:
+                pts = self._wave_points(cx, cy, base_r + offset, warp, ring_phase)
+                scaled = tuple(min(255, int(c * bright * 1.6)) for c in color)
+                if len(pts) >= 3:
+                    pygame.draw.lines(self._trail, scaled, True, pts, thick)
 
-            # R (inner), G (centre), B (outer) — additive RGB separation
-            pygame.draw.circle(
-                self._trail, (min(255, alpha * 2), 0, 0),
-                (cx, cy), max(1, ri - split), thick)
-            pygame.draw.circle(
-                self._trail, (0, min(255, alpha * 2), 0),
-                (cx, cy), ri, thick)
-            pygame.draw.circle(
-                self._trail, (0, 0, min(255, alpha * 2)),
-                (cx, cy), ri + split, thick)
-
-        scaled = pygame.transform.scale(self._trail,
-                                        (config.WIDTH, config.HEIGHT))
-        surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+        surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
     def _spawn(self, bass, W, H):
         if len(self._rings) >= _MAX_RINGS:
             return
-        cx     = W // 2 + random.randint(-W // 6, W // 6)
-        cy     = H // 2 + random.randint(-H // 6, H // 6)
-        max_r  = math.hypot(max(cx, W - cx), max(cy, H - cy)) * 1.1
-        speed  = 3.0 + bass * 5.0
-        inten  = 0.5 + bass * 0.5
-        self._rings.append([cx, cy, 0.0, max_r, speed, inten])
+        cx = W // 2 + random.randint(-W // 6, W // 6)
+        cy = H // 2 + random.randint(-H // 6, H // 6)
+        max_r = math.hypot(max(cx, W - cx), max(cy, H - cy)) * 1.1
+        speed = 3.0 + bass * 5.0
+        inten = 0.5 + bass * 0.5
+        self._rings.append([cx, cy, 0.0, max_r, speed, inten, random.random() * math.tau])
+
+    def _wave_points(self, cx, cy, radius, warp, phase):
+        pts = []
+        steps = 72
+        for i in range(steps):
+            a = i / steps * math.tau
+            rr = radius
+            rr += math.sin(a * 3.0 + phase) * warp
+            rr += math.sin(a * 7.0 - phase * 0.7) * warp * 0.38
+            rr += math.cos(a * 2.0 + phase * 1.6) * warp * 0.18
+            pts.append((
+                int(cx + math.cos(a) * rr),
+                int(cy + math.sin(a) * rr),
+            ))
+        return pts

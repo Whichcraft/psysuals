@@ -82,20 +82,6 @@ class FlowField(Effect):
             self._px = (self._px + (dx / dist) * push) % W
             self._py = (self._py + (dy / dist) * push) % H
 
-        # Recycle particles that accumulate near screen edges back into a central cloud.
-        # Edge margin: 8% of each dimension.
-        margin_x = W * 0.08
-        margin_y = H * 0.08
-        on_edge = ((self._px < margin_x) | (self._px > W - margin_x) |
-                   (self._py < margin_y) | (self._py > H - margin_y))
-        edge_idx = np.where(on_edge)[0]
-        if edge_idx.size > 0:
-            # Relocate to a random position within the central 60% of the screen.
-            cx_min, cx_max = W * 0.20, W * 0.80
-            cy_min, cy_max = H * 0.20, H * 0.80
-            self._px[edge_idx] = np.random.uniform(cx_min, cx_max, edge_idx.size).astype(np.float32)
-            self._py[edge_idx] = np.random.uniform(cy_min, cy_max, edge_idx.size).astype(np.float32)
-
         # Decay trail (RGB mult is fast on 24-bit)
         self._trail.fill((240, 240, 240), special_flags=pygame.BLEND_RGB_MULT)
 

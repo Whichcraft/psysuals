@@ -1,17 +1,4 @@
-"""Clifford — strange attractor with audio-morphing parameters.
-
-40 000 parallel walkers are iterated through the Clifford map each frame:
-  x' = sin(a·y) - cos(b·x)
-  y' = sin(c·x) - cos(d·y)
-
-Parameters (a, b, c, d) drift slowly at rest and snap to new values on strong
-beats.  Uses NumPy vectorised ops + surfarray for near-zero Python overhead.
-
-  Bass   → parameter morph speed + point brightness
-  Mid    → morph amplitude
-  Treble → colour cycle speed
-  Beat   → jump to new attractor parameters
-"""
+"""Clifford — stabilized strange attractor field with dynamic framing."""
 import math
 import random
 
@@ -26,42 +13,69 @@ from .base import Effect
 class Clifford(Effect):
     TRAIL_ALPHA = 0
     RES_DIV     = 2
+    _FADE_ALPHA = 18
 
-    _N = 40_000   # parallel walkers
+    _N = 48_000
+    _PRESETS = [
+        (-1.40, 1.60, 1.00, 0.70),
+        (-1.70, 1.80, -1.90, -0.40),
+        (1.30, -1.70, 1.80, 1.30),
+        (-1.20, 1.90, -0.90, 1.70),
+        (1.60, 1.10, -1.50, 0.90),
+    ]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W = config.WIDTH  // self.RES_DIV
-        H = config.HEIGHT // self.RES_DIV
-        self._W, self._H = W, H
-        self._trail = pygame.Surface((W, H))
-        self._trail.fill((0, 0, 0))
+        self._trail = pygame.Surface((1, 1))
+        self._scaled = pygame.Surface((1, 1))
+        self._fade = pygame.Surface((1, 1), pygame.SRCALPHA)
         self._hue = random.random()
         self._a, self._b = np.float32(-1.4), np.float32(1.6)
         self._c, self._d = np.float32(1.0),  np.float32(0.7)
         self._ta = self._a; self._tb = self._b
         self._tc = self._c; self._td = self._d
-        self._xs = np.random.uniform(-2, 2, self._N).astype(np.float32)
-        self._ys = np.random.uniform(-2, 2, self._N).astype(np.float32)
+        self._xmin = -2.0
+        self._xmax = 2.0
+        self._ymin = -2.0
+        self._ymax = 2.0
         self._beat_prev = 0.0
+        self._reset_state()
 
-    def _new_params(self):
-        self._ta = np.float32(random.uniform(-2.0, 2.0))
-        self._tb = np.float32(random.uniform(-2.0, 2.0))
-        self._tc = np.float32(random.uniform(-2.0, 2.0))
-        self._td = np.float32(random.uniform(-2.0, 2.0))
+    def _reset_state(self):
+        W = max(1, config.WIDTH // self.RES_DIV)
+        H = max(1, config.HEIGHT // self.RES_DIV)
+        self._W, self._H = W, H
+        self._trail = pygame.Surface((W, H))
+        self._trail.fill((0, 0, 0))
+        self._fade = pygame.Surface((W, H), pygame.SRCALPHA)
+        self._fade.fill((0, 0, 0, self._FADE_ALPHA))
+        self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
+        self._xs = np.random.uniform(-1.6, 1.6, self._N).astype(np.float32)
+        self._ys = np.random.uniform(-1.6, 1.6, self._N).astype(np.float32)
+        self._xmin, self._xmax = -2.0, 2.0
+        self._ymin, self._ymax = -2.0, 2.0
+        self._new_params(force=True)
+
+    def _new_params(self, force=False):
+        base = random.choice(self._PRESETS)
+        jitter = 0.0 if force else 0.18
+        self._ta = np.float32(base[0] + random.uniform(-jitter, jitter))
+        self._tb = np.float32(base[1] + random.uniform(-jitter, jitter))
+        self._tc = np.float32(base[2] + random.uniform(-jitter, jitter))
+        self._td = np.float32(base[3] + random.uniform(-jitter, jitter))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        RD   = self.RES_DIV
-        W    = config.WIDTH  // RD
-        H    = config.HEIGHT // RD
+        W = max(1, config.WIDTH // self.RES_DIV)
+        H = max(1, config.HEIGHT // self.RES_DIV)
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
 
         if self._trail.get_width() != W or self._trail.get_height() != H:
-            self._trail = pygame.Surface((W, H))
-            self._trail.fill((0, 0, 0))
+            self._reset_state()
+            W, H = self._W, self._H
+        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
+            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
         self._hue = (self._hue + 0.002 + high * 0.003) % 1.0
 
@@ -75,19 +89,51 @@ class Clifford(Effect):
         self._c = np.float32(self._c + (self._tc - self._c) * spd)
         self._d = np.float32(self._d + (self._td - self._d) * spd)
 
-        # Vectorised Clifford map — one step for all walkers simultaneously
         xs, ys = self._xs, self._ys
-        nx = np.sin(self._a * ys) - np.cos(self._b * xs)
-        ny = np.sin(self._c * xs) - np.cos(self._d * ys)
-        self._xs, self._ys = nx.astype(np.float32), ny.astype(np.float32)
+        clouds_x = []
+        clouds_y = []
+        for _ in range(3):
+            nx = np.sin(self._a * ys) - np.cos(self._b * xs)
+            ny = np.sin(self._c * xs) - np.cos(self._d * ys)
+            xs = nx.astype(np.float32)
+            ys = ny.astype(np.float32)
+            clouds_x.append(xs)
+            clouds_y.append(ys)
+        self._xs, self._ys = xs, ys
 
-        scale = min(W, H) * 0.24
-        ix = np.clip((xs * scale + W * 0.5).astype(np.int32), 0, W - 1)
-        iy = np.clip((ys * scale + H * 0.5).astype(np.int32), 0, H - 1)
+        if not np.isfinite(xs).all() or not np.isfinite(ys).all():
+            self._reset_state()
+            return
 
-        ang   = (np.arctan2(ys, xs) / math.tau + 0.5).astype(np.float32)
-        h_arr = (self._hue + ang * 0.7) % 1.0
-        bright = 0.40 + bass * 0.30
+        spread_x = float(np.std(xs))
+        spread_y = float(np.std(ys))
+        if spread_x < 0.03 or spread_y < 0.03:
+            self._reset_state()
+            return
+
+        draw_x = np.concatenate(clouds_x)
+        draw_y = np.concatenate(clouds_y)
+
+        x_lo, x_hi = np.percentile(draw_x, (1.0, 99.0))
+        y_lo, y_hi = np.percentile(draw_y, (1.0, 99.0))
+        if x_hi - x_lo < 0.10 or y_hi - y_lo < 0.10:
+            self._reset_state()
+            return
+
+        self._xmin += (x_lo - self._xmin) * 0.12
+        self._xmax += (x_hi - self._xmax) * 0.12
+        self._ymin += (y_lo - self._ymin) * 0.12
+        self._ymax += (y_hi - self._ymax) * 0.12
+
+        x_span = max(0.01, self._xmax - self._xmin)
+        y_span = max(0.01, self._ymax - self._ymin)
+        ix = np.clip(((draw_x - self._xmin) / x_span * (W - 1)).astype(np.int32), 0, W - 1)
+        iy = np.clip(((draw_y - self._ymin) / y_span * (H - 1)).astype(np.int32), 0, H - 1)
+
+        ang = (np.arctan2(draw_y, draw_x) / math.tau + 0.5).astype(np.float32)
+        rad = np.clip(np.hypot(draw_x, draw_y) * 0.18, 0.0, 1.0).astype(np.float32)
+        h_arr = (self._hue + ang * 0.55 + rad * 0.20) % 1.0
+        bright = 0.32 + bass * 0.20 + (1.0 - rad) * 0.18
 
         r_arr = np.clip(
             (np.sin(h_arr * math.tau) * 127 + 128) * bright * 2,
@@ -100,16 +146,14 @@ class Clifford(Effect):
             0, 255).astype(np.uint32)
         colors = (r_arr << 16) | (g_arr << 8) | b_arr
 
-        self._trail.fill((228, 225, 232), special_flags=pygame.BLEND_RGB_MULT)
+        # Use alpha fade instead of RGB multiply so the attractor trail keeps
+        # more chroma instead of drifting toward muddy gray.
+        self._trail.blit(self._fade, (0, 0))
         pix = surfarray.pixels2d(self._trail)
         try:
             pix[ix, iy] = colors
         finally:
             del pix
 
-        if RD > 1:
-            scaled = pygame.transform.scale(self._trail,
-                                            (config.WIDTH, config.HEIGHT))
-            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
-        else:
-            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT), self._scaled)
+        surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

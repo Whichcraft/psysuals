@@ -24,15 +24,24 @@ _BASE_SD = 7                   # sensor distance in sim pixels
 
 class SlimeMold(Effect):
     TRAIL_ALPHA = 0
-    RES_DIV     = 4   # simulation runs at 1/4 resolution
+    RES_DIV     = 3
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W = config.WIDTH  // self.RES_DIV
-        H = config.HEIGHT // self.RES_DIV
+        self._W, self._H = 1, 1
+        self._n = 0
+        self._trail = np.zeros((1, 1), dtype=np.float32)
+        self._surf = pygame.Surface((1, 1))
+        self._scaled = pygame.Surface((1, 1))
+        self._hue = 0.30
+        self._reset_sim()
+
+    def _reset_sim(self):
+        W = max(1, config.WIDTH // self.RES_DIV)
+        H = max(1, config.HEIGHT // self.RES_DIV)
         self._W, self._H = W, H
-        area     = W * H
-        self._n  = max(3000, min(15000, int(10000 * area / (480 * 270))))
+        area = W * H
+        self._n = max(5000, min(26000, int(13000 * area / (640 * 360))))
         cx, cy   = W / 2.0, H / 2.0
         r_spread = min(W, H) * 0.25
         self._px  = np.clip(
@@ -44,7 +53,7 @@ class SlimeMold(Effect):
         self._ang = np.random.uniform(0, math.tau, self._n).astype(np.float32)
         self._trail = np.zeros((W, H), dtype=np.float32)
         self._surf  = pygame.Surface((W, H))
-        self._hue   = 0.30
+        self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
     def _sense(self, offset_ang, dist):
         W, H = self._W, self._H
@@ -57,7 +66,11 @@ class SlimeMold(Effect):
         return self._trail[sx, sy]
 
     def draw(self, surf, waveform, fft, beat, tick):
+        if self._W != max(1, config.WIDTH // self.RES_DIV) or self._H != max(1, config.HEIGHT // self.RES_DIV):
+            self._reset_sim()
         W, H = self._W, self._H
+        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
+            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -135,6 +148,7 @@ class SlimeMold(Effect):
         finally:
             del pix
 
-        scaled = pygame.transform.scale(self._surf,
-                                        (config.WIDTH, config.HEIGHT))
-        surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        pygame.transform.smoothscale(self._surf,
+                                     (config.WIDTH, config.HEIGHT),
+                                     self._scaled)
+        surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

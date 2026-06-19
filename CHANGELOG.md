@@ -5,6 +5,41 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Audio startup fallback** — startup now prefers concrete input devices (such as PipeWire/Pulse or explicit hardware devices) before falling back to Linux's generic `default` wrapper, reducing ALSA startup failures that aborted the app before the UI appeared.
+- **Silence handling** — added RMS/FFT-based silence detection with hysteresis so effects drop to a deliberate low-motion idle level before and after tracks instead of reacting to noise-floor normalization spikes.
+- **Crossfade scaling** — cached the scaled previous-frame surface used during mode crossfades, reducing repeated full-frame scaling work on every transition frame.
+- **Aurora** — ribbon fills now use successive strip quads instead of one large polygon per band, avoiding the straight-line/spoke artifacts seen on Android.
+- **FlowField** — removed the edge recycling behavior so particles wrap across the full viewport and no longer leave a dark border.
+- **Butterflies** — trail scaling now uses a cached resize-aware surface instead of allocating a fresh full-screen scale result every frame.
+- **Butterflies** — boundary handling now bounces butterflies back into view instead of pinning them to the edge.
+- **Butterflies** — added light cohesion/separation steering so the swarm does not collapse into a single clump.
+- **Butterflies** — centralized the main motion and lifecycle tuning values into named constants for easier adjustment.
+- **Magnetar** — particle density now scales higher on large displays, and the internal particle state is rebuilt on resize so the field stays full after geometry changes.
+- **SlimeMold** — increased internal simulation fidelity, added resize-safe buffer rebuilds, and smooth-scaled the output to reduce chunky Android pixels.
+- **Clifford** — replaced unconstrained random parameter jumps with curated presets plus dynamic framing and collapse recovery, keeping the attractor broad instead of collapsing into a tiny bright point.
+- **Möbius** — removed the interior longitude wires so the band reads cleanly without straight cross-lines.
+- **Chromatic** — replaced concentric RGB circles with wavy chromatic raindrop ripples that read properly on Android.
+- **Mycelium** — reworked from a single center-out burst into a multi-colony swirling growth pattern for fuller, more psychedelic screen coverage.
+- **Synapse** — bounded live pulse count and cascade fan-out to prevent runaway signal growth and improve stability on lower-power platforms.
+- **Vortex** — feedback upscaling now reuses a cached surface and recreates internal buffers cleanly on resize.
+- **Vortex** — centralized the main launch, trail, feedback, and culling tuning values into named constants.
+- **Audio reactivity** — fixed FFT band handling so genre and energy calculations clamp safely to the available spectrum instead of assuming fixed bin ranges.
+- **Import hygiene** — removed unused imports, lazy-loaded optional `librosa`, and deferred GL helper imports until the `--gl` path is actually used.
+- **NVIDIA OpenGL compatibility** — requested a 3.3 core context explicitly and standardized shader versions so `--gl` works on stricter desktop drivers.
+- **FlowField** — scaled particle count by screen area to keep large displays visually dense without overloading smaller ones.
+- **Tunnel / Corridor** — lowered the near recycling threshold so geometry clears the screen before being recycled, removing boundary pops and gaps.
+
+### Removed
+- **Droste** — removed from the active mode registry.
+- **OilSlick** — removed from the active mode registry.
+- **Coral** — removed from the active mode registry.
+
+### Documented
+- **Mode count** — updated current docs to match the active 27-mode registry.
+
 ## [3.8.0] — 2026-06-15
 
 ### Added

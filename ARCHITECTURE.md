@@ -35,7 +35,7 @@ get_audio()
 
 The callback stays cheap and deterministic. It computes the always-available fallback beat/BPM path and pushes raw audio into `LibrosaBeatTracker`.
 
-Input-stream startup is tolerant now: the app tries the saved device first, then the default device, and if both fail it keeps running with no live input stream so the UI can still come up.
+Input-stream startup is tolerant now: the app tries the saved device first, then preferred concrete inputs (favoring PipeWire/Pulse and other explicit devices ahead of Linux's brittle `default` wrappers), and if all candidates fail it keeps running with no live input stream so the UI can still come up.
 
 `beat_tracking.py` is an optional refinement layer:
 
@@ -56,6 +56,16 @@ beat = beat_decay
 ```
 
 `avg` is the rolling average of the last 40 raw-beat samples. The result is volume-adaptive and decays smoothly between kicks.
+
+### Silence handling
+
+Before and after tracks, the app applies a silence gate with hysteresis using waveform RMS plus average FFT energy:
+
+- Enter silence after several frames under the low threshold.
+- Exit silence only after crossing a higher threshold.
+- While silent, `raw_beat` is forced to zero, the rolling beat history is cleared, and `MID_ENERGY` / `TREBLE_ENERGY` are clamped to faint idle floors.
+
+This prevents normalization noise from turning silence into fake beat spikes while still keeping effects gently alive at a low-motion baseline.
 
 ---
 
@@ -102,8 +112,10 @@ Fullscreen/display changes also recreate the background effect so display-bound 
 | `MID_ENERGY` | `0.0` | Normalised mid-band energy, updated each frame |
 | `TREBLE_ENERGY` | `0.0` | Normalised treble energy, updated each frame |
 | `BPM` | `0.0` | Live BPM estimate or tap-tempo override |
+| `IS_SILENT` | `True` | Exported silence-gate state for effects and HUD logic |
 | `DEFAULT_EFFECT_GAIN` | `0.7` | Reset value used on startup and mode changes |
 | `EFFECT_GAIN` | `0.7` | Current foreground intensity |
+| `SILENCE_*` | various | Silence gate thresholds and idle motion floors |
 
 ---
 
@@ -143,6 +155,7 @@ Effects may also read:
 - `config.WIDTH`, `config.HEIGHT`
 - `config.MID_ENERGY`, `config.TREBLE_ENERGY`
 - `config.BPM`
+- `config.IS_SILENT`
 - `config.EFFECT_GAIN`
 - `effects.palette.palette`
 
@@ -176,12 +189,12 @@ Rules that matter in this repo:
 | File | Role |
 |------|------|
 | `core/audio_engine.py` | `AudioEngine`: capture, FFT, beat/genre detection |
-| `core/display_manager.py` | `DisplayManager`: monitors, X11, windowing, span mode |
+| `core/display_manager.py` | `DisplayManager`: monitors, X11, windowing, span mode; lazily loads the GL renderer only when `--gl` is active |
 | `core/ui_manager.py` | `UIManager`: HUD, pane, picker rendering |
 | `effects/utils.py` | `hsl()` and `_hsl_batch()` colour helpers |
 | `effects/palette.py` | shared hue/saturation/lightness palette driven by audio |
 | `settings.py` | persistent settings and preset storage under `~/.config/psysuals/` |
-| `gl_renderer.py` | moderngl helper for the experimental GL path |
+| `gl_renderer.py` | moderngl helper for the experimental GL path, loaded lazily by the display manager |
 | `effects/shaders/` | tracked GLSL assets loaded by `gl_renderer.py` |
 | `requirements-gl.txt` | optional dependency set for the GL path |
 
@@ -200,6 +213,4 @@ Rules that matter in this repo:
 | `effects/utils.py` | `27` | colour helpers |
 | `gl_renderer.py` | `144` | GL helper and shader-asset loader |
 | `settings.py` | `72` | settings and preset persistence |
-| `effects/*.py` | `30` modes + shared helpers | visual implementations |
-
-
+| `effects/*.py` | `27` active modes + shared helpers | visual implementations |

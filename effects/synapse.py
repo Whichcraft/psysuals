@@ -21,6 +21,7 @@ from .utils import hsl
 
 _N_NODES       = 55
 _EDGES_PER_NODE = 3
+_MAX_SIGNALS    = 240
 
 
 class Synapse(Effect):
@@ -42,6 +43,7 @@ class Synapse(Effect):
 
         # Connect each node to _EDGES_PER_NODE nearest neighbours
         self._edges: list = []   # [from_i, to_i]
+        edge_set = set()
         for i in range(_N_NODES):
             xi, yi = self._nodes[i]
             dists  = sorted(
@@ -49,7 +51,12 @@ class Synapse(Effect):
                              self._nodes[j][1] - yi), j)
                  for j in range(_N_NODES) if j != i])
             for _, j in dists[:_EDGES_PER_NODE]:
-                self._edges.append([i, j])
+                if (i, j) not in edge_set:
+                    edge_set.add((i, j))
+                    self._edges.append([i, j])
+        self._outgoing = [[] for _ in range(_N_NODES)]
+        for ei, (fi, _) in enumerate(self._edges):
+            self._outgoing[fi].append(ei)
 
         # Live signals: [edge_idx, progress 0..1, speed, hue]
         self._signals: list = []
@@ -60,13 +67,18 @@ class Synapse(Effect):
 
     # ------------------------------------------------------------------
 
-    def _fire(self, idx):
+    def _fire(self, idx, fanout=2):
         self._glow[idx] = 1.0
         h = (self._hue + idx / _N_NODES * 0.4) % 1.0
-        for ei, (fi, _) in enumerate(self._edges):
-            if fi == idx:
-                spd = 0.020 + random.uniform(0, 0.010)
-                self._signals.append([ei, 0.0, spd, h])
+        outgoing = self._outgoing[idx]
+        if not outgoing or len(self._signals) >= _MAX_SIGNALS:
+            return
+        fanout = max(1, min(fanout, len(outgoing)))
+        for ei in random.sample(outgoing, fanout):
+            if len(self._signals) >= _MAX_SIGNALS:
+                break
+            spd = 0.020 + random.uniform(0, 0.010)
+            self._signals.append([ei, 0.0, spd, h])
 
     # ------------------------------------------------------------------
 
@@ -81,18 +93,19 @@ class Synapse(Effect):
         # Beat cascade
         if bass > 0.65 and self._beat_prev <= 0.65:
             for _ in range(int(1 + bass * 3)):
-                self._fire(random.randint(0, _N_NODES - 1))
+                self._fire(random.randint(0, _N_NODES - 1), fanout=2 + int(high * 2))
         self._beat_prev = bass
 
         # Auto-fire
         self._auto_fire_cd -= 1
         if self._auto_fire_cd <= 0:
-            self._fire(random.randint(0, _N_NODES - 1))
+            self._fire(random.randint(0, _N_NODES - 1), fanout=1)
             self._auto_fire_cd = max(8, int(25 - mid * 15))
 
         # Advance signals
         spd_mul   = 1.0 + bass * 2.0
         live_sigs = []
+        fired_nodes = []
         for sig in self._signals:
             ei, t, spd, h = sig
             t += spd * spd_mul
@@ -100,8 +113,10 @@ class Synapse(Effect):
             if t < 1.0:
                 live_sigs.append(sig)
             else:
-                self._fire(self._edges[ei][1])
+                fired_nodes.append(self._edges[ei][1])
         self._signals = live_sigs
+        for idx in fired_nodes[:18]:
+            self._fire(idx, fanout=1 + int(mid * 2))
 
         # Decay glow
         for i in range(_N_NODES):
