@@ -3,7 +3,12 @@ __pycache__/
 .venv/
 screenshot.png
 
+# AI Agent files
 CLAUDE.md
+AGENTS.md
+AI.md
+.agents/
+.ai/
 
 # QMD search index
 qmd.sqlite
