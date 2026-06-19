@@ -24,6 +24,8 @@ class FlowField(Effect):
         # Baseline: 25000 particles for a 1920x1080 (1080p) screen.
         area = W * H
         self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
+        if getattr(config, "LOW_SPEC", False):
+            self._n = max(4000, self._n // 2)
         self._px = np.random.uniform(0, W, self._n).astype(np.float32)
         self._py = np.random.uniform(0, H, self._n).astype(np.float32)
         self._hue = random.random()

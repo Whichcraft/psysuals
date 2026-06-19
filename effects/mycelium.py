@@ -26,8 +26,14 @@ class Mycelium(Effect):
         self._tips: list = []
         self._cores: list[tuple[float, float, float]] = []
         self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self.max_segs = _MAX_SEGS
+        self.max_tips = _MAX_TIPS
+        if getattr(config, "LOW_SPEC", False):
+            self.max_segs //= 2
+            self.max_tips //= 2
+            
         self._build_cores()
-        self._seed_tips(28)
+        self._seed_tips(14 if getattr(config, "LOW_SPEC", False) else 28)
 
     def _build_cores(self):
         W, H = config.WIDTH, config.HEIGHT
@@ -47,7 +53,7 @@ class Mycelium(Effect):
     def _seed_tips(self, count, core_idx=None):
         if not self._cores:
             self._build_cores()
-        n = min(count, _MAX_TIPS - len(self._tips))
+        n = min(count, self.max_tips - len(self._tips))
         if n <= 0:
             return
         if core_idx is None:
@@ -81,7 +87,7 @@ class Mycelium(Effect):
         self._phase += 0.010 + mid * 0.012 + high * 0.006
         self._pulse = max(0.0, self._pulse - 0.03)
 
-        if bass > 0.65 and len(self._tips) < _MAX_TIPS:
+        if bass > 0.65 and len(self._tips) < self.max_tips:
             self._pulse = 1.0
             for _ in range(1 + int(bass * 2.5)):
                 self._seed_tips(int(5 + bass * 6), int(self._rng.integers(0, len(self._cores))))
@@ -115,20 +121,20 @@ class Mycelium(Effect):
                 length = max(2.5, speed * (1.0 - depth * 0.030) * float(len_mul[idx]))
                 ex = (tx + math.cos(ta2) * length) % W
                 ey = (ty + math.sin(ta2) * length) % H
-                if len(self._segs) < _MAX_SEGS:
+                if len(self._segs) < self.max_segs:
                     self._segs.append([tx, ty, ex, ey, 0, seg_life + int(seg_jitter[idx]), depth, h_off])
-                if len(next_tips) < _MAX_TIPS:
+                if len(next_tips) < self.max_tips:
                     next_tips.append([ex, ey, ta2, depth + 1, h_off, core_idx])
-                if branch_roll[idx] < branch_p and depth < 13 and len(next_tips) < _MAX_TIPS:
+                if branch_roll[idx] < branch_p and depth < 13 and len(next_tips) < self.max_tips:
                     b_ang = ta2 + float(branch_sign[idx]) * float(branch_angle[idx])
                     b_core = core_idx if self._rng.random() > 0.18 else int(branch_core[idx])
                     next_tips.append([ex, ey, b_ang, depth + 1, (h_off + 0.10) % 1.0, b_core])
 
-        self._tips = next_tips[:_MAX_TIPS]
+        self._tips = next_tips[:self.max_tips]
 
         if not self._tips:
             self._build_cores()
-            self._seed_tips(28)
+            self._seed_tips(14 if getattr(config, "LOW_SPEC", False) else 28)
 
         self._segs = [s for s in self._segs if s[4] < s[5]]
         for s in self._segs:

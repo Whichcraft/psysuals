@@ -2,7 +2,7 @@
 
 **Welcome to the super-duper greatest music visualizer ever made.** psysuals v3 is a massive leap forward, re-engineered from the ground up to deliver uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, v3 is built to melt your mind with precision and style.
 
-![Version](https://img.shields.io/badge/version-3.8.0-orange)
+![Version](https://img.shields.io/badge/version-3.9.0-orange)
  ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -51,6 +51,11 @@ pip install -r requirements-gl.txt
 Run with ModernGL hardware acceleration:
 ```bash
 .venv/bin/python psysualizer.py --gl
+```
+
+Run on low-spec/low-power systems (caps framerate to 30 FPS and scales down simulation complexity):
+```bash
+.venv/bin/python psysualizer.py --low-spec
 ```
 
 The app restores the last saved display index on startup. Use `--display N` to override that for a single launch.

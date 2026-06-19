@@ -98,8 +98,9 @@ class Vortex(Effect):
         self._rockets.append([float(x), float(H), vx, vy, h, []])
 
     def _explode(self, x, y, hue, treble=0.0, res_div: int = 1):
-        # Scale ember count and velocity with treble energy
         n = int(random.randint(*self._EXPLODE_EMBERS) * (1.0 + treble * self._EXPLODE_TREBLE_COUNT_GAIN))
+        if getattr(config, "LOW_SPEC", False):
+            n = max(5, n // 2)
         angs = self._rng.uniform(0.0, math.tau, n)
         spds = self._rng.normal(self._EXPLODE_SPEED_MEAN / res_div,
                                 self._EXPLODE_SPEED_STD / res_div, n)

@@ -41,6 +41,8 @@ class SlimeMold(Effect):
         self._W, self._H = W, H
         area = W * H
         self._n = max(5000, min(26000, int(13000 * area / (640 * 360))))
+        if getattr(config, "LOW_SPEC", False):
+            self._n = max(2500, self._n // 2)
         cx, cy   = W / 2.0, H / 2.0
         r_spread = min(W, H) * 0.25
         self._px  = np.clip(

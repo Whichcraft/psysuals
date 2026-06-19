@@ -21,7 +21,14 @@ class Bubbles(Effect):
         self.pulse      = 0.0
         self.pvel       = 0.0
         self._bass_flash = 0.0   # spikes on strong bass, inflates rendered bubble size
-        self.pool = [self._make(y=random.uniform(0, config.HEIGHT)) for _ in range(200)]
+        
+        self.max_bubbles = self.MAX
+        init_size = 200
+        if getattr(config, "LOW_SPEC", False):
+            self.max_bubbles = self.MAX // 2
+            init_size = 100
+            
+        self.pool = [self._make(y=random.uniform(0, config.HEIGHT)) for _ in range(init_size)]
         self._surf_cache: dict = {}
 
     @staticmethod
@@ -49,18 +56,27 @@ class Bubbles(Effect):
     def _spawn(self, beat, bass, mid, high):
         beat_sel = min(beat, 1.0)
         hue_spread = 0.35 + beat_sel * 0.30
+        
         # Spawn more bubbles on bass beats and treble transients
-        for _ in range(int(2 + beat_sel * 12 + bass * 6 + high * 8)):
-            b = self._make()
-            b["vy"]  *= (1 + beat_sel * 0.8 + mid * 0.6)
-            b["r"]   *= (1 + bass * 1.2)
-            b["hue"]  = (self.hue + random.uniform(0, hue_spread)) % 1.0
-            self.pool.append(b)
+        n_spawn = int(2 + beat_sel * 12 + bass * 6 + high * 8)
+        if getattr(config, "LOW_SPEC", False):
+            n_spawn = max(1, n_spawn // 2)
+            
+        for _ in range(n_spawn):
+            if len(self.pool) < self.max_bubbles:
+                b = self._make()
+                b["vy"]  *= (1 + beat_sel * 0.8 + mid * 0.6)
+                b["r"]   *= (1 + bass * 1.2)
+                b["hue"]  = (self.hue + random.uniform(0, hue_spread)) % 1.0
+                self.pool.append(b)
 
         # Mega-bubbles on strong bass hits: 1-3 extra large luminous bubbles
-        if beat > 0.7 and len(self.pool) < self.MAX:
-            for _ in range(1 + int((beat - 0.7) * 4)):
-                if len(self.pool) < self.MAX:
+        if beat > 0.7 and len(self.pool) < self.max_bubbles:
+            n_mega = 1 + int((beat - 0.7) * 4)
+            if getattr(config, "LOW_SPEC", False):
+                n_mega = max(1, n_mega // 2)
+            for _ in range(n_mega):
+                if len(self.pool) < self.max_bubbles:
                     b = self._make()
                     b["r"]  *= (2.2 + bass * 2.0)
                     b["vy"] *= (1.4 + mid * 0.5)

@@ -96,22 +96,27 @@ class UIManager:
         gap = 3
         total_w = 3 * bar_w + 2 * gap
         
-        if self._bar_surf is None:
-            self._bar_surf = pygame.Surface((total_w, bar_max), pygame.SRCALPHA)
+        pad_x = 6
+        pad_y = 6
+        surf_w = total_w + 2 * pad_x
+        surf_h = bar_max + 2 * pad_y
+        
+        if self._bar_surf is None or self._bar_surf.get_size() != (surf_w, surf_h):
+            self._bar_surf = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
             
-        self._bar_surf.fill((0, 0, 0, 0))
+        self._bar_surf.fill((0, 0, 0, 110)) # semi-transparent background
         
         defs = [
-            (beat_val, (180, 50, 50, 150)),
-            (mid_val, (50, 180, 50, 150)),
-            (treble_val, (130, 60, 200, 150)),
+            (beat_val, (180, 50, 50, 200)),
+            (mid_val, (50, 180, 50, 200)),
+            (treble_val, (130, 60, 200, 200)),
         ]
         for i, (value, color) in enumerate(defs):
             h = int(bar_max * max(0.0, min(value / 3.0, 1.0)))
-            x = i * (bar_w + gap)
+            x = pad_x + i * (bar_w + gap)
             if h > 0:
-                pygame.draw.rect(self._bar_surf, color, (x, bar_max - h, bar_w, h))
-        target.blit(self._bar_surf, (6, config.HEIGHT - bar_max - 6))
+                pygame.draw.rect(self._bar_surf, color, (x, pad_y + bar_max - h, bar_w, h))
+        target.blit(self._bar_surf, (6, config.HEIGHT - surf_h - 6))
 
     def draw_tap_flash(self, target: pygame.Surface, tap_bpm: float, alpha: int) -> None:
         if self._flash_surf is None or self._flash_surf.get_size() != (config.WIDTH, config.HEIGHT):

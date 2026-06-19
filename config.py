@@ -11,6 +11,7 @@ import numpy as np
 WIDTH  = 0
 HEIGHT = 0
 FPS    = 60
+LOW_SPEC = False
 
 SAMPLE_RATE = 44100
 BLOCK_SIZE  = 1024

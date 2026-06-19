@@ -24,10 +24,11 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.8.0"
+__version__ = "3.9.0"
 
 import argparse
 import atexit
+import math
 import os
 import sys
 import time as _time
@@ -52,6 +53,9 @@ class VisualizerApp:
     def __init__(self):
         self._setup_signals()
         self.args = self._parse_args()
+        config.LOW_SPEC = self.args.low_spec
+        if config.LOW_SPEC:
+            config.FPS = 30
         self.settings = sett.load()
         self.fade_alpha = 28
         
@@ -146,6 +150,7 @@ class VisualizerApp:
         parser.add_argument("-d", "--display", type=int, default=None, help="Target display index (e.g. 0, 1)")
         parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index (0-26)")
         parser.add_argument("-g", "--gl", action="store_true", help="Enable ModernGL hardware acceleration")
+        parser.add_argument("--low-spec", action="store_true", help="Optimize performance for low-end systems (lowers FPS and particle counts)")
         parser.add_argument("--span-child", action="store_true", help=argparse.SUPPRESS)
         return parser.parse_args()
 
@@ -423,13 +428,26 @@ class VisualizerApp:
 
         if self.is_silent:
             raw_beat = 0.0
-            mid_e = config.SILENCE_MID_FLOOR
-            treble_e = config.SILENCE_TREBLE_FLOOR
+            # Gentle breathing/LFO modulation to keep the visuals alive and dynamic in no-input/silent mode
+            t_sec = self.tick / 60.0
+            lfo_mid = 0.5 + 0.5 * math.sin(t_sec * 1.2)
+            lfo_treble = 0.5 + 0.5 * math.cos(t_sec * 0.9)
+            lfo_beat = 0.5 + 0.5 * math.sin(t_sec * 2.0)
+            
+            mid_e = config.SILENCE_MID_FLOOR * (0.8 + 0.4 * lfo_mid)
+            treble_e = config.SILENCE_TREBLE_FLOOR * (0.8 + 0.4 * lfo_treble)
+            
+            # Simulate a very gentle ambient pulse at config.BPM (or fallback 120)
+            bpm_rate = (config.BPM or 120.0) / 60.0
+            pulse = max(0.0, math.sin(t_sec * math.pi * bpm_rate)) ** 4
+            silence_beat_floor = config.SILENCE_BEAT_FLOOR * (0.7 + 0.6 * pulse + 0.2 * lfo_beat)
+            
             self.energy_hist.clear()
             self.energy_sum = 0.0
         else:
             mid_e = max(mid_e, config.SILENCE_MID_FLOOR * 0.5)
             treble_e = max(treble_e, config.SILENCE_TREBLE_FLOOR * 0.5)
+            silence_beat_floor = 0.0
             
         config.MID_ENERGY = mid_e
         config.TREBLE_ENERGY = treble_e
@@ -452,7 +470,7 @@ class VisualizerApp:
         avg = self.energy_sum / len(self.energy_hist) if self.energy_hist else 1e-6
         impulse = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
         self.beat_decay = max(impulse, self.beat_decay * (0.82 if self.is_silent else 0.90))
-        self.beat = max(self.beat_decay, config.SILENCE_BEAT_FLOOR if self.is_silent else 0.0)
+        self.beat = max(self.beat_decay, silence_beat_floor if self.is_silent else 0.0)
         
         self.rms_buf.append(rms)
         if self.auto_gain and self.rms_buf:
@@ -538,29 +556,40 @@ class VisualizerApp:
         gl_tag = " | GL" if self.args.gl else ""
         title = f"psysuals v{__version__}  [{fps:.0f} fps{gl_tag}]"
         
-        y0 = 6
-        target.blit(self.ui.font.render(title, True, (220, 220, 220)), (6, y0))
-        y0 += self.ui.font.get_height() + 2
+        # Build text lines
+        lines = []
+        lines.append(self.ui.font.render(title, True, (220, 220, 220)))
         
         mode_text = f"Mode {self.mode_idx+1}: {self.name} ({self.effect_gain:.1f})"
         if self.bg_on:
             mode_text += f" + BG: {self.bg_name}"
-        target.blit(self.ui.font.render(mode_text, True, (200, 200, 100)), (6, y0))
-        y0 += self.ui.font.get_height() + 4
+        lines.append(self.ui.font.render(mode_text, True, (200, 200, 100)))
         
         if self.hud_level > 1:
             info = f"BPM: {self.bpm:.1f} ({self.current_genre})"
             if self.using_tap: info += " [TAP]"
             if self.auto_gain: info += " [AUTO]"
-            target.blit(self.ui.font_s.render(info, True, (160, 160, 160)), (6, y0))
-            y0 += self.ui.font_s.get_height() + 2
-            
-            target.blit(self.ui.font_s.render(f"Input: {dev_name}", True, (130, 130, 130)), (6, y0))
-            y0 += self.ui.font_s.get_height() + 2
+            lines.append(self.ui.font_s.render(info, True, (160, 160, 160)))
+            lines.append(self.ui.font_s.render(f"Input: {dev_name}", True, (130, 130, 130)))
             
             if self.active_preset >= 0 and self.presets:
                 pname = self.presets[self.active_preset]["name"]
-                target.blit(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)), (6, y0))
+                lines.append(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)))
+                
+        # Draw dark semi-transparent panel for high readability
+        max_w = max(line.get_width() for line in lines)
+        spacing = 3
+        total_h = sum(line.get_height() for line in lines) + spacing * (len(lines) - 1)
+        
+        bg_surf = pygame.Surface((max_w + 16, total_h + 12), pygame.SRCALPHA)
+        bg_surf.fill((0, 0, 0, 110)) # semi-transparent black background
+        target.blit(bg_surf, (4, 4))
+        
+        # Render text lines onto target
+        y = 10
+        for line in lines:
+            target.blit(line, (12, y))
+            y += line.get_height() + spacing
 
 if __name__ == "__main__":
     try:

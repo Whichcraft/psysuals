@@ -8,6 +8,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+
+## [3.9.0] — 2026-06-19
+
+### Changed
+- **HUD Readability** — Added a semi-transparent black background panel behind both the top-left HUD text lines and the bottom-left multiband energy bars to guarantee visibility during dark, bright, or chaotic visuals.
+- **Silence & No-input Modulations** — Added dynamic LFO (low-frequency oscillator) and soft heartbeat BPM-based modulation to visual idle parameters (beat decay, mid/treble floors) when silent or when no audio device is active, keeping visuals organic and avoiding static freezing.
+- **Performance `--low-spec` Mode** — Added a `--low-spec` command-line argument that caps frame rate at 30 FPS and dynamically halves the active particle, slime agent, neural node/signal, and Mycelium growth budgets in performance-heavy effects (FlowField, SlimeMold, Vortex, Bubbles, Mycelium, Synapse).
+- **Cleanup** — Purged `BUGS.md`, empty `results/` folder, and cleared tasks in `TODO.md`.
 - **Bootstrap and hardening** — restored a runnable entrypoint, split the CPU/ModernGL architecture, added smoke tests and benchmarks, modularized the app, tightened dependencies, improved beat/BPM detection, hardened startup validation, and added regression checks for the registry contract.
 - **Audio startup fallback** — startup now prefers concrete input devices (such as PipeWire/Pulse or explicit hardware devices) before falling back to Linux's generic `default` wrapper, reducing ALSA startup failures that aborted the app before the UI appeared.
 - **Silence handling** — added RMS/FFT-based silence detection with hysteresis so effects drop to a deliberate low-motion idle level before and after tracks instead of reacting to noise-floor normalization spikes.
