@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 from collections import deque
+import importlib
 import threading
 import time as _time
 
 import numpy as np
 
-try:
-    import librosa
-except ImportError:  # pragma: no cover - optional dependency at runtime
-    librosa = None
+_LIBROSA = None
+_LIBROSA_FAILED = False
+
+
+def _get_librosa():
+    global _LIBROSA, _LIBROSA_FAILED
+    if _LIBROSA is None and not _LIBROSA_FAILED:
+        try:
+            _LIBROSA = importlib.import_module("librosa")
+        except ImportError:  # pragma: no cover - optional dependency at runtime
+            _LIBROSA_FAILED = True
+    return _LIBROSA
 
 
 def _scalar(value) -> float:
@@ -51,10 +60,10 @@ class LibrosaBeatTracker:
 
     @property
     def enabled(self) -> bool:
-        return librosa is not None
+        return _get_librosa() is not None
 
     def push_audio(self, block: np.ndarray, end_time: float) -> None:
-        if librosa is None:
+        if _get_librosa() is None:
             return
         chunk = np.asarray(block, dtype=np.float32).copy()
         with self._lock:
@@ -62,7 +71,7 @@ class LibrosaBeatTracker:
             self._block_end_time = float(end_time)
 
     def analyze(self, fallback_bpm: float = 0.0) -> float:
-        if librosa is None:
+        if _get_librosa() is None:
             return fallback_bpm
 
         now = _time.monotonic()
@@ -95,6 +104,9 @@ class LibrosaBeatTracker:
                 self._analysis_running = False
 
     def _analyze_blocks(self, blocks, block_end_time: float, fallback_bpm: float) -> None:
+        librosa = _get_librosa()
+        if librosa is None:
+            return
         y = np.concatenate(blocks).astype(np.float32, copy=False)
         if y.size < self._min_samples:
             return
@@ -180,7 +192,7 @@ class LibrosaBeatTracker:
             self._last_onset_strength = onset_strength
 
     def refine_beat(self, raw_beat: float, current_time: float) -> float:
-        if librosa is None:
+        if _get_librosa() is None:
             return raw_beat
 
         with self._lock:

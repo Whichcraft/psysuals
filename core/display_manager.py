@@ -1,11 +1,23 @@
 from __future__ import annotations
+import importlib
 import os
 import sys
 import subprocess
 import re as _re
+from typing import TYPE_CHECKING
 import pygame
 import config
-from gl_renderer import GLRenderer, HAS_MODERNGL
+
+if TYPE_CHECKING:
+    from gl_renderer import GLRenderer
+
+
+def _load_gl_renderer():
+    try:
+        mod = importlib.import_module("gl_renderer")
+    except ImportError:
+        return None, False
+    return mod.GLRenderer, bool(getattr(mod, "HAS_MODERNGL", False))
 
 class DisplayManager:
     def __init__(self, args):
@@ -14,6 +26,8 @@ class DisplayManager:
         self._libX11 = None
         self._xmove_target = None
         self.renderer: GLRenderer | None = None
+        self._gl_renderer_cls: type[GLRenderer] | None = None
+        self._has_moderngl = False
         self.screen = None
         self.target = None
         self.fullscreen = True
@@ -92,6 +106,10 @@ class DisplayManager:
         flags = 0
         if self.args.gl:
             flags |= pygame.OPENGL | pygame.DOUBLEBUF
+            if self._gl_renderer_cls is None:
+                self._gl_renderer_cls, self._has_moderngl = _load_gl_renderer()
+            if not self._has_moderngl:
+                print("  ⚠️ --gl requested but moderngl is not installed in this environment; running without the ModernGL renderer.")
             try:
                 pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
                 pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
@@ -135,13 +153,13 @@ class DisplayManager:
             self.screen = pygame.display.set_mode((1280, 720), flags)
             config.WIDTH, config.HEIGHT = 1280, 720
         
-        if self.args.gl and HAS_MODERNGL:
+        if self.args.gl and self._has_moderngl and self._gl_renderer_cls is not None:
             try:
                 if self.renderer:
                     self.renderer.release()
-                self.renderer = GLRenderer(config.WIDTH, config.HEIGHT)
-            except Exception:
-                # If GL fails, we might want to disable it, but for now just clear renderer
+                self.renderer = self._gl_renderer_cls(config.WIDTH, config.HEIGHT)
+            except Exception as e:
+                print(f"  ⚠️ ModernGL renderer initialization failed: {e}")
                 self.renderer = None
         
         self.target = self.screen

@@ -23,32 +23,42 @@ from .utils import _hsl_batch
 class Magnetar(Effect):
     TRAIL_ALPHA = 0
     RES_DIV     = 2
+    _FADE_ALPHA = 24
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W = config.WIDTH  // self.RES_DIV
-        H = config.HEIGHT // self.RES_DIV
-        area    = W * H
-        self._n = max(4000, min(12000, int(6000 * area / (960 * 540))))
-        self._px    = np.random.uniform(0, W, self._n).astype(np.float32)
-        self._py    = np.random.uniform(0, H, self._n).astype(np.float32)
         self._hue   = 0.62
         self._rot   = 0.0
         self._boost = 0.0
+        self._trail = pygame.Surface((1, 1))
+        self._scaled = pygame.Surface((1, 1))
+        self._fade = pygame.Surface((1, 1), pygame.SRCALPHA)
+        self._reset_particles()
+
+    def _reset_particles(self):
+        W, H, RD = self._render_size()
+        area = W * H
+        self._n = max(6000, min(40000, int(10000 * area / (960 * 540))))
+        self._px = np.random.uniform(0, W, self._n).astype(np.float32)
+        self._py = np.random.uniform(0, H, self._n).astype(np.float32)
         self._trail = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
+        self._fade = pygame.Surface((W, H), pygame.SRCALPHA)
+        self._fade.fill((0, 0, 0, self._FADE_ALPHA))
+        self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        RD       = self.RES_DIV
-        W        = config.WIDTH  // RD
-        H        = config.HEIGHT // RD
+        W, H, RD = self._render_size()
         bass     = beat
         mid      = config.MID_ENERGY
         high     = config.TREBLE_ENERGY
 
         if self._trail.get_width() != W or self._trail.get_height() != H:
-            self._trail = pygame.Surface((W, H))
-            self._trail.fill((0, 0, 0))
+            self._reset_particles()
+            W = self._trail.get_width()
+            H = self._trail.get_height()
+        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
+            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
         self._hue  = (self._hue + 0.0008 + high * 0.001) % 1.0
         self._rot += 0.008 + bass * 0.025 + mid * 0.012
@@ -91,8 +101,9 @@ class Magnetar(Effect):
         self._px = (self._px + vx) % W
         self._py = (self._py + vy) % H
 
-        # Trail decay
-        self._trail.fill((230, 228, 235), special_flags=pygame.BLEND_RGB_MULT)
+        # Fade with alpha overlay instead of multiplicative darkening, which
+        # preserves hue better over long trail runs.
+        self._trail.blit(self._fade, (0, 0))
 
         # Colour by angle to dipole axis
         ang_to_axis = (np.arctan2(ry, rx) - self._rot) / math.tau
@@ -113,8 +124,9 @@ class Magnetar(Effect):
             del pix
 
         if RD > 1:
-            scaled = pygame.transform.scale(self._trail,
-                                            (config.WIDTH, config.HEIGHT))
-            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+            pygame.transform.scale(self._trail,
+                                   (config.WIDTH, config.HEIGHT),
+                                   self._scaled)
+            surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
             surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

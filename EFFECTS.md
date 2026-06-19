@@ -11,9 +11,10 @@ All effects consume the same shared audio signals. They differ only in how they 
 | `waveform` | Latest raw mono PCM block (`1024` samples) | `sounddevice` callback |
 | `fft` | Smoothed, log-scaled spectrum (`512` bins) | Blackman-windowed FFT + EMA |
 | `beat` | Normalised beat impulse (`0.0 .. 3.0`) | Spectral flux, optional tracker refinement, main-loop decay |
-| `config.MID_ENERGY` | Normalised mid-band energy | Smoothed bins `20..99` |
-| `config.TREBLE_ENERGY` | Normalised treble energy | Smoothed bins `100..255` |
+| `config.MID_ENERGY` | Normalised mid-band energy | Smoothed relative mid-band slice |
+| `config.TREBLE_ENERGY` | Normalised treble energy | Smoothed relative treble-band slice |
 | `config.BPM` | Live BPM estimate or tap-tempo override | Callback onset timing + optional `librosa` refinement |
+| `config.IS_SILENT` | True while silence gate is active | RMS + FFT hysteresis in main loop |
 
 `effect_gain` scales only the foreground beat response. Current default is `0.7`, and changing modes resets it back to that default.
 
@@ -26,6 +27,8 @@ The app supports hardware acceleration via the `--gl` flag. When enabled:
 - A fallback system ensures that all effects remain functional even if ModernGL is not installed or the GPU path is disabled.
 
 If no audio input stream is available, the app stays up and the effects simply run against silence until a device is selected.
+
+When `config.IS_SILENT` is true, the runtime suppresses beat spikes and feeds effects low idle motion floors instead of hard zero. That keeps visuals alive during gaps before and after tracks without amplifying the noise floor into fake hits.
 
 Standardized audio energy parameters used across all effects:
 
@@ -57,20 +60,17 @@ Standardized audio energy parameters used across all effects:
 | 14 | `←` / `→` | Vortex | Feedback wormhole with fireworks |
 | 15 | `←` / `→` | Aurora | Parallel Northern Lights ribbons with additive glow |
 | 16 | `←` / `→` | Lattice | Crystal grid with zoom feedback and peak-normalization |
-| 17 | `←` / `→` | Mycelium | Fungal hyphae network with beat-driven bloom bursts |
+| 17 | `←` / `→` | Mycelium | Multi-colony psychedelic hyphae with swirling spores |
 | 18 | `←` / `→` | Magnetar | Magnetic-dipole particle field with equatorial shockwaves |
 | 19 | `←` / `→` | SlimeMold | Physarum trail simulation with self-organising veins |
-| 20 | `←` / `→` | Droste | Recursive zoom portal with spiralling overlays |
-| 21 | `←` / `→` | Clifford | Strange-attractor walkers that remorph on beats |
-| 22 | `←` / `→` | Möbius | Rotating wireframe strip with topology-revealing hue sweep |
-| 23 | `←` / `→` | Chromatic | Additive RGB ring waves with prismatic aberration |
-| 24 | `←` / `→` | Persistence | Long-trail polygon moiré mandala |
-| 25 | `←` / `→` | OilSlick | Rainbow interference field with flowing shimmer |
-| 26 | `←` / `→` | Synapse | Neural graph with travelling light pulses |
-| 27 | `←` / `→` | Coral | Bottom-grown bioluminescent fractal coral |
-| 28 | `←` / `→` | Heartbeat | Centre-out shockwave rings morphing circle to polygon |
-| 29 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
-| 30 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
+| 20 | `←` / `→` | Clifford | Stabilized strange-attractor field with dynamic framing |
+| 21 | `←` / `→` | Möbius | Rotating wireframe strip without interior cross-lines |
+| 22 | `←` / `→` | Chromatic | RGB raindrop ripples with wavy prismatic outlines |
+| 23 | `←` / `→` | Persistence | Long-trail polygon moiré mandala |
+| 24 | `←` / `→` | Synapse | Neural graph with bounded travelling light pulses |
+| 25 | `←` / `→` | Heartbeat | Centre-out shockwave rings morphing circle to polygon |
+| 26 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
+| 27 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
 
 `Spectrum` and `Waterfall` are intentionally the final two registry entries.
 
@@ -165,7 +165,7 @@ Up to three butterfly pairs move through the screen. A solo butterfly appears fi
 Twelve thousand+ particles surf a continuously changing multi-layer vector field (scaling dynamically up to 50,000 on high-res displays) and paint the path they take directly into a persistent trail surface.
 
 - Audio: beat (bass) drives particle speeds and field angle scales; MID_ENERGY accelerates field evolution; TREBLE_ENERGY triggers a vectorized center-outward push on particle positions during transients.
-- Visual notes: particles that drift to within 8% of any screen edge are recycled back into a random position within the central 60% of the screen, keeping the flow concentrated and avoiding edge clustering.
+- Visual notes: particles now wrap cleanly across the full viewport, so the flow reaches the screen edges without the dark border the old edge recycling created.
 
 ## 14. Vortex
 
@@ -190,96 +190,75 @@ A dynamic crystal grid of nodes and beams uses a center-out frequency mapping: c
 
 ## 17. Mycelium
 
-A spreading fungal hyphal network: active tips grow outward leaving decaying filament segments behind. Beat triggers an explosive central bloom that spawns new tip clusters simultaneously.
+A psychedelic fungal lattice with multiple colony cores, swirling field-driven tendrils, and bright spore blooms that light up different regions of the screen.
 
-- Audio: bass controls growth speed and reach; mid controls branching probability and angle spread; treble controls tip respawn rate; beat fires the central bloom burst.
-- Visual notes: tips bias away from the screen centre, filling the periphery over time. Filaments fade individually as they age.
+- Audio: bass drives growth speed and colony bloom intensity; mid controls swirl field motion and branching spread; treble adds finer branching and shimmer; beat seeds new bursts across multiple colony cores.
+- Visual notes: unlike the old center-out pattern, colonies now emerge from several offsets and wrap across the full viewport, producing a denser and less one-dimensional screen image.
 
 ## 18. Magnetar
 
-~6 000 particles ride the field lines of an analytically computed rotating magnetic dipole. Particles accumulate near the poles and trace luminous flux lines. Beat fires a shockwave that scatters particles outward from the magnetic equator.
+Thousands of particles ride the field lines of an analytically computed rotating magnetic dipole. Particles accumulate near the poles and trace luminous flux lines. Beat fires a shockwave that scatters particles outward from the magnetic equator.
 
 - Audio: bass drives field rotation speed and particle velocity; mid shifts the dipole tilt angle; treble shifts particle colour saturation; beat triggers the equatorial shockwave.
-- Visual notes: rendered at half resolution for performance. Particles are coloured by their angular position relative to the dipole axis, producing a continuous spectrum sweep.
+- Visual notes: rendered at half resolution for performance, but particle density now scales much higher on large displays so the field does not thin out on TVs or Android devices.
 
 ## 19. SlimeMold
 
 A Physarum-inspired multi-agent simulation: thousands of agents deposit chemical trail, sense three directions, and steer toward the strongest signal. The self-organising vein network pulses and reforms in real time.
 
 - Audio: bass controls agent speed and trail deposit strength; mid sharpens gradient sensitivity; treble widens the sensor angle; beat teleports a fraction of agents back toward centre.
-- Visual notes: runs at 1/4 resolution with approximate diffusion. Trail hue cycles slowly for a bioluminescent effect.
+- Visual notes: now runs at a finer internal resolution with smooth scaling, reducing the chunky pixel blocks that were especially obvious on Android.
 
-## 20. Droste
+## 20. Clifford
 
-An Escher-style infinite recursive zoom portal: each frame the previous image is zoom-rotated inward, then spiralling geometric shapes are drawn on top and sucked into the vortex.
+A stabilized strange-attractor field iterates multiple Clifford steps per frame, then auto-frames the resulting cloud so it stays broad and readable instead of collapsing into a single bright knot.
 
-- Audio: bass drives zoom depth; mid drives rotation speed and shape complexity; treble brightens the overlay; beat triggers a zoom/rotation spike.
-- Visual notes: runs at 1/3 resolution. The feedback loop is self-sustaining — shapes drawn each frame continually feed the tunnel.
+- Audio: beat jumps to a new curated attractor preset; mid accelerates parameter morphing; bass brightens the densest cores; treble cycles hue across the cloud.
+- Visual notes: dynamic percentile framing tracks the live attractor bounds, and collapse detection resets bad parameter states before the screen degenerates into a single color point.
 
-## 21. Clifford
+## 21. Möbius
 
-40 000 parallel walkers are iterated through the Clifford strange attractor each frame. Parameters (a, b, c, d) drift slowly at rest and snap to new values on strong beats, morphing the attractor shape in real time.
+A 3-D Möbius strip rendered as a wireframe with perspective projection. The visible structure is now carried by the latitude loops alone, leaving the band clean instead of cutting it up with interior cross-lines.
 
-- Audio: beat jumps to new attractor parameters; mid accelerates parameter morphing; bass brightens points; treble cycles hue.
-- Visual notes: rendered at half resolution with a long trail decay. On beat, the attractor dissolves and rebuilds in a new form.
+- Audio: bass controls rotation speed; mid controls roll/tilt speed; treble accelerates hue drift along the strip; beat triggers the shiver.
+- Visual notes: hue varies continuously along the strip width, highlighting the non-orientable topology without the straight interior wires.
 
-## 22. Möbius
+## 22. Chromatic
 
-A 3-D Möbius strip rendered as a wireframe with perspective projection. Latitude and longitude lines sweep across the single face of the band as it rotates in 3-D. Beat fires a shiver that temporarily increases twist amplitude.
+Prismatic raindrop ripples expand from beat origins as wavy RGB-separated outlines rather than plain circles, producing chromatic interference that reads cleanly on Android.
 
-- Audio: bass controls rotation speed; mid controls roll/tilt speed; treble increases longitude line density; beat triggers the shiver.
-- Visual notes: hue varies continuously along the strip width, highlighting the non-orientable topology.
+- Audio: bass controls expansion speed and ring intensity; mid drives ripple drift; treble increases the RGB split and wave deformation; beat spawns new droplets.
+- Visual notes: the rings are intentionally irregular and fluid, so the effect reads as chromatic rainfall instead of concentric circles.
 
-## 23. Chromatic
-
-Concentric ring waves expand from beat origins, splitting red, green, and blue channels outward by a treble-controlled pixel offset. Rings overlap additively, generating prismatic rainbow halos at intersection zones.
-
-- Audio: bass controls expansion speed and ring intensity; mid drives hue drift; treble increases the RGB aberration split; beat spawns new rings.
-- Visual notes: rendered at half resolution using BLEND_RGB_ADD for additive colour mixing. Multiple simultaneous rings create complex interference colours.
-
-## 24. Persistence of Vision
+## 23. Persistence
 
 Multiple nested polygons (triangle through decagon) rotate at slightly different speeds. With the long trail persistence (TRAIL_ALPHA = 5), ghost images accumulate and interfere, building wagon-wheel moiré illusions and mandala kaleidoscope patterns.
 
 - Audio: bass drives rotation speed bursts; mid scales the number of active shapes; treble fires a radial flash ring; beat triggers a speed spike.
-- Visual notes: the slower the music, the more complex the accumulated pattern. Let it run for 10+ seconds to see full moiré effects.
+- Visual notes: the slower the music, the more complex the accumulated pattern. Let it run for 10+ seconds to see the full moiré buildup.
 
-## 25. OilSlick
-
-Two families of sine waves interfere across a full pixel grid, simulating the rainbow shimmer of an oil film. The interference value maps continuously to hue, producing flowing prismatic colour fields that shift with the music.
-
-- Audio: bass adds a radial ripple from centre; mid scales spatial frequency; treble speeds up temporal shimmer; beat phase-jumps the pattern.
-- Visual notes: runs at 1/4 resolution. The entire screen is re-rendered each frame as a vectorised NumPy operation.
-
-## 26. Synapse
+## 24. Synapse
 
 ~55 nodes wired to their nearest neighbours form a neural graph. Signals travel visibly along edges as glowing pulses; arriving signals fire destination nodes which cascade further. Beat triggers multi-node cascades.
 
-- Audio: bass drives signal propagation speed and node glow intensity; mid controls the baseline auto-fire rate; treble increases signal colour saturation; beat fires 1–4 random cascades.
-- Visual notes: the baseline firing rate produces a gentle idle glow; strong beats produce branching light storms across the entire graph.
+- Audio: bass drives signal propagation speed and node glow intensity; mid controls the baseline auto-fire rate; treble increases signal color saturation; beat fires bounded multi-node cascades.
+- Visual notes: the live signal pool is now capped and node fan-out is sampled instead of fully expanded, keeping the effect stable on Android and other lower-power targets.
 
-## 27. Coral
-
-Iterative branch-tip growth produces upward-sweeping fractal coral structures from the bottom edge. Branch thickness tapers with depth; hue shifts along the colony. Beat fires a bioluminescent pulse that lights the whole structure at once.
-
-- Audio: bass controls growth speed and stem length; mid controls branching angle spread; treble drives tip respawn rate; beat fires the bioluminescent bloom.
-- Visual notes: distinct from Branches — Coral grows from the ground up with gravitropic bias, tapers naturally, and uses a much longer trail for accumulated colony density.
-
-## 28. Heartbeat
+## 25. Heartbeat
 
 Rhythmic pressure waves expand from the screen centre. Each beat spawns concentric rings whose outline morphs between a circle (gentle bass) and a polygon (heavy bass). Multiple overlapping rings create moiré interference patterns.
 
 - Audio: bass drives wave speed and polygon morphing (low bass = circle, high bass = triangle); mid modulates propagation speed; treble adds shimmer; beat spawns new ring(s).
 - Visual notes: strong beats at high bass produce stark polygonal shockwaves; gentle beats produce soft circular ripples. Rings are drawn with polygon outlines for smooth morphing.
 
-## 29. Spectrum
+## 26. Spectrum
 
 Classic analyser bars are spaced logarithmically, with peak markers and a waveform line layered over the centre of the screen.
 
 - Audio: per-bin FFT controls bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
 - Visual notes: this is the plainest diagnostic mode and is useful for checking input levels quickly.
 
-## 30. Waterfall
+## 27. Waterfall
 
 A scrolling spectrogram stores recent history as rows, with hue encoding frequency and brightness encoding energy.
 
@@ -293,7 +272,7 @@ A scrolling spectrogram stores recent history as rows, with hue encoding frequen
 | Key | Action |
 |-----|--------|
 | `1` – `9` | Jump directly to modes 1–9 |
-| `←` / `→` | Previous / next mode across all 30 modes |
+| `←` / `→` | Previous / next mode across all 27 modes |
 | `Space` or mouse click | Next mode |
 | `↑` / `↓` | Adjust intensity for the current mode (`0.0 .. 2.0`) |
 | `Tab` | Open the settings pane |

@@ -12,8 +12,8 @@
 - **✨ Unified ModernGL Engine** — Harness the power of your GPU. v3 merges experimental hardware acceleration into the core app. Run with `--gl` for blistering frame rates and per-pixel shader fluid motion.
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
 - **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. v3 scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
-- **🔊 Battle-Hardened Audio Pipeline** — Bulletproof audio capture that never crashes. v3 features intelligent no-input fallback, live device switching, and a refined spectral-flux beat detection system tuned for maximum response.
-- **⚖️ Built-in Benchmarking & Regression Gates** — Measure your speed with `benchmarks.py` and sleep easy knowing our automated smoke tests guard all 30 effects from regressions.
+- **🔊 Battle-Hardened Audio Pipeline** — Bulletproof audio capture that never crashes. v3 features intelligent no-input fallback, silence-aware idle motion, live device switching, and a refined spectral-flux beat detection system tuned for maximum response.
+- **⚖️ Built-in Benchmarking & Regression Gates** — Measure your speed with `benchmarks.py` and sleep easy knowing our automated smoke tests guard all 27 active effects from regressions.
 
 ---
 
@@ -84,6 +84,8 @@ Press `D` while running to open the interactive device picker. Use `↑`/`↓` t
 
 If no input device is available at startup, psysuals stays open in silent mode instead of crashing. The HUD shows `no input` until a device is selected successfully.
 
+Before and after tracks, psysuals uses RMS/FFT silence detection with hysteresis. During true silence, beat spikes are suppressed and effects fall back to a faint low-motion idle state instead of freezing completely or reacting to noise-floor normalization.
+
 ## Project structure
 
 ```
@@ -105,7 +107,7 @@ psysuals/
 │   ├── base.py               # Effect base class and contract
 │   ├── utils.py              # Shared colour helpers
 │   ├── palette.py            # Shared colour palette
-│   └── (30 modes).py         # Visual implementations
+│   └── (27 modes).py         # Visual implementations
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects
 ├── requirements.txt

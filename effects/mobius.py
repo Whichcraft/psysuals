@@ -24,8 +24,6 @@ class Mobius(Effect):
 
     _N_LAT  = 60    # latitude lines (parallel to the long axis)
     _N_U    = 120   # segments along u (around the strip)
-    _N_LON  = 30    # longitude sample count (across strip width)
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._ry = 0.0   # rotation around Y
@@ -37,7 +35,6 @@ class Mobius(Effect):
         # Pre-compute u and v arrays
         self._u  = np.linspace(0, math.tau, self._N_U + 1, dtype=np.float32)
         self._vs = np.linspace(-0.5, 0.5, self._N_LAT, dtype=np.float32)
-        self._v_lon = np.linspace(-0.5, 0.5, self._N_LON, dtype=np.float32)
 
     # ------------------------------------------------------------------
 
@@ -69,16 +66,6 @@ class Mobius(Effect):
         z    = v_scalar * np.sin(hu) * twist
         return np.stack([x, y, z], axis=1)
 
-    def _strip_pts_v(self, u_scalar, v, twist):
-        """Möbius strip 3-D coordinates for scalar u and array v."""
-        hu   = u_scalar / 2.0
-        x    = (1.0 + v * math.cos(hu) * twist) * math.cos(u_scalar)
-        y    = (1.0 + v * math.cos(hu) * twist) * math.sin(u_scalar)
-        z    = v * math.sin(hu) * twist
-        return np.stack([x, y, z], axis=1)
-
-    # ------------------------------------------------------------------
-
     def draw(self, surf, waveform, fft, beat, tick):
         W, H = config.WIDTH, config.HEIGHT
         bass = beat
@@ -104,20 +91,6 @@ class Mobius(Effect):
             pts2d = self._project(pts3d, W, H)
             h      = (self._hue + (v + 0.5)) % 1.0
             bright = 0.18 + abs(v) * 0.30 + bass * 0.20 + self._shiver * 0.25
-            col    = hsl(h, l=bright)
-            pts_i  = [(int(p[0]), int(p[1])) for p in pts2d]
-            if len(pts_i) >= 2:
-                pygame.draw.lines(surf, col, False, pts_i, 1)
-
-        # Longitude lines (sparse)
-        v_arr  = self._v_lon.astype(np.float32)
-        stride = max(1, self._N_U // (4 + int(high * 4)))
-        for i in range(0, len(u) - 1, stride):
-            u_val  = float(u[i]) + self._u_off
-            pts3d  = self._strip_pts_v(u_val, v_arr, twist)
-            pts2d  = self._project(pts3d, W, H)
-            h      = (self._hue + u_val / math.tau * 0.5) % 1.0
-            bright = 0.12 + bass * 0.12 + self._shiver * 0.18
             col    = hsl(h, l=bright)
             pts_i  = [(int(p[0]), int(p[1])) for p in pts2d]
             if len(pts_i) >= 2:

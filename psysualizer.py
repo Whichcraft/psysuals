@@ -32,16 +32,10 @@ import os
 import sys
 import time as _time
 import signal
-import subprocess
 from collections import deque
 
 import numpy as np
 import pygame
-
-try:
-    import moderngl
-except ImportError:
-    moderngl = None
 
 import config
 import settings as sett
@@ -86,6 +80,7 @@ class VisualizerApp:
         self.bg_alpha = self.settings.get("bg_alpha", 102)
         
         self.prev_surf = None
+        self.prev_surf_scaled = None
         self.crossfade_frame = 0
         self.cf_frames = self.settings.get("cf_frames", _CROSSFADE_FRAMES)
         
@@ -95,6 +90,8 @@ class VisualizerApp:
         self.beat_decay = 0.0
         self.effect_gain = self.settings.get("effect_gain", config.DEFAULT_EFFECT_GAIN)
         self.current_genre = "detecting..."
+        self.silence_frames = 0
+        self.is_silent = True
         
         self.hud_level = self.settings.get("hud_level", 2)
         self.show_hud = self.hud_level > 0
@@ -147,7 +144,7 @@ class VisualizerApp:
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
         parser.add_argument("-d", "--display", type=int, default=None, help="Target display index (e.g. 0, 1)")
-        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index (0-17)")
+        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index (0-26)")
         parser.add_argument("-g", "--gl", action="store_true", help="Enable ModernGL hardware acceleration")
         parser.add_argument("--span-child", action="store_true", help=argparse.SUPPRESS)
         return parser.parse_args()
@@ -169,8 +166,11 @@ class VisualizerApp:
 
     def _update_target_res(self):
         div = 1
-        if hasattr(self, "vis"):
-            div = getattr(self.vis, "RES_DIV", 1)
+        if hasattr(self, "vis") and self.vis is not None:
+            if hasattr(self.vis, "_render_div"):
+                div = self.vis._render_div()
+            else:
+                div = getattr(self.vis, "RES_DIV", 1)
         
         if not self.args.gl:
             self.display.target = self.display.screen
@@ -221,6 +221,7 @@ class VisualizerApp:
         if hasattr(self.vis, "release") and callable(self.vis.release):
             self.vis.release()
         self.prev_surf = self.display.target.copy()
+        self.prev_surf_scaled = None
         self.crossfade_frame = 0
         self.mode_idx = new_idx % len(MODES)
         self.name, self.VisCls = MODES[self.mode_idx]
@@ -237,6 +238,7 @@ class VisualizerApp:
         self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
         self.bg_vis = self.bg_cls(renderer=self.display.renderer)
         self.bg_surf = pygame.Surface((config.WIDTH, config.HEIGHT))
+        self.prev_surf_scaled = None
         self._update_target_res()
 
     def run(self):
@@ -247,7 +249,7 @@ class VisualizerApp:
             if self.args.gl and self.display.renderer:
                 self.display.renderer.ctx.screen.use()
                 self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
-                self.display.renderer.ctx.disable(moderngl.BLEND)
+                self.display.renderer.ctx.disable(self.display.renderer.ctx.BLEND)
 
             self._render()
             
@@ -395,10 +397,44 @@ class VisualizerApp:
         if self.audio.beat_tracker.enabled:
             bpm = self.audio.beat_tracker.analyze(fallback_bpm=bpm)
             raw_beat = self.audio.beat_tracker.refine_beat(raw_beat, audio_time)
+
+        rms = float(np.sqrt(np.mean(self.waveform ** 2)))
+        fft_mean = float(np.mean(self.fft)) if len(self.fft) else 0.0
+
+        if self.is_silent:
+            silent_now = (
+                rms < config.SILENCE_RMS_EXIT
+                and fft_mean < config.SILENCE_FFT_EXIT
+            )
+        else:
+            silent_now = (
+                rms < config.SILENCE_RMS_ENTER
+                and fft_mean < config.SILENCE_FFT_ENTER
+            )
+
+        if silent_now:
+            self.silence_frames += 1
+        else:
+            self.silence_frames = 0
+            self.is_silent = False
+
+        if self.silence_frames >= config.SILENCE_FRAMES_ENTER:
+            self.is_silent = True
+
+        if self.is_silent:
+            raw_beat = 0.0
+            mid_e = config.SILENCE_MID_FLOOR
+            treble_e = config.SILENCE_TREBLE_FLOOR
+            self.energy_hist.clear()
+            self.energy_sum = 0.0
+        else:
+            mid_e = max(mid_e, config.SILENCE_MID_FLOOR * 0.5)
+            treble_e = max(treble_e, config.SILENCE_TREBLE_FLOOR * 0.5)
             
         config.MID_ENERGY = mid_e
         config.TREBLE_ENERGY = treble_e
         config.EFFECT_GAIN = self.effect_gain
+        config.IS_SILENT = self.is_silent
         
         if self.tap_bpm > 0 and _time.monotonic() < self.tap_bpm_expiry:
             config.BPM = self.tap_bpm
@@ -415,10 +451,10 @@ class VisualizerApp:
         self.energy_sum += raw_beat
         avg = self.energy_sum / len(self.energy_hist) if self.energy_hist else 1e-6
         impulse = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
-        self.beat_decay = max(impulse, self.beat_decay * 0.90)
-        self.beat = self.beat_decay
+        self.beat_decay = max(impulse, self.beat_decay * (0.82 if self.is_silent else 0.90))
+        self.beat = max(self.beat_decay, config.SILENCE_BEAT_FLOOR if self.is_silent else 0.0)
         
-        self.rms_buf.append(float(np.sqrt(np.mean(self.waveform ** 2))))
+        self.rms_buf.append(rms)
         if self.auto_gain and self.rms_buf:
             cur_rms = float(np.mean(self.rms_buf)) + 1e-9
             auto_scale = max(0.5, min(self.target_rms / cur_rms, 2.0))
@@ -458,7 +494,9 @@ class VisualizerApp:
         
         if self.prev_surf:
             tw, th = target.get_size()
-            scaled_prev = pygame.transform.scale(self.prev_surf, (tw, th))
+            if self.prev_surf_scaled is None or self.prev_surf_scaled.get_size() != (tw, th):
+                self.prev_surf_scaled = pygame.transform.scale(self.prev_surf, (tw, th))
+            scaled_prev = self.prev_surf_scaled
             frames = max(1, int(self.cf_frames))
             t = self.crossfade_frame / frames
             ease = t * t * (3.0 - 2.0 * t)
@@ -468,6 +506,7 @@ class VisualizerApp:
             if self.crossfade_frame >= frames:
                 scaled_prev.set_alpha(0)
                 self.prev_surf = None
+                self.prev_surf_scaled = None
                 
         now = _time.monotonic()
         if self.tap_bpm > 0 and now < self.tap_flash_end:
