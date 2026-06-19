@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Bootstrap and hardening** — restored a runnable entrypoint, split the CPU/ModernGL architecture, added smoke tests and benchmarks, modularized the app, tightened dependencies, improved beat/BPM detection, hardened startup validation, and added regression checks for the registry contract.
 - **Audio startup fallback** — startup now prefers concrete input devices (such as PipeWire/Pulse or explicit hardware devices) before falling back to Linux's generic `default` wrapper, reducing ALSA startup failures that aborted the app before the UI appeared.
 - **Silence handling** — added RMS/FFT-based silence detection with hysteresis so effects drop to a deliberate low-motion idle level before and after tracks instead of reacting to noise-floor normalization spikes.
 - **Crossfade scaling** — cached the scaled previous-frame surface used during mode crossfades, reducing repeated full-frame scaling work on every transition frame.
