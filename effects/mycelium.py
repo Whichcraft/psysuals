@@ -24,6 +24,7 @@ class Mycelium(Effect):
         self._pulse = 0.0
         self._segs: list = []
         self._tips: list = []
+        self._spores: list = []
         self._cores: list[tuple[float, float, float]] = []
         self._rng = np.random.default_rng(config.RNG_SEED or None)
         self.max_segs = _MAX_SEGS
@@ -87,10 +88,26 @@ class Mycelium(Effect):
         self._phase += 0.010 + mid * 0.012 + high * 0.006
         self._pulse = max(0.0, self._pulse - 0.03)
 
+        # Beat spawns new tips
         if bass > 0.65 and len(self._tips) < self.max_tips:
             self._pulse = 1.0
             for _ in range(1 + int(bass * 2.5)):
                 self._seed_tips(int(5 + bass * 6), int(self._rng.integers(0, len(self._cores))))
+
+        # Beat spawns spores from cores
+        if bass > 0.65:
+            for cx, cy, h_off in self._cores:
+                for _ in range(random.randint(2, 5)):
+                    ang = self._rng.uniform(0.0, math.tau)
+                    spd = self._rng.uniform(1.0, 3.5)
+                    self._spores.append([
+                        cx, cy,
+                        math.cos(ang) * spd, math.sin(ang) * spd,
+                        h_off,
+                        random.randint(120, 240), # life
+                        240, # max_life
+                        random.uniform(2.0, 4.5) # size
+                    ])
 
         speed = 6.5 + bass * 18.0 + mid * 5.0
         spread = 0.20 + mid * 0.30 + high * 0.10
@@ -121,6 +138,19 @@ class Mycelium(Effect):
                 length = max(2.5, speed * (1.0 - depth * 0.030) * float(len_mul[idx]))
                 ex = (tx + math.cos(ta2) * length) % W
                 ey = (ty + math.sin(ta2) * length) % H
+                
+                # Tip grows, occasionally releases a spore
+                if self._rng.random() < 0.12 and len(self._spores) < (150 if getattr(config, "LOW_SPEC", False) else 300):
+                    self._spores.append([
+                        ex, ey,
+                        math.cos(ta2 + math.pi) * 0.5 + self._rng.uniform(-0.5, 0.5),
+                        math.sin(ta2 + math.pi) * 0.5 + self._rng.uniform(-0.5, 0.5),
+                        h_off,
+                        random.randint(80, 160),
+                        160,
+                        random.uniform(1.5, 3.5)
+                    ])
+
                 if len(self._segs) < self.max_segs:
                     self._segs.append([tx, ty, ex, ey, 0, seg_life + int(seg_jitter[idx]), depth, h_off])
                 if len(next_tips) < self.max_tips:
@@ -140,6 +170,54 @@ class Mycelium(Effect):
         for s in self._segs:
             s[4] += 1
 
+        # Update Spores
+        new_spores = []
+        max_spores_limit = 150 if getattr(config, "LOW_SPEC", False) else 300
+        for sx, sy, svx, svy, shue, slife, smax_life, ssize in self._spores:
+            # find nearest core
+            nearest_core = None
+            min_d = 99999.0
+            for cx, cy, _ in self._cores:
+                d = math.hypot(sx - cx, sy - cy)
+                if d < min_d:
+                    min_d = d
+                    nearest_core = (cx, cy)
+            
+            if nearest_core:
+                cx, cy = nearest_core
+                dx, dy = sx - cx, sy - cy
+                d = max(1.0, min_d)
+                # Orbit force
+                ox = -dy / d
+                oy = dx / d
+                # Pull/push force
+                px = -dx / d
+                py = -dy / d
+                
+                f_orbit = 0.4 + mid * 0.8
+                f_pull = 0.05 + bass * 0.1
+                if d > 200:
+                    f_orbit *= 0.5
+                    f_pull *= 2.0
+                elif d < 50:
+                    f_orbit *= 1.5
+                    f_pull = -0.1
+                    
+                svx += ox * f_orbit + px * f_pull + self._rng.uniform(-0.15, 0.15)
+                svy += oy * f_orbit + py * f_pull + self._rng.uniform(-0.15, 0.15)
+                
+            svx *= 0.94
+            svy *= 0.94
+            
+            sx = (sx + svx) % W
+            sy = (sy + svy) % H
+            
+            slife -= 1
+            if slife > 0:
+                new_spores.append([sx, sy, svx, svy, shue, slife, smax_life, ssize])
+        self._spores = new_spores[:max_spores_limit]
+
+        # Draw Cores
         for i, (cx, cy, h_off) in enumerate(self._cores):
             phase = self._phase * (0.7 + i * 0.08)
             wobble = 10.0 + math.sin(phase) * 8.0
@@ -148,6 +226,16 @@ class Mycelium(Effect):
             pygame.draw.circle(surf, hsl(hue, l=glow * 0.35), (int(cx), int(cy)), int(22 + wobble))
             pygame.draw.circle(surf, hsl(hue, l=glow), (int(cx), int(cy)), int(7 + bass * 8))
 
+            # Rotating ring of satellite nodes around each core
+            num_dots = 6
+            r_ring = 15.0 + wobble * 0.5 + bass * 12.0
+            for d in range(num_dots):
+                ang = self._phase * 0.8 + d * (math.tau / num_dots)
+                dx = cx + math.cos(ang) * r_ring
+                dy = cy + math.sin(ang) * r_ring
+                pygame.draw.circle(surf, hsl(hue, l=min(0.9, glow * 1.8)), (int(dx), int(dy)), int(3 + bass * 2))
+
+        # Draw Hyphae Segments
         for x1, y1, x2, y2, age, max_age, depth, h_off in self._segs:
             fade = max(0.0, 1.0 - age / max_age)
             hue = (self._hue + h_off + depth * 0.015) % 1.0
@@ -156,7 +244,20 @@ class Mycelium(Effect):
             core_w = max(1, 3 - depth // 6)
             p1 = (int(x1), int(y1))
             p2 = (int(x2), int(y2))
-            pygame.draw.line(surf, hsl(hue, l=bright * 0.28), p1, p2, glow_w + 2)
-            pygame.draw.line(surf, hsl(hue, l=bright), p1, p2, core_w)
+            
+            # Bioluminescent glow style drawing:
+            # Broad soft color glow
+            pygame.draw.line(surf, hsl(hue, s=0.9, l=bright * 0.3), p1, p2, glow_w + 3)
+            # Bright thin core line
+            pygame.draw.line(surf, hsl(hue, s=0.4, l=min(0.95, bright * 1.5)), p1, p2, core_w)
+            
             if depth > 5 and age < max_age * 0.25 and (depth + age) % 5 == 0:
                 pygame.draw.circle(surf, hsl(hue, l=bright * 0.85), p2, max(1, 3 - depth // 8))
+
+        # Draw Spores
+        for sx, sy, svx, svy, shue, slife, smax_life, ssize in self._spores:
+            fade = slife / smax_life
+            hue = (shue + self._hue) % 1.0
+            val = min(0.95, 0.3 + high * 0.5) * fade
+            r = max(1.0, ssize * fade * (1.0 + high * 0.8))
+            pygame.draw.circle(surf, hsl(hue, l=val), (int(sx), int(sy)), int(r))

@@ -46,12 +46,22 @@ class Bubbles(Effect):
         }
 
     def _get_bsurf(self, size):
+        # Quantize size to nearest multiple of 8 to avoid infinite cache growth
+        size = max(8, ((size + 7) // 8) * 8)
         s = self._surf_cache.get(size)
         if s is None:
+            if len(self._surf_cache) >= 128:
+                # Evict oldest entries
+                keys = list(self._surf_cache.keys())
+                for k in keys[:64]:
+                    del self._surf_cache[k]
             s = pygame.Surface((size, size), pygame.SRCALPHA)
             self._surf_cache[size] = s
         s.fill((0, 0, 0, 0))
         return s
+
+    def release(self) -> None:
+        self._surf_cache.clear()
 
     def _spawn(self, beat, bass, mid, high):
         beat_sel = min(beat, 1.0)
@@ -115,8 +125,9 @@ class Bubbles(Effect):
             r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.35 + high * 0.20 + self._bass_flash * 0.45)))
             pad   = r + 14
             alpha = int(life * 160)
-            bsurf = self._get_bsurf(pad * 2)
-            cc = pad
+            size = max(8, ((pad * 2 + 7) // 8) * 8)
+            bsurf = self._get_bsurf(size)
+            cc = size // 2
 
             for g, (g_exp, g_l, g_a_mul) in enumerate(
                     [(1.55, 0.40, 0.18), (1.28, 0.52, 0.35), (1.10, 0.65, 0.60)]):

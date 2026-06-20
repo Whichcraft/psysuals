@@ -16,13 +16,15 @@ _LAYERS = 2
 
 class FlowField(Effect):
     TRAIL_ALPHA = 0 # we manage the surface
+    RES_DIV = 3 # 2 levels faster than default 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W, H = config.WIDTH, config.HEIGHT
+        W, H, RD = self._render_size()
+        self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
         # Scale particle count dynamically based on screen area.
         # Baseline: 25000 particles for a 1920x1080 (1080p) screen.
-        area = W * H
+        area = config.WIDTH * config.HEIGHT
         self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
         if getattr(config, "LOW_SPEC", False):
             self._n = max(4000, self._n // 2)
@@ -45,14 +47,18 @@ class FlowField(Effect):
         return a * (math.pi * (2.2 + bass * 1.8))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H, RD = self._render_size()
         if self._trail.get_width() != W or self._trail.get_height() != H:
             self._trail = pygame.Surface((W, H))
             self._trail.fill((0, 0, 0))
-            area = W * H
+            area = config.WIDTH * config.HEIGHT
             self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
+            if getattr(config, "LOW_SPEC", False):
+                self._n = max(4000, self._n // 2)
             self._px = np.random.uniform(0, W, self._n).astype(np.float32)
             self._py = np.random.uniform(0, H, self._n).astype(np.float32)
+        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
+            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
         bass = beat
         mid  = config.MID_ENERGY
@@ -105,4 +111,8 @@ class FlowField(Effect):
             del pixels
 
         # Force alpha 255 to ensure visibility in GL mode
-        surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        if RD > 1:
+            pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT), self._scaled)
+            surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        else:
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

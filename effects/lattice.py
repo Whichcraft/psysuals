@@ -22,10 +22,10 @@ class Lattice(Effect):
     @property
     def RES_DIV(self):
         if config.WIDTH >= 2560:
-            return 1
-        elif config.WIDTH >= 1600:
             return 2
-        return 3
+        elif config.WIDTH >= 1600:
+            return 3
+        return 4
 
     @property
     def _grid_cols(self):

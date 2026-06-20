@@ -92,6 +92,11 @@ class AudioEngine:
             pass
         try:
             mono = np.asarray(indata[:, 0], dtype=np.float32)
+            if mono.size != config.BLOCK_SIZE:
+                if mono.size < config.BLOCK_SIZE:
+                    mono = np.pad(mono, (0, config.BLOCK_SIZE - mono.size))
+                else:
+                    mono = mono[:config.BLOCK_SIZE]
             self.beat_tracker.push_audio(mono, time_info.currentTime)
 
             windowed = mono * self._blackman_window

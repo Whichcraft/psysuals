@@ -155,10 +155,10 @@ A recursive lightning tree radiates from the screen centre with multiple branchi
 
 ## 12. Butterflies
 
-Up to three butterfly pairs move through the screen. A solo butterfly appears first, then a partner joins and the two chase each other in a tightening mutual orbit before occasionally breaking away to wander freely. Pairs come in two sizes: large (default) and small (roughly half the size), mixed in a large/small/large rotation.
+Up to three butterfly pairs move through the screen. A solo butterfly appears first, then a partner joins and the two chase each other in a tightening mutual orbit before occasionally breaking away to wander freely.
 
-- Audio: beat (bass) drives wing flapping speed and sparkle triggers; MID_ENERGY increases flight velocities and mutual orbit chase rates; TREBLE_ENERGY speeds up wing flaps and triggers dense close-proximity sparkle bursts.
-- Visual notes: trails are managed on an internal surface so the effect survives backends that do not preserve the display backbuffer between frames. Wing-phase sync distance scales with each pair's butterfly size.
+- Audio: beat and bass drive wing flapping speed and flight velocities; beat triggers particle sparkles when partners are in close proximity.
+- Visual notes: trails are managed on an internal surface so the effect survives backends that do not preserve the display backbuffer between frames. Wing-phase sync is dynamically enabled when partners are near each other.
 
 ## 13. FlowField
 
@@ -190,10 +190,10 @@ A dynamic crystal grid of nodes and beams uses a center-out frequency mapping: c
 
 ## 17. Mycelium
 
-A psychedelic fungal lattice with multiple colony cores, swirling field-driven tendrils, and bright spore blooms that light up different regions of the screen.
+A bioluminescent fungal colony simulation featuring rotating satellite node rings orbiting the cores, glowing organic root structures (hyphae), and dynamic swirling spore particles that drift according to a gravity/orbital vector field.
 
-- Audio: bass drives growth speed and colony bloom intensity; mid controls swirl field motion and branching spread; treble adds finer branching and shimmer; beat seeds new bursts across multiple colony cores.
-- Visual notes: unlike the old center-out pattern, colonies now emerge from several offsets and wrap across the full viewport, producing a denser and less one-dimensional screen image.
+- Audio: bass drives growth speed, core pulsing, and core spore releases; mid controls swirl field motion and branching spread; treble/high frequencies accelerate spore flutter, spore count, and glowing trail brightness; beat seeds new bursts across multiple colony cores.
+- Visual notes: growing hyphae tips dynamically shed glowing spores. The cores feature rotating rings of satellite nodes, and the hyphae draw with a soft neon bioluminescent glow style.
 
 ## 18. Magnetar
 
@@ -211,10 +211,10 @@ A Physarum-inspired multi-agent simulation: thousands of agents deposit chemical
 
 ## 20. Clifford
 
-A stabilized strange-attractor field iterates multiple Clifford steps per frame, then auto-frames the resulting cloud so it stays broad and readable instead of collapsing into a single bright knot.
+A 3D-shaded, density-accumulated strange attractor. It runs the Clifford equations at high point density, bins them into a 2D grid using fast `np.bincount`, applies logarithmic scaling for a smooth nebulous look, and shades the result as a 3D relief using bump-mapped diffuse reflection from an orbiting light source.
 
-- Audio: beat jumps to a new curated attractor preset; mid accelerates parameter morphing; bass brightens the densest cores; treble cycles hue across the cloud.
-- Visual notes: dynamic percentile framing tracks the live attractor bounds, and collapse detection resets bad parameter states before the screen degenerates into a single color point.
+- Audio: beat jumps to a new curated attractor preset; mid accelerates parameter morphing; bass/beat expands brightness; treble/high frequencies drive hue shifting and detail.
+- Visual notes: features dynamic percentile framing to keep the attractor scaled properly. The 3D relief shading makes the fractal ribbons look like sculpted metallic/glassy structures morphing in space.
 
 ## 21. Möbius
 
@@ -232,10 +232,10 @@ Prismatic raindrop ripples expand from beat origins as wavy RGB-separated outlin
 
 ## 23. Persistence
 
-Multiple nested polygons (triangle through decagon) rotate at slightly different speeds. With the long trail persistence (TRAIL_ALPHA = 5), ghost images accumulate and interfere, building wagon-wheel moiré illusions and mandala kaleidoscope patterns.
+Multiple nested polygons rotate in 3D space on non-coplanar X, Y, and Z axes at different speeds. Projected through a perspective camera with depth-based thickness and brightness shading, their counter-rotating ghost images accumulate under long persistence to form 3D holographic moiré mandalas.
 
-- Audio: bass drives rotation speed bursts; mid scales the number of active shapes; treble fires a radial flash ring; beat triggers a speed spike.
-- Visual notes: the slower the music, the more complex the accumulated pattern. Let it run for 10+ seconds to see the full moiré buildup.
+- Audio: bass drives X/Y/Z rotation speed bursts; mid scales the number of active shapes; treble fires a radial flash ring in background; beat triggers a speed spike and hue jump.
+- Visual notes: lines closer to the camera are drawn thicker and brighter, creating realistic 3D depth cueing as the polygons spin in perspective.
 
 ## 24. Synapse
 

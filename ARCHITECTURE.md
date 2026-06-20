@@ -204,13 +204,13 @@ Rules that matter in this repo:
 
 | File | Lines | Role |
 |------|-------|------|
-| `psysualizer.py` | `~532` | thin orchestrator |
-| `core/audio_engine.py` | `~160` | audio logic |
-| `core/display_manager.py` | `~130` | window/span logic |
-| `core/ui_manager.py` | `~90` | UI rendering |
-| `config.py` | `20` | shared runtime state |
-| `effects/__init__.py` | `64` | mode registry |
+| `psysualizer.py` | `~600` | thin orchestrator |
+| `core/audio_engine.py` | `~260` | audio logic |
+| `core/display_manager.py` | `~220` | window/span logic |
+| `core/ui_manager.py` | `~140` | UI rendering |
+| `config.py` | `~40` | shared runtime state |
+| `effects/__init__.py` | `~60` | mode registry |
 | `effects/utils.py` | `27` | colour helpers |
-| `gl_renderer.py` | `144` | GL helper and shader-asset loader |
-| `settings.py` | `72` | settings and preset persistence |
+| `gl_renderer.py` | `~260` | GL helper and shader-asset loader |
+| `settings.py` | `~80` | settings and preset persistence |
 | `effects/*.py` | `27` active modes + shared helpers | visual implementations |

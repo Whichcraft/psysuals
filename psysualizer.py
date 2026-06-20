@@ -51,7 +51,6 @@ _BG_MODES = 9
 
 class VisualizerApp:
     def __init__(self):
-        self._setup_signals()
         self.args = self._parse_args()
         config.LOW_SPEC = self.args.low_spec
         if config.LOW_SPEC:
@@ -102,7 +101,7 @@ class VisualizerApp:
         
         self.auto_gain = self.settings.get("auto_gain", False)
         self.target_rms = 0.05
-        self.rms_buf = deque(maxlen=30, iterable=[self.target_rms])
+        self.rms_buf = deque([self.target_rms], maxlen=30)
         
         self.tap_times = deque(maxlen=4)
         self.tap_bpm = 0.0
@@ -122,6 +121,7 @@ class VisualizerApp:
         if not hasattr(self, "fade"):
             self.fade = self._make_fade(self.fade_alpha)
         
+        self._setup_signals()
         atexit.register(self.display.kill_children)
 
     def _setup_signals(self):
@@ -194,9 +194,10 @@ class VisualizerApp:
         return surf
 
     def _quit(self):
-        self.display.kill_children()
-        if self.display.renderer:
-            self.display.renderer.release()
+        if hasattr(self, "display") and self.display is not None:
+            self.display.kill_children()
+            if self.display.renderer:
+                self.display.renderer.release()
         try:
             pygame.display.set_mode((1, 1))
         except Exception:

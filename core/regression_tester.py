@@ -29,7 +29,9 @@ def test_all_files_registered():
     registered_classes = {m[1].__name__ for m in MODES}
     # Some classes might be imported with aliases or be helper files
     
-    files = glob.glob("effects/*.py")
+    core_dir = os.path.dirname(os.path.abspath(__file__))
+    effects_dir = os.path.join(os.path.dirname(core_dir), "effects")
+    files = glob.glob(os.path.join(effects_dir, "*.py"))
     unregistered = []
     for f in files:
         basename = os.path.basename(f)

@@ -28,6 +28,11 @@ class Branches(Effect):
         self.hue  = 0.0
         self.time = 0.0
         self.beat_flash = 0.0
+        self.max_depth = 7
+        self.base_arms = 9
+        if getattr(config, "LOW_SPEC", False):
+            self.max_depth = 5
+            self.base_arms = 6
 
     # ------------------------------------------------------------------
     def _branch(self, surf, x, y, angle, length, depth,
@@ -41,12 +46,12 @@ class Branches(Effect):
                   + math.sin(time * 6.5 + angle * 3.3) * high * 0.18)
 
         # Trunk segment drawn short; children still get full length
-        draw_len = length * 0.015 if depth == self.MAX_DEPTH else length
+        draw_len = length * 0.015 if depth == self.max_depth else length
         ex = x + math.cos(angle + jitter) * draw_len
         ey = y + math.sin(angle + jitter) * draw_len
 
         # Colour: trunk warm, tips cool, wide hue sweep across depth
-        depth_t = depth / self.MAX_DEPTH
+        depth_t = depth / self.max_depth
         h       = (hue + (1.0 - depth_t) * 0.80) % 1.0
         bright  = 0.28 + depth_t * 0.52 + high * 0.22 + beat_flash * 0.35
         # Segment thickness/glow reacts to high-frequency transients
@@ -69,7 +74,7 @@ class Branches(Effect):
                      hue, time, mid, high, beat_flash)
 
         # Triple-fork (extra centre child) at trunk AND first split level
-        if depth >= self.MAX_DEPTH - 1:
+        if depth >= self.max_depth - 1:
             self._branch(surf, ex, ey, angle,
                          length * ratio * 0.72, depth - 1,
                          hue, time, mid, high, beat_flash)
@@ -94,7 +99,7 @@ class Branches(Effect):
         trunk = min(sc * 0.22 * (1.0 + bass * 0.70 + mid * 0.25), sc * 0.27)
 
         # Extra arms on strong beats (up to +5); treble has minimal influence
-        n_arms = self.BASE_ARMS + int(min(bass, 2.5) * 2.2 + high * 0.8)
+        n_arms = self.base_arms + int(min(bass, 2.5) * 2.2 + high * 0.8)
 
         # Slow rotation of the whole tree; hue spread across all arms
         base_rot = self.time * 0.06
@@ -103,5 +108,5 @@ class Branches(Effect):
             angle   = base_rot + i / n_arms * math.tau
             arm_hue = (self.hue + i / n_arms * 0.75) % 1.0
             self._branch(surf, cx, cy, angle, trunk,
-                         self.MAX_DEPTH, arm_hue,
+                         self.max_depth, arm_hue,
                          self.time, mid, high, self.beat_flash)

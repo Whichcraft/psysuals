@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Mycelium** — Completely reworked from a single central burst into a multi-colony bioluminescent hyphae network with rotating satellite rings and swirling orbital spore particles.
+- **Persistence** — Reworked nested rotating polygons into 3D perspective projection space with depth cueing (depth-based thickness and brightness shading) and non-coplanar axis rotation.
+- **Clifford Attractor** — Rewritten to use high-speed 2D density mapping via `np.bincount`, logarithmic density scaling, dynamic percentile framing, and 3D diffuse relief shading from a rotating light source.
+- **Butterflies** — Reverted to the stable April 2026 version to remove size variations and swarm forces, restoring classic chase/orbit motion behavior.
+- **FlowField** — Shifted initial resolution divisor to start 2 levels faster (`RES_DIV = 3`).
+- **Lattice** — Shifted initial resolution divisor up by 1 level to start 1 level faster.
+- **TriFlux** — Moderated active rotation speeds, spin acceleration, and damping to reduce jitter and make the effect less nervous.
+
+### Fixed
+- **deque keyword crash** — Resolved Python < 3.10 startup crash by using positional arguments for `deque` in `psysualizer.py`.
+- **Signal handler AttributeError** — Robustly delayed signal setup during initialization and added safety checks in `_quit()` to avoid referencing undefined display/audio managers.
+- **ModernGL resource leak** — Released GPU shader programs and VAOs explicitly on `release()` in `PlasmaGL`.
+- **Unbounded cache growth** — Quantized bubble surface cache keys to multiples of 8 and enforced a cache capacity limit of 128 in `Bubbles` to prevent memory leaks.
+- **Branches recursion performance** — Optimized recursive tree rendering to scale depth based on `config.LOW_SPEC` settings.
+- **Pygame image deprecation** — Updated `pygame.image.tostring` calls to `to_string` in `GLRenderer` to align with modern Pygame-ce.
+- **Regression tester path** — Resolved relative path glob check to use absolute paths based on `__file__`.
+- **UI Font scale on resize** — Added dynamic recalculation of font sizes in `UIManager` when window size/resolution updates.
+- **Audio Callback Blocksize Jitter** — Padded/sliced incoming audio chunks in `AudioEngine` to prevent failures when the host ALSA/PortAudio block size varies.
+- **Division-by-zero check** — Added safety checks in `Butterflies` boundary repulsion to prevent crashes on tiny viewport sizing.
 
 ## [3.9.0] — 2026-06-19
 

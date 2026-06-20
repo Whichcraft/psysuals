@@ -247,3 +247,9 @@ class PlasmaGL(Effect):
     def release(self) -> None:
         """Drop cached offscreen framebuffers owned by this effect."""
         self._fbo_cache.clear()
+        if self._vao is not None:
+            self._vao.release()
+            self._vao = None
+        if self._prog is not None:
+            self._prog.release()
+            self._prog = None

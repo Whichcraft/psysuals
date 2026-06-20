@@ -4,15 +4,8 @@ import config
 
 class UIManager:
     def __init__(self):
-        # Scale font sizes proportionally based on screen width
-        # This covers all screens from small laptops (e.g. 1280 or 1920 width -> 20px or 24px) 
-        # up to large TV screens (e.g. 3840 width -> 48px)
-        fs = max(20, min(48, int(config.WIDTH / 80)))
-        fs_s = max(16, min(36, int(config.WIDTH / 100)))
-        
-        self.font = pygame.font.SysFont("monospace", fs)
-        self.font_s = pygame.font.SysFont("monospace", fs_s)
-        self.font_big = pygame.font.SysFont("monospace", max(72, int(config.WIDTH / 25)), bold=True)
+        self._last_width = 0
+        self.recalculate_fonts()
         self.pane_open = False
         self.pane_sel = 0
         self.picking = False
@@ -23,7 +16,21 @@ class UIManager:
         self._bar_surf: pygame.Surface | None = None
         self._flash_surf: pygame.Surface | None = None
 
+    def recalculate_fonts(self):
+        self._last_width = config.WIDTH
+        fs = max(20, min(48, int(config.WIDTH / 80)))
+        fs_s = max(16, min(36, int(config.WIDTH / 100)))
+        
+        self.font = pygame.font.SysFont("monospace", fs)
+        self.font_s = pygame.font.SysFont("monospace", fs_s)
+        self.font_big = pygame.font.SysFont("monospace", max(72, int(config.WIDTH / 25)), bold=True)
+
+    def _check_resize(self):
+        if config.WIDTH != self._last_width:
+            self.recalculate_fonts()
+
     def draw_device_picker(self, target: pygame.Surface, devices: list[tuple[int, str]], active_idx: int | None) -> None:
+        self._check_resize()
         if self._picker_overlay is None or self._picker_overlay.get_size() != (config.WIDTH, config.HEIGHT):
             self._picker_overlay = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
             self._picker_overlay.fill((0, 0, 0, 210))
@@ -60,6 +67,7 @@ class UIManager:
             target.blit(self.font.render(label, True, color), (40, y))
 
     def draw_pane(self, target: pygame.Surface, effect_gain: float, bg_alpha: int, cf_frames: float) -> None:
+        self._check_resize()
         panel_w, panel_h = 240, 160
         px = config.WIDTH - panel_w - 12
         py = 50
@@ -91,6 +99,7 @@ class UIManager:
                 pygame.draw.rect(target, color, (px + 10, y + 16, bar_w, 6))
 
     def draw_multiband_bars(self, target: pygame.Surface, beat_val: float, mid_val: float, treble_val: float) -> None:
+        self._check_resize()
         bar_w = 8
         bar_max = 120
         gap = 3
@@ -119,6 +128,7 @@ class UIManager:
         target.blit(self._bar_surf, (6, config.HEIGHT - surf_h - 6))
 
     def draw_tap_flash(self, target: pygame.Surface, tap_bpm: float, alpha: int) -> None:
+        self._check_resize()
         if self._flash_surf is None or self._flash_surf.get_size() != (config.WIDTH, config.HEIGHT):
             self._flash_surf = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
             

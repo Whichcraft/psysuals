@@ -175,7 +175,7 @@ class Attractor(Effect):
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
                     t["life"]    = random.randint(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX)
-                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.04, 0.10)
+                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.015, 0.04)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
                     t["cvx"] = 0.0;         t["cvy"] = 0.0
             else:
@@ -195,7 +195,7 @@ class Attractor(Effect):
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
                     t["life"]    = random.randint(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX)
-                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.03, 0.08)
+                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.012, 0.03)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
                     t["cvx"] = 0.0;         t["cvy"] = 0.0
 
@@ -265,9 +265,9 @@ class Attractor(Effect):
                 tile["svel"]  *= 0.70
                 tile["scale"]  = min(tile["scale"] + tile["svel"], 12.0)
                 tile["rot"]   += tile["rot_vel"]
-                # Bass and treble reinforce spin
-                tile["rot_vel"] += (bass * 0.016 + high * 0.024) * math.copysign(1, tile["rot_vel"] or 1)
-                tile["rot_vel"] *= 0.96
+                # Bass and treble reinforce spin (moderated to prevent excessive nervousness)
+                tile["rot_vel"] += (bass * 0.005 + high * 0.008) * math.copysign(1, tile["rot_vel"] or 1)
+                tile["rot_vel"] *= 0.94
                 # Move centroid with velocity, then let bounce handle edges
                 tile["cx"] += tile.get("cvx", 0.0)
                 tile["cy"] += tile.get("cvy", 0.0)

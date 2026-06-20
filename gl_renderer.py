@@ -166,7 +166,10 @@ class GLRenderer:
                 self._blit_tex.release()
             self._blit_tex = self.ctx.texture(size, 4)
             
-        rgba = pygame.image.tostring(surface, "RGBA")
+        if hasattr(pygame.image, "to_string"):
+            rgba = pygame.image.to_string(surface, "RGBA")
+        else:
+            rgba = pygame.image.tostring(surface, "RGBA")
         self._blit_tex.write(rgba)
         self._blit_tex.use(0)
         self._blit_prog["u_tex"] = 0
@@ -186,7 +189,10 @@ class GLRenderer:
             self._feedback_tex.repeat_x = False
             self._feedback_tex.repeat_y = False
 
-        rgba = pygame.image.tostring(surface, "RGBA")
+        if hasattr(pygame.image, "to_string"):
+            rgba = pygame.image.to_string(surface, "RGBA")
+        else:
+            rgba = pygame.image.tostring(surface, "RGBA")
         self._feedback_tex.write(rgba)
         self._feedback_tex.use(0)
         return self._feedback_tex
