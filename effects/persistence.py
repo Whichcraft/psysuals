@@ -1,17 +1,18 @@
-"""Persistence of Vision — stroboscopic rotating geometric shapes in 3D.
+"""Persistence of Vision — stroboscopic rotating geometric 3D wireframe models.
 
-Multiple nested polygons rotate in 3D space at subtly different speeds on
-different axes. With long trail persistence, their ghost images accumulate
-in perspective, creating a glowing 3D wagon-wheel moiré and holographic mandala.
+Multiple nested 3D models (Tetrahedron, Octahedron, Cube, Icosahedron, Dodecahedron)
+rotate in 3D space at subtly different speeds on different axes. With long trail persistence,
+their ghost images accumulate in perspective, creating a glowing 3D wagon-wheel moiré and
+holographic mandala.
 
   Bass   → rotation speed burst
-  Mid    → number of shapes / polygon complexity
+  Mid    → number of shapes / model complexity
   Treble → strobe flash
   Beat   → speed spike + hue jump
 """
 import math
 import random
-
+import numpy as np
 import pygame
 
 import config
@@ -23,6 +24,21 @@ _MAX_SHAPES = 8
 
 class Persistence(Effect):
     TRAIL_ALPHA = 5   # very long persistence for 3D moiré build-up
+
+    @staticmethod
+    def _Rx(a):
+        c, s = math.cos(a), math.sin(a)
+        return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]], dtype=float)
+
+    @staticmethod
+    def _Ry(a):
+        c, s = math.cos(a), math.sin(a)
+        return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]], dtype=float)
+
+    @staticmethod
+    def _Rz(a):
+        c, s = math.cos(a), math.sin(a)
+        return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=float)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -40,8 +56,71 @@ class Persistence(Effect):
         self._boost = 0.0
         self._beat_prev = 0.0
 
+        # Build Platonic solid wireframe geometry
+        phi = (1.0 + math.sqrt(5.0)) / 2.0
+        inv_phi = 1.0 / phi
+
+        raw_models = [
+            # 1. Tetrahedron
+            [
+                [1.0, 1.0, 1.0],
+                [-1.0, -1.0, 1.0],
+                [-1.0, 1.0, -1.0],
+                [1.0, -1.0, -1.0]
+            ],
+            # 2. Octahedron
+            [
+                [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0], [0.0, -1.0, 0.0],
+                [0.0, 0.0, 1.0], [0.0, 0.0, -1.0]
+            ],
+            # 3. Cube
+            [
+                [-1.0, -1.0, -1.0], [1.0, -1.0, -1.0], [1.0, 1.0, -1.0], [-1.0, 1.0, -1.0],
+                [-1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [1.0, 1.0, 1.0], [-1.0, 1.0, 1.0]
+            ],
+            # 4. Icosahedron
+            [
+                [0.0, -1.0, -phi], [0.0, -1.0, phi], [0.0, 1.0, -phi], [0.0, 1.0, phi],
+                [-1.0, -phi, 0.0], [-1.0, phi, 0.0], [1.0, -phi, 0.0], [1.0, phi, 0.0],
+                [-phi, 0.0, -1.0], [-phi, 0.0, 1.0], [phi, 0.0, -1.0], [phi, 0.0, 1.0]
+            ],
+            # 5. Dodecahedron
+            [
+                [-1.0, -1.0, -1.0], [1.0, -1.0, -1.0], [1.0, 1.0, -1.0], [-1.0, 1.0, -1.0],
+                [-1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [1.0, 1.0, 1.0], [-1.0, 1.0, 1.0],
+                [0.0, -inv_phi, -phi], [0.0, -inv_phi, phi], [0.0, inv_phi, -phi], [0.0, inv_phi, phi],
+                [-inv_phi, -phi, 0.0], [-inv_phi, phi, 0.0], [inv_phi, -phi, 0.0], [inv_phi, phi, 0.0],
+                [-phi, 0.0, -inv_phi], [-phi, 0.0, inv_phi], [phi, 0.0, -inv_phi], [phi, 0.0, inv_phi]
+            ]
+        ]
+
+        self._models = []
+        for rm in raw_models:
+            verts = np.array(rm, dtype=float)
+            # Normalize vertices to the unit sphere
+            norms = np.linalg.norm(verts, axis=1, keepdims=True)
+            norms[norms == 0.0] = 1.0
+            verts = verts / norms
+            
+            # Compute edges based on minimum distance
+            n_verts = len(verts)
+            dists = []
+            for i in range(n_verts):
+                for j in range(i + 1, n_verts):
+                    d_val = np.linalg.norm(verts[i] - verts[j])
+                    dists.append((d_val, i, j))
+            min_dist = min(d[0] for d in dists)
+            
+            edges = []
+            threshold = min_dist * 1.05
+            for d_val, i, j in dists:
+                if d_val <= threshold:
+                    edges.append((i, j))
+            self._models.append((verts, edges))
+
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -67,60 +146,42 @@ class Persistence(Effect):
             self._rot_z[i] += self._speeds_z[i] * spd_mul
 
             ax, ay, az = self._rot_x[i], self._rot_y[i], self._rot_z[i]
-            r = 0.25 + 0.75 * (i + 1) / n_shapes
-            sides = 3 + i
+            r = 0.2 + 0.8 * (i + 1) / n_shapes
             h = (self._hue + i / n_shapes * 0.55) % 1.0
             bright = 0.28 + bass * 0.25 + (high * 0.12 if i == n_shapes - 1 else 0)
 
-            # Precompute trig values for fast rotation
-            cx_cos, cx_sin = math.cos(ax), math.sin(ax)
-            cy_cos, cy_sin = math.cos(ay), math.sin(ay)
-            cz_cos, cz_sin = math.cos(az), math.sin(az)
+            # Get the model and apply rotations
+            model_idx = i % len(self._models)
+            u_verts, edges = self._models[model_idx]
+            
+            R = self._Rx(ax) @ self._Ry(ay) @ self._Rz(az)
+            scaled_verts = u_verts * r
+            rotated_verts = (R @ scaled_verts.T).T
 
             projected = []
             depths = []
 
-            for s in range(sides):
-                ang = s / sides * math.tau
-                # Original point in local 3D space (Z = 0)
-                vx = math.cos(ang) * r
-                vy = math.sin(ang) * r
-                vz = 0.0
-
-                # 3D Rotation Matrix Multiplication (Euler sequence: X -> Y -> Z)
-                # Rotate around X
-                y1 = vy * cx_cos - vz * cx_sin
-                z1 = vy * cx_sin + vz * cx_cos
-
-                # Rotate around Y
-                x2 = vx * cy_cos + z1 * cy_sin
-                z2 = -vx * cy_sin + z1 * cy_cos
-
-                # Rotate around Z
-                x3 = x2 * cz_cos - y1 * cz_sin
-                y3 = x2 * cz_sin + y1 * cz_cos
-                z3 = z2
-
+            for v in rotated_verts:
                 # Camera distance and perspective projection
                 cam_z = 2.2
-                depth = cam_z + z3
-                
-                sx = cx + int(x3 * fov / depth)
-                sy = cy + int(y3 * fov / depth)
-
+                depth = cam_z + v[2]
+                if depth <= 0.1:
+                    depth = 0.1
+                sx = cx + int(v[0] * fov / depth)
+                sy = cy + int(v[1] * fov / depth)
                 projected.append((sx, sy))
-                depths.append(z3)
+                depths.append(v[2])
 
             # Draw edge segments with depth fading
-            for s in range(sides):
-                next_s = (s + 1) % sides
-                p1 = projected[s]
-                p2 = projected[next_s]
+            for edge_idx, (a, b) in enumerate(edges):
+                p1 = projected[a]
+                p2 = projected[b]
 
                 # Compute depth factor (Z ranges from -r to +r, mapping to [0.15, 1.0])
-                avg_z = (depths[s] + depths[next_s]) / 2.0
-                d_factor = (3.2 - (2.2 + avg_z)) / 2.0
-                d_factor = max(0.15, min(1.0, 0.2 + 0.8 * d_factor))
+                avg_z = (depths[a] + depths[b]) / 2.0
+                z_norm = avg_z / r
+                d_factor = 0.15 + 0.85 * (1.0 - (z_norm + 1.0) / 2.0)
+                d_factor = max(0.15, min(1.0, d_factor))
 
                 col = hsl(h, l=bright * d_factor)
                 glow = hsl(h, l=bright * 0.30 * d_factor)

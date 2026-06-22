@@ -152,6 +152,8 @@ class GLRenderer:
         """
         target = fbo if fbo is not None else self.ctx.screen
         target.use()
+        if fbo is None:
+            self.ctx.viewport = (0, 0, self.width, self.height)
         # self.ctx.clear(0.0, 0.0, 0.0, 1.0) # Removed clear to allow layering
         vao.render(moderngl.TRIANGLE_STRIP)
 

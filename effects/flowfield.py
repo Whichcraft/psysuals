@@ -110,9 +110,10 @@ class FlowField(Effect):
         finally:
             del pixels
 
-        # Force alpha 255 to ensure visibility in GL mode
-        if RD > 1:
-            pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT), self._scaled)
+        if surf.get_size() != self._trail.get_size():
+            if self._scaled.get_size() != surf.get_size():
+                self._scaled = pygame.Surface(surf.get_size())
+            pygame.transform.scale(self._trail, surf.get_size(), self._scaled)
             surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
             surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

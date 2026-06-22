@@ -11,7 +11,7 @@ from .triflux     import Attractor
 from .branches    import Branches
 from .butterflies        import Butterflies
 from .flowfield          import FlowField
-from .vortex             import Vortex
+from .fireworks        import Fireworks
 from .aurora             import Aurora
 from .lattice            import Lattice
 from .mycelium    import Mycelium
@@ -40,7 +40,7 @@ MODES = [
     ("Branches",    Branches),    # ←/→ only
     ("Butterflies", Butterflies), # ←/→ only
     ("FlowField",   FlowField),   # ←/→ only
-    ("Vortex",      Vortex),      # ←/→ only
+    ("Fireworks",   Fireworks),   # ←/→ only
     ("Aurora",      Aurora),      # ←/→ only
     ("Lattice",     Lattice),     # ←/→ only
     ("Mycelium",    Mycelium),    # ←/→ only

@@ -59,7 +59,7 @@ class Lattice(Effect):
         self._nodes = []
         self._col_peaks = np.ones(self._grid_cols, dtype=np.float32) * 0.2
 
-        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
+        W, H = self._render_size()[:2]
         self._resize(W, H)
 
     def _resize(self, W, H):
@@ -108,7 +108,7 @@ class Lattice(Effect):
     def draw(self, surf, waveform, fft, beat, tick):
         n_cols = self._grid_cols
         n_rows = self._grid_rows
-        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
+        W, H = self._render_size()[:2]
         if self._surf is None or self._surf.get_width() != W or self._surf.get_height() != H:
             self._resize(W, H)
 
@@ -246,8 +246,8 @@ class Lattice(Effect):
                 pygame.draw.circle(self._surf, hsl(hue, l=min(b * 0.75 + 0.15 + high * 0.05, 0.95)),
                                    (int(sx_arr[ni]), int(sy_arr[ni])), r_core)
 
-        if self.RES_DIV > 1:
-            scaled = pygame.transform.scale(self._surf, (config.WIDTH, config.HEIGHT))
+        if surf.get_size() != self._surf.get_size():
+            scaled = pygame.transform.scale(self._surf, surf.get_size())
             surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
             surf.blit(self._surf, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

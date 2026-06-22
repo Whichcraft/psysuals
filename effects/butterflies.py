@@ -336,7 +336,7 @@ class Butterflies(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        W, H = config.WIDTH // self.RES_DIV, config.HEIGHT // self.RES_DIV
+        W, H = self._render_size()[:2]
         self._tick       = 0
         self._global_hue = random.random()
         self._trail      = pygame.Surface((W, H))
@@ -367,8 +367,8 @@ class Butterflies(Effect):
             pair.update(bass, beat, gh, self._tick)
             pair.draw(self._trail, beat, gh)
 
-        if self.RES_DIV > 1:
-            scaled = pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT))
+        if surf.get_size() != self._trail.get_size():
+            scaled = pygame.transform.scale(self._trail, surf.get_size())
             surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
         else:
             surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
