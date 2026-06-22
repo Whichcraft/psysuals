@@ -1,10 +1,10 @@
-"""Vortex — pixel feedback wormhole tunnel with fireworks.
+"""Fireworks — pixel feedback falling/zooming tunnel with fireworks.
 
-Each frame the previous frame is zoom-rotated and multiplied dark, building
+Each frame the previous frame is zoomed and multiplied dark, building
 an infinite falling psychedelic tunnel.  Firework rockets launch from the
 bottom, arc upward under gravity, and explode into glowing embers at the
-apex.  Beat fires extra rockets and cranks the zoom/rotation speed.
-The feedback loop swallows all trails into the wormhole.
+apex.  Beat fires extra rockets and cranks the zoom speed.
+The feedback loop swallows all trails.
 """
 import math
 import random
@@ -23,22 +23,19 @@ _DRAG = 0.991   # velocity multiplier per frame
 
 from .base import Effect
 
-class Vortex(Effect):
+class Fireworks(Effect):
     TRAIL_ALPHA = 0   # we manage the surface
     RES_DIV     = 3   # Render at 1/3 resolution for FPS boost
     _FADE_ALPHA = 20
 
     _BASE_ZOOM       = 1.0038
-    _BASE_ROT        = 0.42
     _BEAT_ZOOM       = 1.015
-    _BEAT_ROT        = 2.4
     _BEAT_FRAMES     = 50
     _HUE_BASE_STEP   = 0.0015
     _HUE_BASS_GAIN   = 0.002
     _HUE_HIGH_GAIN   = 0.001
     _ZOOM_BASS_GAIN  = 0.002
     _ZOOM_HIGH_GAIN  = 0.001
-    _ROT_MID_GAIN    = 0.45
     # Auto-launch interval at gain=1.0.  Scales linearly with gain so that
     # higher intensity → longer interval (fewer rockets) and lower → shorter.
     # Formula: interval = _BASE_INTERVAL * gain  (clamped 20..200)
@@ -130,8 +127,8 @@ class Vortex(Effect):
             self._trail.fill((0, 0, 0))
             self._fade = pygame.Surface((W, H), pygame.SRCALPHA)
             self._fade.fill((0, 0, 0, self._FADE_ALPHA))
-        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
-            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
+        if self._scaled.get_width() != surf.get_width() or self._scaled.get_height() != surf.get_height():
+            self._scaled = pygame.Surface(surf.get_size())
         if self.renderer is not None and (
             self._feedback_fbo is None
             or self._feedback_fbo.width != W
@@ -156,22 +153,21 @@ class Vortex(Effect):
             self._auto_t = 0
             self._launch(RD)
 
-        # ── feedback: zoom + rotate trail ─────────────────────────────────────
+        # ── feedback: zoom trail ──────────────────────────────────────────────
         t = self._beat_t / self._BEAT_FRAMES if self._beat_t > 0 else 0.0
         self._beat_t = max(0, self._beat_t - 1)
         zoom    = self._BASE_ZOOM + t * (self._BEAT_ZOOM - self._BASE_ZOOM) + bass * self._ZOOM_BASS_GAIN + high * self._ZOOM_HIGH_GAIN
-        rot_deg = self._BASE_ROT  + t * (self._BEAT_ROT  - self._BASE_ROT) + mid * self._ROT_MID_GAIN
 
-        # Feedback transform: use GL when available, CPU rotozoom otherwise.
+        # Feedback transform: use GL when available, CPU scale otherwise.
         if self.renderer is not None and self._feedback_fbo is not None:
-            self.renderer.feedback_transform(self._trail, self._feedback_fbo, zoom, rot_deg)
+            self.renderer.feedback_transform(self._trail, self._feedback_fbo, zoom, 0.0)
             fb = self.renderer.read_pixels(self._feedback_fbo)
             surfarray.blit_array(self._trail, fb[:, :, :3].transpose(1, 0, 2))
         else:
-            rotated = pygame.transform.rotozoom(self._trail, rot_deg, zoom)
-            rw, rh  = rotated.get_size()
+            zw, zh = int(W * zoom), int(H * zoom)
+            zoomed = pygame.transform.scale(self._trail, (zw, zh))
             self._trail.fill((0, 0, 0))
-            self._trail.blit(rotated, (-((rw - W) // 2), -((rh - H) // 2)))
+            self._trail.blit(zoomed, (-((zw - W) // 2), -((zh - H) // 2)))
 
         # Fade with alpha overlay to preserve chroma better than RGB multiply.
         self._trail.blit(self._fade, (0, 0))
@@ -226,8 +222,8 @@ class Vortex(Effect):
                 live.append(em)
         self._embers = live
 
-        if RD > 1:
-            pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT), self._scaled)
+        if surf.get_size() != self._trail.get_size():
+            pygame.transform.scale(self._trail, surf.get_size(), self._scaled)
             surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
             surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

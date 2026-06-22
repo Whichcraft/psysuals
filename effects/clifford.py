@@ -196,5 +196,10 @@ class Clifford(Effect):
         self._trail.blit(self._fade, (0, 0))
         self._trail.blit(self._frame_surf, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
 
-        pygame.transform.scale(self._trail, (config.WIDTH, config.HEIGHT), self._scaled)
-        surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        if surf.get_size() != self._trail.get_size():
+            if self._scaled.get_size() != surf.get_size():
+                self._scaled = pygame.Surface(surf.get_size())
+            pygame.transform.scale(self._trail, surf.get_size(), self._scaled)
+            surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        else:
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

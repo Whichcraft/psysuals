@@ -57,7 +57,7 @@ Standardized audio energy parameters used across all effects:
 | 11 | `←` / `→` | Branches | Fractal lightning tree with audio-jittered angles |
 | 12 | `←` / `→` | Butterflies | Dancing butterfly pairs with orbit breaks |
 | 13 | `←` / `→` | FlowField | 12 000+ particles surfing a shifting vector field |
-| 14 | `←` / `→` | Vortex | Feedback wormhole with fireworks |
+| 14 | `←` / `→` | Fireworks | Feedback zooming tunnel with fireworks |
 | 15 | `←` / `→` | Aurora | Parallel Northern Lights ribbons with additive glow |
 | 16 | `←` / `→` | Lattice | Crystal grid with zoom feedback and peak-normalization |
 | 17 | `←` / `→` | Mycelium | Multi-colony psychedelic hyphae with swirling spores |
@@ -167,11 +167,11 @@ Twelve thousand+ particles surf a continuously changing multi-layer vector field
 - Audio: beat (bass) drives particle speeds and field angle scales; MID_ENERGY accelerates field evolution; TREBLE_ENERGY triggers a vectorized center-outward push on particle positions during transients.
 - Visual notes: particles now wrap cleanly across the full viewport, so the flow reaches the screen edges without the dark border the old edge recycling created.
 
-## 14. Vortex
+## 14. Fireworks
 
-The previous frame is zoomed, rotated, and darkened into a wormhole while fireworks launch upward and explode into glowing embers.
+The previous frame is zoomed and darkened into a tunnel while fireworks launch upward and explode into glowing embers.
 
-- Audio: beat (bass) launches rockets and drives rotozoom scaling; MID_ENERGY accelerates feedback rotation rates; TREBLE_ENERGY dramatically increases rocket explosion ember counts, launch trail widths, and velocities.
+- Audio: beat (bass) launches rockets and drives zoom scaling; TREBLE_ENERGY dramatically increases rocket explosion ember counts, launch trail widths, and velocities.
 - Visual notes: auto-launch timing is also tied to `config.EFFECT_GAIN`, so quieter gain settings create more background rockets between beats.
 
 ## 15. Aurora

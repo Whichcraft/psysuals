@@ -211,7 +211,7 @@ class PlasmaGL(Effect):
         rgb = _hsl_arr(h, l)
         pygame.surfarray.blit_array(self._fallback_surf, rgb.transpose(1, 0, 2))
         surf.blit(pygame.transform.scale(
-            self._fallback_surf, (config.WIDTH, config.HEIGHT)), (0, 0))
+            self._fallback_surf, surf.get_size()), (0, 0))
 
     # ── Android / offscreen API ───────────────────────────────────────────────
 

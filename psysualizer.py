@@ -507,7 +507,11 @@ class VisualizerApp:
             self.bg_surf.fill((0, 0, 0))
             self.bg_vis.draw(self.bg_surf, self.waveform, self.fft, self.draw_beat, self.tick)
             self.bg_surf.set_alpha(self.bg_alpha)
-            target.blit(self.bg_surf, (0, 0))
+            if target.get_size() != self.bg_surf.get_size():
+                bg_scaled = pygame.transform.smoothscale(self.bg_surf, target.get_size())
+                target.blit(bg_scaled, (0, 0))
+            else:
+                target.blit(self.bg_surf, (0, 0))
             
         self.vis.draw(target, self.waveform, self.fft, self.draw_beat, self.tick)
         

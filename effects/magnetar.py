@@ -57,8 +57,8 @@ class Magnetar(Effect):
             self._reset_particles()
             W = self._trail.get_width()
             H = self._trail.get_height()
-        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
-            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
+        if self._scaled.get_width() != surf.get_width() or self._scaled.get_height() != surf.get_height():
+            self._scaled = pygame.Surface(surf.get_size())
 
         self._hue  = (self._hue + 0.0008 + high * 0.001) % 1.0
         self._rot += 0.008 + bass * 0.025 + mid * 0.012
@@ -123,9 +123,9 @@ class Magnetar(Effect):
         finally:
             del pix
 
-        if RD > 1:
+        if surf.get_size() != self._trail.get_size():
             pygame.transform.scale(self._trail,
-                                   (config.WIDTH, config.HEIGHT),
+                                   surf.get_size(),
                                    self._scaled)
             surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:

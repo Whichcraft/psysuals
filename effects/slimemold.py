@@ -72,8 +72,8 @@ class SlimeMold(Effect):
             self._reset_sim()
             W, H, RD = self._render_size()
         W, H = self._W, self._H
-        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
-            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
+        if self._scaled.get_width() != surf.get_width() or self._scaled.get_height() != surf.get_height():
+            self._scaled = pygame.Surface(surf.get_size())
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -151,7 +151,8 @@ class SlimeMold(Effect):
         finally:
             del pix
 
-        pygame.transform.smoothscale(self._surf,
-                                     (config.WIDTH, config.HEIGHT),
-                                     self._scaled)
-        surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        if surf.get_size() != self._surf.get_size():
+            pygame.transform.smoothscale(self._surf, surf.get_size(), self._scaled)
+            surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+        else:
+            surf.blit(self._surf, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
