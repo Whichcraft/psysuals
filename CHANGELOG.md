@@ -7,6 +7,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.10.0] — 2026-06-22
+
 ### Changed
 - **Mycelium** — Completely reworked from a single central burst into a multi-colony bioluminescent hyphae network with rotating satellite rings and swirling orbital spore particles.
 - **Persistence** — Reworked nested rotating polygons into 3D perspective projection space with depth cueing (depth-based thickness and brightness shading) and non-coplanar axis rotation.
