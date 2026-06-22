@@ -106,6 +106,7 @@ Fullscreen/display changes also recreate the background effect so display-bound 
 | `WIDTH` | `0` | Placeholder until the display opens |
 | `HEIGHT` | `0` | Placeholder until the display opens |
 | `FPS` | `60` | Target frame rate |
+| `LOW_SPEC` | `False` | Performance mode: caps FPS at 30 and scales down simulation budgets |
 | `SAMPLE_RATE` | `44100` | Audio sample rate |
 | `BLOCK_SIZE` | `1024` | Audio callback / FFT block size |
 | `CHANNELS` | `1` | Mono input |
