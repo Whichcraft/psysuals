@@ -98,6 +98,7 @@ class DisplayManager:
     def open_display(self, idx: int, fullscreen: bool):
         # Validate index
         if idx < 0 or idx >= self.num_displays:
+            print(f"  ⚠️ display_idx {idx} out of range (0-{self.num_displays - 1}), falling back to 0")
             idx = 0
             
         self.display_idx = idx
@@ -110,12 +111,14 @@ class DisplayManager:
                 self._gl_renderer_cls, self._has_moderngl = _load_gl_renderer()
             if not self._has_moderngl:
                 print("  ⚠️ --gl requested but moderngl is not installed in this environment; running without the ModernGL renderer.")
-            try:
-                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
-                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
-                pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
-            except Exception as e:
-                print(f"  ⚠️ Warning: Failed to set OpenGL attributes: {e}")
+            if not getattr(self, "_gl_attrs_set", False):
+                try:
+                    pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+                    pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
+                    pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+                    self._gl_attrs_set = True
+                except Exception as e:
+                    print(f"  ⚠️ Warning: Failed to set OpenGL attributes: {e}")
         
         try:
             if fullscreen and idx < len(self.xmonitors):
@@ -148,10 +151,12 @@ class DisplayManager:
                 h = config.HEIGHT or 720
                 self.screen = pygame.display.set_mode((w, h), flags)
                 config.WIDTH, config.HEIGHT = self.screen.get_size()
-        except Exception:
+        except Exception as _dm_exc:
+            print(f"  ⚠️ Display init failed: {_dm_exc}", file=sys.stderr)
             # Last resort fallback: windowed mode
             self.screen = pygame.display.set_mode((1280, 720), flags)
             config.WIDTH, config.HEIGHT = 1280, 720
+        config._INITIALIZED = True
         
         if self.args.gl and self._has_moderngl and self._gl_renderer_cls is not None:
             try:
@@ -169,12 +174,19 @@ class DisplayManager:
         return self.open_display(self.display_idx, not self.fullscreen)
 
     def reposition_window_fix(self, tick: int):
-        if self._libX11 and self._xmove_target and tick < 60:
+        if self._libX11 and self._xmove_target and tick == 0:
             dpy, win, mx, my = self._xmove_target
             self._libX11.XMoveWindow(dpy, win, mx, my)
             self._libX11.XSync(dpy, 0)
 
-    def _spawn_child(self, child_idx: int, mode_i: int, entry_script: str) -> None:
+    def requery_xmonitors(self) -> None:
+        """Re-query xrandr monitor list (handles hotplug changes)."""
+        new_mons = self._xrandr_monitors()
+        if len(new_mons) != len(self.xmonitors):
+            self.xmonitors = new_mons
+            self.num_displays = max(len(self.xmonitors), 1)
+
+    def spawn_child(self, child_idx: int, mode_i: int, entry_script: str) -> None:
         cmd = [
             sys.executable,
             entry_script,
@@ -196,7 +208,7 @@ class DisplayManager:
         for child_idx in range(self.num_displays):
             if child_idx == self.display_idx:
                 continue
-            self._spawn_child(child_idx, mode_i, entry_script)
+            self.spawn_child(child_idx, mode_i, entry_script)
 
     def kill_children(self) -> None:
         """Terminate all span child processes and wait for them to exit."""

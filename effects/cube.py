@@ -40,16 +40,19 @@ class Cube(Effect):
     def _target_size(self):
         return self._render_size()[:2]
 
-    def _project(self, v, fov=680):
-        W, H = self._target_size()
+    def _fov(self, W, H):
+        return min(W, H) * 0.72
+
+    def _project(self, v, W, H):
         cx, cy = W // 2, H // 2
+        fov = self._fov(W, H)
         z = v[2] + 3.8
         return (int(v[0] * fov / z + cx),
                 int(v[1] * fov / z + cy))
 
-    def _project_sat(self, verts_3d, ox, oy, sat_scale, fov=680):
-        W, H = self._target_size()
+    def _project_sat(self, verts_3d, ox, oy, sat_scale, W, H):
         cx, cy = W // 2, H // 2
+        fov = self._fov(W, H)
         z       = 3.8
         scale_s = fov / z
         cx_s    = ox * scale_s + cx
@@ -83,7 +86,8 @@ class Cube(Effect):
         return np.array([[c,-s,0],[s,c,0],[0,0,1]])
 
     def draw(self, surf, waveform, fft, beat, tick):
-        if self.sat_surf is None or self.sat_surf.get_size() != self._target_size():
+        W, H = self._target_size()
+        if self.sat_surf is None or self.sat_surf.get_size() != (W, H):
             self._init_sat_surf()
 
         self.fade_hue += 0.0018
@@ -111,7 +115,7 @@ class Cube(Effect):
             if jitter_amp > 0.001:
                 cube_verts = cube_verts + (np.random.normal(0, jitter_amp, cube_verts.shape))
             verts = (R @ cube_verts.T).T
-            proj  = [self._project(v) for v in verts]
+            proj  = [self._project(v, W, H) for v in verts]
             for ei, (a, b) in enumerate(self.EDGES):
                 h = (self.fade_hue + hue_off + ei / len(self.EDGES) * 0.4) % 1.0
                 lw = max(1, int(2 + self.svel * 4 + high * 2.0)) if base_scale > 0.4 else 1
@@ -134,7 +138,7 @@ class Cube(Effect):
             if jitter_amp > 0.001:
                 sat_verts = sat_verts + (np.random.normal(0, jitter_amp, sat_verts.shape))
             verts = (Rs @ sat_verts.T).T
-            proj  = self._project_sat(verts, ox, oy, sat_scale)
+            proj  = self._project_sat(verts, ox, oy, sat_scale, W, H)
             h_off = si * 0.5
             for ei, (a, b) in enumerate(self.EDGES):
                 h = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0

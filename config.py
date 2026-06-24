@@ -10,6 +10,15 @@ import numpy as np
 
 WIDTH  = 0
 HEIGHT = 0
+_INITIALIZED = False
+
+
+def assert_initialized():
+    if not _INITIALIZED:
+        raise RuntimeError(
+            "config.WIDTH/HEIGHT accessed before display init. "
+            "Ensure DisplayManager.open_display() is called before any effect __init__."
+        )
 FPS    = 60
 LOW_SPEC = False
 
@@ -37,7 +46,10 @@ SILENCE_BEAT_FLOOR   = 0.015
 SILENCE_MID_FLOOR    = 0.020
 SILENCE_TREBLE_FLOOR = 0.018
 
-RNG_SEED = int(os.environ.get("PSYSUALS_SEED", "0") or 0)
-if RNG_SEED:
+_seed_str = os.environ.get("PSYSUALS_SEED")
+if _seed_str is not None:
+    RNG_SEED = int(_seed_str) if _seed_str else 0
     random.seed(RNG_SEED)
     np.random.seed(RNG_SEED)
+else:
+    RNG_SEED = 0

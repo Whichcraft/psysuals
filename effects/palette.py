@@ -14,11 +14,12 @@ from effects.utils import hsl
 
 
 # Genre → (target_hue, drift_speed, sat_boost, trail_alpha)
+# Index: 0=target_hue, 1=drift_speed, 2=sat_boost, 3=trail_alpha
 _GENRE_PRESETS = {
-    "electronic": (0.55, 0.004, 0.20, 16),   # cyan/blue, fast, punchy, short trail
-    "rock":       (0.05, 0.003, 0.15, 22),   # orange/red, medium, warm
-    "classical":  (0.75, 0.001, 0.00, 35),   # purple, slow, soft, long trail
-    "any":        (None, 0.002, 0.10, 28),   # free drift, neutral
+    "electronic": (0.55, 0.004, 0.20, 16),
+    "rock":       (0.05, 0.003, 0.15, 22),
+    "classical":  (0.75, 0.001, 0.00, 35),
+    "any":        (None, 0.002, 0.10, 28),
 }
 
 

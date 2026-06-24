@@ -15,6 +15,7 @@ from .base import Effect
 _FFT_USE = 0.55
 _SHOCK_W = 22
 _IDLE = 0.08
+_FFT_START_BIN = 3  # skip DC component and sub-bass rumble
 
 class Lattice(Effect):
     TRAIL_ALPHA = 0 # Managed by internal surface
@@ -48,6 +49,7 @@ class Lattice(Effect):
 
         self._surf = None
         self._hue = 0.52
+        self._scaled = None
         self._shock_r = 9999.0
         self._shock_spd = 0.0
         self._beat_prev = 0.0
@@ -60,20 +62,22 @@ class Lattice(Effect):
         self._col_peaks = np.ones(self._grid_cols, dtype=np.float32) * 0.2
 
         W, H = self._render_size()[:2]
-        self._resize(W, H)
+        self._init_surfaces(W, H)
 
-    def _resize(self, W, H):
-        n_cols = self._grid_cols
-        n_rows = self._grid_rows
+    def _init_surfaces(self, W, H):
         self._surf = pygame.Surface((W, H))
         self._surf.fill((0, 0, 0))
-        # Keep shock speed relative to the internal canvas width
         self._shock_spd = 6.0 * (W / 640.0)
-
         cx, cy = W / 2.0, H / 2.0
         self._cx, self._cy = cx, cy
         self._max_r = math.hypot(cx, cy)
+        self._build_grid()
 
+    def _build_grid(self):
+        n_cols = self._grid_cols
+        n_rows = self._grid_rows
+        W, H = self._render_size()[:2]
+        cx, cy = self._cx, self._cy
         x0, y0 = W * 0.08, H * 0.10
         cw = W * 0.84 / max(n_cols - 1, 1)
         ch = H * 0.80 / max(n_rows - 1, 1)
@@ -92,11 +96,27 @@ class Lattice(Effect):
                     'h_off': h_off,
                 })
 
-        # Reset column peaks for the new grid size
         self._col_peaks = np.ones(n_cols, dtype=np.float32) * 0.2
 
+    def _draw_beam(self, ni_a, ni_b, hue, sx_arr, sy_arr, bright,
+                   scale_factor, high):
+        w_base = max(1, int(1.0 * scale_factor))
+        pygame.draw.line(self._surf, hsl(hue, s=0.25, l=0.06),
+                         (int(sx_arr[ni_a]), int(sy_arr[ni_a])),
+                         (int(sx_arr[ni_b]), int(sy_arr[ni_b])), w_base)
+        avg_b = (bright[ni_a] + bright[ni_b]) * 0.5
+        if avg_b > 0.1:
+            w_outer = max(1, int((3.5 + high * 1.5) * scale_factor))
+            pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.15, 0.25)),
+                             (int(sx_arr[ni_a]), int(sy_arr[ni_a])),
+                             (int(sx_arr[ni_b]), int(sy_arr[ni_b])), w_outer)
+            w_core = max(1, int((1.2 + high * 0.5) * scale_factor))
+            pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.4, 0.7)),
+                             (int(sx_arr[ni_a]), int(sy_arr[ni_a])),
+                             (int(sx_arr[ni_b]), int(sy_arr[ni_b])), w_core)
+
     def _bin(self, col: int, n_cols: int, fft_len: int) -> int:
-        start = 3  # skip DC component and sub-bass rumble
+        start = _FFT_START_BIN
         end = min(fft_len - 1, int(fft_len * _FFT_USE))
         if end <= start:
             return 0
@@ -110,14 +130,14 @@ class Lattice(Effect):
         n_rows = self._grid_rows
         W, H = self._render_size()[:2]
         if self._surf is None or self._surf.get_width() != W or self._surf.get_height() != H:
-            self._resize(W, H)
+            self._init_surfaces(W, H)
 
         fft_len = len(fft)
         bass = beat
         mid = config.MID_ENERGY
         high = config.TREBLE_ENERGY
         cx, cy = self._cx, self._cy
-        scale_factor = W / 640.0
+        scale_factor = min(W, H) / 640.0
 
         self._hue = (self._hue + 0.0025 + mid * 0.005 + high * 0.002) % 1.0
 
@@ -131,8 +151,9 @@ class Lattice(Effect):
         self._scale = max(0.90, min(self._scale + self._svel, 1.12))
 
         # Feedback loop at lower res (zoom scaled by bass and mids)
-        rotated = pygame.transform.rotozoom(self._surf, 0.0, 1.0 + bass * 0.01 + mid * 0.008)
-        rw, rh = rotated.get_size()
+        sc = 1.0 + bass * 0.01 + mid * 0.008
+        rw, rh = max(1, int(W * sc)), max(1, int(H * sc))
+        rotated = pygame.transform.scale(self._surf, (rw, rh))
         self._surf.fill((0, 0, 0))
         self._surf.blit(rotated, (-((rw - W) // 2), -((rh - H) // 2)))
         self._surf.fill((230, 230, 230), special_flags=pygame.BLEND_RGB_MULT)
@@ -178,47 +199,11 @@ class Lattice(Effect):
                 ni = row * n_cols + col
                 hue = (self._hue + self._nodes[ni]['h_off']) % 1.0
                 if col < n_cols - 1:
-                    ni_r = ni + 1
-
-                    # Draw base faint line
-                    w_base = max(1, int(1.0 * scale_factor))
-                    pygame.draw.line(self._surf, hsl(hue, s=0.25, l=0.06),
-                                     (int(sx_arr[ni]), int(sy_arr[ni])),
-                                     (int(sx_arr[ni_r]), int(sy_arr[ni_r])), w_base)
-
-                    avg_b = (bright[ni] + bright[ni_r]) * 0.5
-                    if avg_b > 0.1:
-                        # Glow line
-                        w_outer = max(1, int((3.5 + high * 1.5) * scale_factor))
-                        pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.15, 0.25)),
-                                         (int(sx_arr[ni]), int(sy_arr[ni])),
-                                         (int(sx_arr[ni_r]), int(sy_arr[ni_r])), w_outer)
-                        # Core line
-                        w_core = max(1, int((1.2 + high * 0.5) * scale_factor))
-                        pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.4, 0.7)),
-                                         (int(sx_arr[ni]), int(sy_arr[ni])),
-                                         (int(sx_arr[ni_r]), int(sy_arr[ni_r])), w_core)
+                    self._draw_beam(ni, ni + 1, hue, sx_arr, sy_arr, bright,
+                                    scale_factor, high)
                 if row < n_rows - 1:
-                    ni_d = ni + n_cols
-
-                    # Draw base faint line
-                    w_base = max(1, int(1.0 * scale_factor))
-                    pygame.draw.line(self._surf, hsl(hue, s=0.25, l=0.06),
-                                     (int(sx_arr[ni]), int(sy_arr[ni])),
-                                     (int(sx_arr[ni_d]), int(sy_arr[ni_d])), w_base)
-
-                    avg_b = (bright[ni] + bright[ni_d]) * 0.5
-                    if avg_b > 0.1:
-                        # Glow line
-                        w_outer = max(1, int((3.5 + high * 1.5) * scale_factor))
-                        pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.15, 0.25)),
-                                         (int(sx_arr[ni]), int(sy_arr[ni])),
-                                         (int(sx_arr[ni_d]), int(sy_arr[ni_d])), w_outer)
-                        # Core line
-                        w_core = max(1, int((1.2 + high * 0.5) * scale_factor))
-                        pygame.draw.line(self._surf, hsl(hue, l=min(avg_b * 0.4, 0.7)),
-                                         (int(sx_arr[ni]), int(sy_arr[ni])),
-                                         (int(sx_arr[ni_d]), int(sy_arr[ni_d])), w_core)
+                    self._draw_beam(ni, ni + n_cols, hue, sx_arr, sy_arr, bright,
+                                    scale_factor, high)
 
         # Draw Nodes
         for ni, nd in enumerate(self._nodes):
@@ -247,7 +232,10 @@ class Lattice(Effect):
                                    (int(sx_arr[ni]), int(sy_arr[ni])), r_core)
 
         if surf.get_size() != self._surf.get_size():
-            scaled = pygame.transform.scale(self._surf, surf.get_size())
-            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+            if self._scaled is None or self._scaled.get_size() != surf.get_size():
+                self._scaled = pygame.transform.scale(self._surf, surf.get_size())
+            else:
+                pygame.transform.scale(self._surf, surf.get_size(), self._scaled)
+            surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
             surf.blit(self._surf, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

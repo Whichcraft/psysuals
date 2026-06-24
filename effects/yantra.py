@@ -41,15 +41,15 @@ class Yantra(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.005
-        
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
         
         self.time += 0.02 + mid * 0.05 + high * 0.03
 
-        cx, cy  = config.WIDTH // 2, config.HEIGHT // 2
-        max_r   = min(config.WIDTH, config.HEIGHT) * 0.46
+        cx, cy  = W // 2, H // 2
+        max_r   = min(W, H) * 0.46
 
         # Construct distinct bands combining different proportions of the 3 detections
         bands = [
@@ -92,7 +92,7 @@ class Yantra(Effect):
                                  hsl(h, l=0.30 + e * 0.20 + mid * 0.10),
                                  (int(ox), int(oy)), (int(ix), int(iy)), 1)
 
-        for i in range(self.N_RINGS - 1, -1, -1):
+        for i in range(self.N_RINGS - 1, -1, -1):  # outermost first so inner rings layer on top
             e     = min(bands[i], 1.0)
             h     = (self.hue + i / self.N_RINGS * 0.55) % 1.0
             bright = 0.52 + e * 0.20 + mid * 0.15

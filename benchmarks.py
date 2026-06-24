@@ -20,67 +20,70 @@ def run_benchmark(duration_s=2.0):
     os.environ['SDL_VIDEODRIVER'] = 'dummy'
     pygame.init()
     W, h = 1920, 1080 # Benchmark at Full HD
+    _old_w, _old_h = config.WIDTH, config.HEIGHT
     config.WIDTH, config.HEIGHT = W, h
     
-    # CPU Target
-    cpu_surf = pygame.Surface((W, h))
-    
-    # GL Target (if available)
-    renderer = None
-    gl_target = None
-    if HAS_MODERNGL:
-        try:
-            pygame.display.set_mode((W, h), pygame.OPENGL | pygame.DOUBLEBUF)
-            renderer = GLRenderer(W, h)
-            gl_target = pygame.Surface((W, h), pygame.SRCALPHA)
-        except Exception as e:
-            print(f"  ⚠️ ModernGL init failed for benchmark: {e}")
-            HAS_MODERNGL = False
+    try:
+        # CPU Target
+        cpu_surf = pygame.Surface((W, h))
 
-    results = []
+        renderer = None
+        gl_target = None
+        if HAS_MODERNGL:
+            try:
+                pygame.display.set_mode((W, h), pygame.OPENGL | pygame.DOUBLEBUF)
+                renderer = GLRenderer(W, h)
+                gl_target = pygame.Surface((W, h), pygame.SRCALPHA)
+            except Exception as e:
+                print(f"  ⚠️ ModernGL init failed for benchmark: {e}")
+                HAS_MODERNGL = False
 
-    for name, VisCls in MODES:
-        print(f"  Benchmarking {name:12}...", end="", flush=True)
-        
-        # CPU Test
-        vis_cpu = VisCls()
-        tick = 0
-        start = time.perf_counter()
-        frames = 0
-        end_time = start + duration_s
-        while time.perf_counter() < end_time:
-            vis_cpu.draw(cpu_surf, waveform, fft, beat, tick)
-            frames += 1
-            tick += 1
-        cpu_fps = frames / (time.perf_counter() - start)
-        
-        # GL Test
-        gl_fps = None
-        if renderer:
-            vis_gl = VisCls(renderer=renderer)
+        results = []
+
+        for name, VisCls in MODES:
+            print(f"  Benchmarking {name:12}...", end="", flush=True)
+
+            # CPU Test
+            vis_cpu = VisCls()
             tick = 0
             start = time.perf_counter()
             frames = 0
             end_time = start + duration_s
             while time.perf_counter() < end_time:
-                vis_gl.draw(gl_target, waveform, fft, beat, tick)
-                renderer.blit(gl_target)
-                gl_target.fill((0, 0, 0, 0))
+                vis_cpu.draw(cpu_surf, waveform, fft, beat, tick)
                 frames += 1
                 tick += 1
-            gl_fps = frames / (time.perf_counter() - start)
-            
-        results.append((name, cpu_fps, gl_fps))
-        print(f" Done. (CPU: {cpu_fps:6.1f} fps" + (f" | GL: {gl_fps:6.1f} fps" if gl_fps else "") + ")")
+            cpu_fps = frames / (time.perf_counter() - start)
 
-    print("\n" + "="*60)
-    print(f"{'Effect':15} | {'CPU FPS':10} | {'GL FPS':10} | {'Speedup':8}")
-    print("-" * 60)
-    for name, cpu, gl in results:
-        speedup = f"{gl/cpu:7.2f}x" if gl else "N/A"
-        gl_str = f"{gl:10.1f}" if gl else "N/A"
-        print(f"{name:15} | {cpu:10.1f} | {gl_str:10} | {speedup}")
-    print("="*60)
+            # GL Test
+            gl_fps = None
+            vis_gl = None
+            if renderer:
+                vis_gl = VisCls(renderer=renderer)
+                tick = 0
+                start = time.perf_counter()
+                frames = 0
+                end_time = start + duration_s
+                while time.perf_counter() < end_time:
+                    vis_gl.draw(gl_target, waveform, fft, beat, tick)
+                    renderer.blit(gl_target)
+                    gl_target.fill((0, 0, 0, 0))
+                    frames += 1
+                    tick += 1
+                gl_fps = frames / (time.perf_counter() - start)
+            if vis_gl is not None and hasattr(vis_gl, "release"):
+                vis_gl.release()
 
-if __name__ == "__main__":
-    run_benchmark()
+            results.append((name, cpu_fps, gl_fps))
+            print(f" Done. (CPU: {cpu_fps:6.1f} fps" + (f" | GL: {gl_fps:6.1f} fps" if gl_fps else "") + ")")
+
+        print("\n" + "="*60)
+        print(f"{'Effect':15} | {'CPU FPS':10} | {'GL FPS':10} | {'Speedup':8}")
+        print("-" * 60)
+        for name, cpu, gl in results:
+            speedup = f"{gl/cpu:7.2f}x" if gl else "N/A"
+            gl_str = f"{gl:10.1f}" if gl else "N/A"
+            print(f"{name:15} | {cpu:10.1f} | {gl_str:10} | {speedup}")
+        print("="*60)
+    finally:
+        config.WIDTH, config.HEIGHT = _old_w, _old_h

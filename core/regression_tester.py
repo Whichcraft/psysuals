@@ -63,6 +63,7 @@ def run_all_tests():
     pygame.init()
     pygame.display.set_mode((1, 1))
     config.WIDTH, config.HEIGHT = 800, 600
+    config._INITIALIZED = True
     
     try:
         test_registry_order()

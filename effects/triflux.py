@@ -1,5 +1,4 @@
 import math
-import random
 
 import numpy as np
 import pygame
@@ -32,28 +31,30 @@ class Attractor(Effect):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.hue        = 0.0
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
         self.tiles      = []
         self.filled_ids = []
         self.active_ids = []
         self._built     = False
+        self._W = self._H = 0
         self._swap_cd   = 0
-        self._auto_cd   = random.randint(180, 300)  # frames until next auto-activation
+        self._auto_cd   = int(self._rng.integers(180, 301))  # frames until next auto-activation
         # Two independent rainbow sweeps so one is nearly always on screen
         # Second starts mid-travel so they're never both off-screen simultaneously
         self._sweeps = [
-            {"pos": 0.0,   "angle": random.uniform(0, math.tau), "vel": 3.2},
-            {"pos": 600.0, "angle": random.uniform(0, math.tau), "vel": 4.1},
+            {"pos": 0.0,   "angle": self._rng.uniform(0, math.tau), "vel": 3.2},
+            {"pos": 600.0, "angle": self._rng.uniform(0, math.tau), "vel": 4.1},
         ]
         self._sweep_width = 90.0         # half-width of each sweep band
         self._sweep_diag  = 0.0          # set on build (screen diagonal)
 
     # ------------------------------------------------------------------
     def _build_grid(self):
-        tw = config.WIDTH  / self.N_COLS
+        tw = self._W / self.N_COLS
         th = tw * math.sqrt(3) / 2
         # Start one tile outside each edge so no clipped triangles appear at borders
         n_cols_ext = self.N_COLS + 2   # one extra column each side
-        n_rows = int(config.HEIGHT / th) + 3  # one extra row each side
+        n_rows = int(self._H / th) + 3  # one extra row each side
         x0 = -tw
         y0 = -th
 
@@ -77,10 +78,11 @@ class Attractor(Effect):
 
         # Seed filled set — allow any tile whose centroid is near the screen
         visible = self._visible_indices()
-        self.filled_ids = random.sample(visible, min(self.N_FILLED, len(visible)))
+        k = min(self.N_FILLED, len(visible))
+        self.filled_ids = list(self._rng.choice(visible, size=k, replace=False))
         self._built = True
         # Screen diagonal for sweep wrap-around
-        self._sweep_diag = math.hypot(config.WIDTH, config.HEIGHT)
+        self._sweep_diag = math.hypot(self._W, self._H)
         # Initialise sweep positions at the true screen edge for each angle
         for idx, sw in enumerate(self._sweeps):
             mn, mx = self._sweep_edge_range(sw["angle"])
@@ -88,7 +90,7 @@ class Attractor(Effect):
 
     def _sweep_edge_range(self, angle):
         """Return (min_proj, max_proj) of screen corners onto sweep direction."""
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = self._W, self._H
         cos_a, sin_a = math.cos(angle), math.sin(angle)
         projs = [x * cos_a + y * sin_a for x, y in ((0,0),(W,0),(0,H),(W,H))]
         return min(projs), max(projs)
@@ -99,9 +101,9 @@ class Attractor(Effect):
         return {
             "verts":   verts,
             "cx": cx,  "cy": cy,
-            "hue":     random.random(),
-            "hvel":    random.uniform(-0.0006, 0.0006),
-            "bright":  random.uniform(0.20, 0.50),
+            "hue":     self._rng.random(),
+            "hvel":    self._rng.uniform(-0.0006, 0.0006),
+            "bright":  self._rng.uniform(0.20, 0.50),
             "rot":     0.0,
             "rot_vel": 0.0,
             "scale":   1.0,
@@ -111,7 +113,7 @@ class Attractor(Effect):
 
     def _visible_indices(self):
         """Tiles whose centroid is within a half-tile margin of the screen."""
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = self._W, self._H
         tw = W / self.N_COLS
         m  = tw
         return [i for i, t in enumerate(self.tiles)
@@ -119,14 +121,14 @@ class Attractor(Effect):
 
     def _interior_indices(self):
         """Tiles whose centroid is comfortably inside the screen (not edge tiles)."""
-        W, H  = config.WIDTH, config.HEIGHT
+        W, H  = self._W, self._H
         tw    = W / self.N_COLS
         margin = tw * 1.5   # stay at least 1.5 tile-widths from each edge
         return [i for i, t in enumerate(self.tiles)
                 if margin <= t["cx"] < W - margin and margin <= t["cy"] < H - margin]
 
     def _any_on_screen(self, tile):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = self._W, self._H
         return any(0 <= vx < W and 0 <= vy < H for vx, vy in tile["verts"])
 
     def _screen_verts(self, tile):
@@ -148,6 +150,10 @@ class Attractor(Effect):
 
     # ------------------------------------------------------------------
     def draw(self, surf, waveform, fft, beat, tick):
+        W, H = surf.get_size()
+        if W != self._W or H != self._H:
+            self._W, self._H = W, H
+            self._built = False
         if not self._built:
             self._build_grid()
 
@@ -159,11 +165,11 @@ class Attractor(Effect):
         # Slowly rotate filled set
         self._swap_cd -= 1
         if self._swap_cd <= 0:
-            self._swap_cd = random.randint(70, 120)
+            self._swap_cd = int(self._rng.integers(70, 121))
             vis       = self._visible_indices()
             candidates = [i for i in vis if i not in self.filled_ids]
             if candidates and self.filled_ids:
-                self.filled_ids[random.randrange(len(self.filled_ids))] = random.choice(candidates)
+                self.filled_ids[self._rng.integers(len(self.filled_ids))] = candidates[self._rng.integers(len(candidates))]
 
         # On bass beat, pop a new interior tile to front (or extend life of existing ones)
         bass_beat = bass > 0.25
@@ -171,11 +177,11 @@ class Attractor(Effect):
             if len(self.active_ids) < self.N_ACTIVE_MAX:
                 candidates = [i for i in self._interior_indices() if i not in self.active_ids]
                 if candidates:
-                    idx = random.choice(candidates)
+                    idx = candidates[self._rng.integers(len(candidates))]
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
-                    t["life"]    = random.randint(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX)
-                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.015, 0.04)
+                    t["life"]    = int(self._rng.integers(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX))
+                    t["rot_vel"] = (-1 if self._rng.random() < 0.5 else 1) * self._rng.uniform(0.015, 0.04)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
                     t["cvx"] = 0.0;         t["cvy"] = 0.0
             else:
@@ -186,27 +192,25 @@ class Attractor(Effect):
         # Periodically auto-activate 1-2 interior tiles regardless of beat
         self._auto_cd -= 1
         if self._auto_cd <= 0:
-            self._auto_cd = random.randint(180, 320)
-            n_new = random.randint(1, 2)
+            self._auto_cd = int(self._rng.integers(180, 321))
+            n_new = int(self._rng.integers(1, 3))
             candidates = [i for i in self._interior_indices() if i not in self.active_ids]
-            random.shuffle(candidates)
+            self._rng.shuffle(candidates)
             for idx in candidates[:n_new]:
                 if len(self.active_ids) < self.N_ACTIVE_MAX:
                     self.active_ids.append(idx)
                     t = self.tiles[idx]
-                    t["life"]    = random.randint(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX)
-                    t["rot_vel"] = random.choice([-1, 1]) * random.uniform(0.012, 0.03)
+                    t["life"]    = int(self._rng.integers(self.ACTIVE_LIFE_MIN, self.ACTIVE_LIFE_MAX))
+                    t["rot_vel"] = (-1 if self._rng.random() < 0.5 else 1) * self._rng.uniform(0.012, 0.03)
                     t["home_cx"] = t["cx"]; t["home_cy"] = t["cy"]
                     t["cvx"] = 0.0;         t["cvy"] = 0.0
-
-        W, H = config.WIDTH, config.HEIGHT
 
         # ── Advance both sweeps (speed scaled by mids) ───────────────────────
         for sw in self._sweeps:
             sw["pos"] += sw["vel"] * (1.0 + mid * 1.5)
             mn, mx = self._sweep_edge_range(sw["angle"])
             if sw["pos"] > mx + self._sweep_width:
-                sw["angle"] = random.uniform(0, math.tau)
+                sw["angle"] = self._rng.uniform(0, math.tau)
                 mn2, _ = self._sweep_edge_range(sw["angle"])
                 sw["pos"] = mn2 - self._sweep_width
 

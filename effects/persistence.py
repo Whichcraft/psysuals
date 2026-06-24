@@ -24,6 +24,7 @@ _MAX_SHAPES = 8
 
 class Persistence(Effect):
     TRAIL_ALPHA = 5   # very long persistence for 3D moiré build-up
+    RES_DIV     = 2
 
     @staticmethod
     def _Rx(a):
@@ -55,6 +56,7 @@ class Persistence(Effect):
         
         self._boost = 0.0
         self._beat_prev = 0.0
+        self._scaled = None
 
         # Build Platonic solid wireframe geometry
         phi = (1.0 + math.sqrt(5.0)) / 2.0
@@ -120,10 +122,14 @@ class Persistence(Effect):
             self._models.append((verts, edges))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = surf.get_size()
+        W, H, RD = self._render_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
+
+        if self._scaled is None or self._scaled.get_size() != (W, H):
+            self._scaled = pygame.Surface((W, H))
+        self._scaled.fill((0, 0, 0))
 
         self._hue = (self._hue + 0.003 + mid * 0.003) % 1.0
         self._boost = max(0.0, self._boost - 0.04)
@@ -188,11 +194,15 @@ class Persistence(Effect):
                 thickness = max(1, int(4 * d_factor))
 
                 # Double-pass drawing for neon/glowing effect
-                pygame.draw.line(surf, glow, p1, p2, thickness + 2)
-                pygame.draw.line(surf, col, p1, p2, thickness)
+                pygame.draw.line(self._scaled, glow, p1, p2, thickness + 2)
+                pygame.draw.line(self._scaled, col, p1, p2, thickness)
 
         # Treble: brief radial flash ring in background
         if high > 0.50:
             flash_r = int(min(W, H) * 0.48 * high)
-            pygame.draw.circle(surf, hsl(self._hue, l=0.15 * high),
+            pygame.draw.circle(self._scaled, hsl(self._hue, l=0.15 * high),
                                (cx, cy), flash_r, 2)
+
+        # Scale up to full resolution
+        scaled = pygame.transform.smoothscale(self._scaled, surf.get_size())
+        surf.blit(scaled, (0, 0))

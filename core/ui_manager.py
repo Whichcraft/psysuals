@@ -15,15 +15,17 @@ class UIManager:
         self._picker_overlay: pygame.Surface | None = None
         self._bar_surf: pygame.Surface | None = None
         self._flash_surf: pygame.Surface | None = None
+        self._hud_bg: pygame.Surface | None = None
 
     def recalculate_fonts(self):
         self._last_width = config.WIDTH
         fs = max(20, min(48, int(config.WIDTH / 80)))
         fs_s = max(16, min(36, int(config.WIDTH / 100)))
         
-        self.font = pygame.font.SysFont("monospace", fs)
-        self.font_s = pygame.font.SysFont("monospace", fs_s)
-        self.font_big = pygame.font.SysFont("monospace", max(72, int(config.WIDTH / 25)), bold=True)
+        families = ["monospace", "Courier New", "DejaVu Sans Mono", "Liberation Mono", "Consolas"]
+        self.font = pygame.font.SysFont(families, fs)
+        self.font_s = pygame.font.SysFont(families, fs_s)
+        self.font_big = pygame.font.SysFont(families, max(72, int(config.WIDTH / 25)), bold=True)
 
     def _check_resize(self):
         if config.WIDTH != self._last_width:
@@ -31,8 +33,8 @@ class UIManager:
 
     def draw_device_picker(self, target: pygame.Surface, devices: list[tuple[int, str]], active_idx: int | None) -> None:
         self._check_resize()
-        if self._picker_overlay is None or self._picker_overlay.get_size() != (config.WIDTH, config.HEIGHT):
-            self._picker_overlay = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
+        if self._picker_overlay is None or self._picker_overlay.get_size() != target.get_size():
+            self._picker_overlay = pygame.Surface(target.get_size(), pygame.SRCALPHA)
             self._picker_overlay.fill((0, 0, 0, 210))
             
         target.blit(self._picker_overlay, (0, 0))
@@ -51,7 +53,7 @@ class UIManager:
 
         row_h = 28
         y0 = 80
-        visible = min(len(devices), (config.HEIGHT - y0 - 20) // row_h)
+        visible = max(0, min(len(devices), (target.get_height() - y0 - 20) // row_h))
         start = max(0, min(self.pick_sel - visible // 2, len(devices) - visible))
 
         for i, (dev_idx, name) in enumerate(devices[start : start + visible]):
@@ -60,7 +62,7 @@ class UIManager:
             is_selected = row == self.pick_sel
             is_active = dev_idx == active_idx
             if is_selected:
-                pygame.draw.rect(target, (40, 80, 140), (30, y - 2, config.WIDTH - 60, row_h - 2))
+                pygame.draw.rect(target, (40, 80, 140), (30, y - 2, max(1, target.get_width() - 60), row_h - 2))
             marker = ">> " if is_active else "   "
             label = f"{marker}{dev_idx:3d}  {name}"
             color = (255, 255, 100) if is_selected else (140, 140, 140)
@@ -69,7 +71,7 @@ class UIManager:
     def draw_pane(self, target: pygame.Surface, effect_gain: float, bg_alpha: int, cf_frames: float) -> None:
         self._check_resize()
         panel_w, panel_h = 240, 160
-        px = config.WIDTH - panel_w - 12
+        px = target.get_width() - panel_w - 12
         py = 50
         # Pane background (could be cached too, but it's small)
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
@@ -125,12 +127,25 @@ class UIManager:
             x = pad_x + i * (bar_w + gap)
             if h > 0:
                 pygame.draw.rect(self._bar_surf, color, (x, pad_y + bar_max - h, bar_w, h))
-        target.blit(self._bar_surf, (6, config.HEIGHT - surf_h - 6))
+        target.blit(self._bar_surf, (6, target.get_height() - surf_h - 6))
+
+    def draw_hud_background(self, target: pygame.Surface, lines: list[pygame.Surface]) -> None:
+        """Draw semi-transparent panel behind HUD text."""
+        if not lines:
+            return
+        max_w = max(line.get_width() for line in lines)
+        spacing = 3
+        total_h = sum(line.get_height() for line in lines) + spacing * (len(lines) - 1)
+        bg_size = (max_w + 16, total_h + 12)
+        if self._hud_bg is None or self._hud_bg.get_size() != bg_size:
+            self._hud_bg = pygame.Surface(bg_size, pygame.SRCALPHA)
+        self._hud_bg.fill((0, 0, 0, 110))
+        target.blit(self._hud_bg, (4, 4))
 
     def draw_tap_flash(self, target: pygame.Surface, tap_bpm: float, alpha: int) -> None:
         self._check_resize()
-        if self._flash_surf is None or self._flash_surf.get_size() != (config.WIDTH, config.HEIGHT):
-            self._flash_surf = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
+        if self._flash_surf is None or self._flash_surf.get_size() != target.get_size():
+            self._flash_surf = pygame.Surface(target.get_size(), pygame.SRCALPHA)
             
         self._flash_surf.fill((255, 255, 255, alpha // 6))
         target.blit(self._flash_surf, (0, 0))
@@ -138,7 +153,7 @@ class UIManager:
         target.blit(
             label,
             (
-                config.WIDTH // 2 - label.get_width() // 2,
-                config.HEIGHT // 2 - label.get_height() // 2,
+                target.get_width() // 2 - label.get_width() // 2,
+                target.get_height() // 2 - label.get_height() // 2,
             ),
         )

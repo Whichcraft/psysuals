@@ -1,12 +1,11 @@
 """Möbius — a 3-D Möbius strip rendered with perspective projection.
 
-The strip is drawn as a wireframe: latitude lines (constant v, varying u)
-and a sparse set of longitude lines.  It rotates slowly in 3-D; beat fires
-a "shiver" that briefly widens the twist.
+The strip is drawn as a wireframe of latitude lines (constant v, varying u).
+It rotates slowly in 3-D; beat fires a "shiver" that briefly widens the twist.
 
   Bass   → rotation speed
   Mid    → roll (tilt) speed
-  Treble → longitude line density
+  Treble → rotation speed contribution
   Beat   → shiver: twist amplitude spike
 """
 import math
@@ -29,7 +28,6 @@ class Mobius(Effect):
         self._ry = 0.0   # rotation around Y
         self._rx = 0.0   # rotation around X
         self._hue    = 0.55
-        self._u_off  = 0.0
         self._shiver = 0.0
         self._beat_prev = 0.0
         # Pre-compute u and v arrays
@@ -67,15 +65,14 @@ class Mobius(Effect):
         return np.stack([x, y, z], axis=1)
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
 
         self._hue   = (self._hue + 0.0012 + mid * 0.002) % 1.0
-        self._ry   += 0.008 + bass * 0.025 + mid * 0.012
+        self._ry   += 0.008 + bass * 0.025 + mid * 0.012 + high * 0.015
         self._rx   += 0.003 + bass * 0.008
-        self._u_off = (self._u_off + 0.006 + high * 0.020) % math.tau
 
         if bass > 0.75 and self._beat_prev <= 0.75:
             self._shiver = 1.0

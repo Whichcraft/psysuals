@@ -3,9 +3,6 @@ import sys
 import pygame
 import os
 
-# Mock display for headless testing
-os.environ['SDL_VIDEODRIVER'] = 'dummy'
-
 def test_imports():
     print("Checking imports...")
     try:
@@ -25,7 +22,7 @@ def test_effects(MODES):
     config.HEIGHT = 600
     
     pygame.init()
-    pygame.display.set_mode((1, 1))
+    pygame.display.set_mode((320, 240))
     
     passed = 0
     failed = 0
@@ -43,6 +40,7 @@ def test_effects(MODES):
         sys.exit(1)
 
 def run_smoke_tests():
+    os.environ['SDL_VIDEODRIVER'] = 'dummy'
     modes = test_imports()
     test_effects(modes)
     

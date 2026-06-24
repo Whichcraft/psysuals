@@ -81,10 +81,11 @@ class Magnetar(Effect):
 
         r2  = rx * rx + ry * ry + 0.04
         r   = np.sqrt(r2)
+        r3  = r2 * r + 0.1
         dot = rx * mx + ry * my
         # Dipole field B ∝ (3(m·r̂)r̂ − m) / r³
-        bx  = (3.0 * dot * rx / r2 - mx) / (r2 * r + 0.1)
-        by_ = (3.0 * dot * ry / r2 - my) / (r2 * r + 0.1)
+        bx  = (3.0 * dot * rx / r2 - mx) / r3
+        by_ = (3.0 * dot * ry / r2 - my) / r3
 
         bmag = np.sqrt(bx * bx + by_ * by_) + 1e-6
         spd  = 1.2 + bass * 1.8 + self._boost * 0.5
@@ -108,9 +109,7 @@ class Magnetar(Effect):
         # Colour by angle to dipole axis
         ang_to_axis = (np.arctan2(ry, rx) - self._rot) / math.tau
         h_arr       = ((self._hue + ang_to_axis) % 1.0).astype(np.float32)
-        bright      = np.full(self._n, 0.35 + bass * 0.25 + high * 0.12,
-                              dtype=np.float32)
-        rgb    = _hsl_batch(h_arr, bright)
+        rgb    = _hsl_batch(h_arr, l=0.35 + bass * 0.25 + high * 0.12)
         colors = (rgb[:, 0].astype(np.uint32) << 16
                   | rgb[:, 1].astype(np.uint32) << 8
                   | rgb[:, 2].astype(np.uint32))

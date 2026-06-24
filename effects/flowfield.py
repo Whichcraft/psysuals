@@ -33,13 +33,19 @@ class FlowField(Effect):
         self._hue = random.random()
         self._t = 0.0
         self._boost = 0.0
+        self._angles = np.empty(self._n, dtype=np.float32)
+        self._ir = np.empty(self._n, dtype=np.uint32)
+        self._ig = np.empty(self._n, dtype=np.uint32)
+        self._ib = np.empty(self._n, dtype=np.uint32)
+        self._colors_arr = np.empty(self._n, dtype=np.uint32)
         # Internal trail is always 24-bit for BLEND_RGB_MULT speed
         self._trail = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
 
     def _field_angles(self, bass):
         x, y, t = self._px, self._py, self._t
-        a = np.zeros(self._n, dtype=np.float32)
+        a = self._angles
+        a[:] = 0.0
         for i in range(_LAYERS):
             f = 1.6 ** i
             a += (np.sin(x * _FS * f + t * (0.29 + i * 0.08)) *
@@ -57,8 +63,9 @@ class FlowField(Effect):
                 self._n = max(4000, self._n // 2)
             self._px = np.random.uniform(0, W, self._n).astype(np.float32)
             self._py = np.random.uniform(0, H, self._n).astype(np.float32)
-        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
-            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
+        sw, sh = surf.get_size()
+        if self._scaled.get_width() != sw or self._scaled.get_height() != sh:
+            self._scaled = pygame.Surface((sw, sh))
 
         bass = beat
         mid  = config.MID_ENERGY
@@ -95,10 +102,12 @@ class FlowField(Effect):
 
         # Fast color calc
         hx = (self._hue + self._px / W * 0.30) % 1.0
-        ir = (np.sin(hx * math.tau) * 127 + 128).astype(np.uint32)
-        ig = (np.sin((hx + 0.33) * math.tau) * 127 + 128).astype(np.uint32)
-        ib = (np.sin((hx + 0.66) * math.tau) * 127 + 128).astype(np.uint32)
-        colors = (ir << 16) | (ig << 8) | ib
+        self._ir[:] = (np.sin(hx * math.tau) * 127 + 128).astype(np.uint32)
+        self._ig[:] = (np.sin((hx + 0.33) * math.tau) * 127 + 128).astype(np.uint32)
+        self._ib[:] = (np.sin((hx + 0.66) * math.tau) * 127 + 128).astype(np.uint32)
+        np.bitwise_or(self._ir << 16, self._ig << 8, out=self._colors_arr)
+        np.bitwise_or(self._colors_arr, self._ib, out=self._colors_arr)
+        colors = self._colors_arr
 
         ix = np.clip(self._px.astype(np.int32), 0, W - 1)
         iy = np.clip(self._py.astype(np.int32), 0, H - 1)

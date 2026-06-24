@@ -1,5 +1,4 @@
 import math
-import random
 
 import numpy as np
 import pygame
@@ -28,18 +27,25 @@ class Corridor(Effect):
     Z_NEAR   = 0.06
     WORLD_H  = 2.0
     ASPECT   = 1.65
+    _MAX_SPARKS = 100
 
     TRAIL_ALPHA    = 255   # psysualizer clears surf to black; we manage trails
+    RES_DIV        = 2
     _CORRIDOR_FADE = 28
     _SPARK_FADE    = 10    # slower fade → longer spark trails
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng  = np.random.default_rng(config.RNG_SEED or None)
         self.hue    = 0.0
         self.time   = 0.0
         spacing     = (self.Z_FAR - self.Z_NEAR) / self.N_FRAMES
         self.frames = [{"z": self.Z_NEAR + i * spacing} for i in range(self.N_FRAMES)]
-        self.sparks = []
+        self._spark_count = 0
+        self._sz    = np.empty(self._MAX_SPARKS, dtype=np.float32)
+        self._shue  = np.empty(self._MAX_SPARKS, dtype=np.float32)
+        self._sox   = np.empty(self._MAX_SPARKS, dtype=np.float32)
+        self._soy   = np.empty(self._MAX_SPARKS, dtype=np.float32)
         self.corridor_surf = None
         self.spark_surf    = None
         self._cfade        = None
@@ -49,16 +55,22 @@ class Corridor(Effect):
         scale = 1.0 + mid * 0.50
         return (math.sin(t * 0.19) * 0.5 * scale, math.cos(t * 0.14) * 0.35 * scale)
 
-    def _init_surfs(self):
-        W, H = config.WIDTH, config.HEIGHT
-        self.corridor_surf = pygame.Surface((W, H), pygame.SRCALPHA); self.corridor_surf.fill((0, 0, 0, 255))
-        self.spark_surf    = pygame.Surface((W, H), pygame.SRCALPHA); self.spark_surf.fill((0, 0, 0, 255))
-        self._cfade = pygame.Surface((W, H)); self._cfade.set_alpha(self._CORRIDOR_FADE); self._cfade.fill((0, 0, 0))
-        self._sfade = pygame.Surface((W, H)); self._sfade.set_alpha(self._SPARK_FADE);    self._sfade.fill((0, 0, 0))
+    def _init_surfs(self, W, H):
+        self.corridor_surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        self.corridor_surf.fill((0, 0, 0, 255))
+        self.spark_surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        self.spark_surf.fill((0, 0, 0, 255))
+        self._cfade = pygame.Surface((W, H))
+        self._cfade.set_alpha(self._CORRIDOR_FADE)
+        self._cfade.fill((0, 0, 0))
+        self._sfade = pygame.Surface((W, H))
+        self._sfade.set_alpha(self._SPARK_FADE)
+        self._sfade.fill((0, 0, 0))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        if self.corridor_surf is None:
-            self._init_surfs()
+        W, H = surf.get_size()
+        if self.corridor_surf is None or self.corridor_surf.get_size() != (W, H):
+            self._init_surfs(W, H)
 
         self.hue  += 0.005
         bass       = beat
@@ -68,31 +80,36 @@ class Corridor(Effect):
         dt         = 0.028 + bass * 0.08 + mid * 0.06 + high * 0.04
         self.time += dt
 
-        fov = min(config.WIDTH, config.HEIGHT) * 0.72
+        fov = min(W, H) * 0.72
 
         # Spawn rate is driven heavily by treble transients (sparkles) and bass
         spawn_n = int(bass * 4.0 + high * 6.0)
-        for _ in range(spawn_n):
-            z = self.Z_FAR * (0.55 + random.random() * 0.37)
-            self.sparks.append({
-                "z":   z,
-                "hue": (self.hue + random.uniform(0, 0.6)) % 1.0,
-                "ox":  random.uniform(-(self.WORLD_H * self.ASPECT) * 0.85,
-                                       (self.WORLD_H * self.ASPECT) * 0.85),
-                "oy":  random.uniform(-self.WORLD_H * 0.85, self.WORLD_H * 0.85),
-            })
+        for _ in range(min(spawn_n, self._MAX_SPARKS - self._spark_count)):
+            i = self._spark_count
+            self._sz[i]   = self.Z_FAR * (0.55 + float(self._rng.random()) * 0.37)
+            self._shue[i] = (self.hue + float(self._rng.uniform(0, 0.6))) % 1.0
+            self._sox[i]  = float(self._rng.uniform(-(self.WORLD_H * self.ASPECT) * 0.85,
+                                                     (self.WORLD_H * self.ASPECT) * 0.85))
+            self._soy[i]  = float(self._rng.uniform(-self.WORLD_H * 0.85, self.WORLD_H * 0.85))
+            self._spark_count += 1
 
         for f in self.frames:
             f["z"] -= dt
             if f["z"] < self.Z_NEAR:
                 f["z"] += self.Z_FAR
 
-        live = []
-        for sp in self.sparks:
-            sp["z"] -= dt
-            if sp["z"] >= self.Z_NEAR:
-                live.append(sp)
-        self.sparks = live[-100:]
+        # Update + compact sparks in-place (struct-of-arrays)
+        new_n = 0
+        for i in range(self._spark_count):
+            self._sz[i] -= dt
+            if self._sz[i] >= self.Z_NEAR:
+                if new_n != i:
+                    self._sz[new_n]   = self._sz[i]
+                    self._shue[new_n] = self._shue[i]
+                    self._sox[new_n]  = self._sox[i]
+                    self._soy[new_n]  = self._soy[i]
+                new_n += 1
+        self._spark_count = new_n
 
         # ── Fade both layers ─────────────────────────────────────────────────
         self.corridor_surf.blit(self._cfade, (0, 0))
@@ -103,8 +120,8 @@ class Corridor(Effect):
             z      = max(f["z"], 0.01)
             near_t = max(0.0, 1.0 - z / self.Z_FAR)
             pcx, pcy = self._path(self.time - z * 0.5, mid=mid)
-            cx_s   = int(pcx * fov / z + config.WIDTH  / 2)
-            cy_s   = int(pcy * fov / z + config.HEIGHT / 2)
+            cx_s   = int(pcx * fov / z + W / 2)
+            cy_s   = int(pcy * fov / z + H / 2)
 
             h      = (self.hue + near_t) % 1.0
             bright = 0.06 + near_t * 0.70 + mid * 0.15 * near_t + bass * near_t * 0.50
@@ -125,15 +142,15 @@ class Corridor(Effect):
             pygame.draw.rect(self.corridor_surf, hsl(h, l=bright),        rect, lw,     border_radius=radius)
 
         # ── Draw sparks onto spark_surf ──────────────────────────────────────
-        for sp in self.sparks:
-            z      = max(sp["z"], 0.01)
+        for i in range(self._spark_count):
+            z      = max(self._sz[i], 0.01)
             near_t = max(0.0, 1.0 - z / self.Z_FAR)
             pcx, pcy = self._path(self.time - z * 0.5, mid=mid)
-            sx     = int((pcx + sp["ox"]) * fov / z + config.WIDTH  / 2)
-            sy     = int((pcy + sp["oy"]) * fov / z + config.HEIGHT / 2)
+            sx     = int((pcx + self._sox[i]) * fov / z + W / 2)
+            sy     = int((pcy + self._soy[i]) * fov / z + H / 2)
             # Spark size scales with treble transients
             r      = max(2, int((fov / z * 0.05) * (1.0 + high * 1.5)))
-            h      = (sp["hue"] + near_t * 0.35) % 1.0
+            h      = (self._shue[i] + near_t * 0.35) % 1.0
             bright = 0.35 + near_t * 0.60 + high * 0.25
             pygame.draw.circle(self.spark_surf, hsl(h, l=bright * 0.25), (sx, sy), r + 4)
             pygame.draw.circle(self.spark_surf, hsl(h, l=bright),         (sx, sy), max(1, r))

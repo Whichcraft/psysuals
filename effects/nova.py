@@ -31,6 +31,7 @@ class Nova(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.007
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -39,8 +40,8 @@ class Nova(Effect):
         
         bands = [bass, mid, high, (bass + mid + high) / 3.0]
 
-        cx, cy = config.WIDTH // 2, config.HEIGHT // 2
-        max_r  = min(config.WIDTH, config.HEIGHT) * 0.44
+        cx, cy = W // 2, H // 2
+        max_r  = min(W, H) * 0.44
 
         for i in range(self.N_LAYERS):
             e = min(bands[i], 1.0)
@@ -67,12 +68,14 @@ class Nova(Effect):
                 w_slice   = wave if sym % 2 == 0 else wave[::-1]
                 angle_off = sym * sector + self.rot[i]
                 n_w   = len(w_slice)
+                if n_w == 0:
+                    continue
                 j_arr = np.arange(n_w, dtype=float)
                 theta = j_arr / n_w * sector + angle_off
                 r_pts = np.maximum(2.0, base_r + r_off + w_slice.astype(float) * amp)
                 xs    = np.round(cx + np.cos(theta) * r_pts).astype(int)
                 ys    = np.round(cy + np.sin(theta) * r_pts).astype(int)
-                pts   = list(zip(xs.tolist(), ys.tolist()))
+                pts   = np.column_stack([xs, ys])
                 if len(pts) > 1:
                     pygame.draw.lines(surf, hsl(h, l=bright), False, pts, lw)
 

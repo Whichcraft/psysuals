@@ -39,6 +39,7 @@ class Lissajous(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.006
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -89,12 +90,12 @@ class Lissajous(Effect):
         z2   = py_a * sx_r + pz_a * cx_r
         x3   = px_a * cy_r + z2 * sy_r
         z3   = -px_a * sy_r + z2 * cy_r
-        fov_l  = min(config.WIDTH, config.HEIGHT) * 0.52
+        fov_l  = min(W, H) * 0.52
         zcam   = np.maximum(z3 + 2.8, 0.05)
         raw_x  = x3 * fov_l / zcam
         raw_y  = y2 * fov_l / zcam
 
-        cx, cy = config.WIDTH // 2, config.HEIGHT // 2
+        cx, cy = W // 2, H // 2
 
         # Treble brightens the glow: hi-hat energy makes the knot shimmer whiter
         l1_bright = min(0.90 + clamped_beat * 0.08 + high * 0.14, 0.98)
@@ -104,27 +105,30 @@ class Lissajous(Effect):
         t_arr = np.arange(n, dtype=float) / n
         lw_base = (t_arr * 4).astype(int)
 
+        sym_ca_sa = [(math.cos(sym / self.N_SYM * math.tau),
+                      math.sin(sym / self.N_SYM * math.tau))
+                     for sym in range(self.N_SYM)]
         for sym in range(self.N_SYM):
-            a      = sym / self.N_SYM * math.tau
-            ca, sa = math.cos(a), math.sin(a)
+            ca, sa = sym_ca_sa[sym]
             sx_arr = np.round(cx + raw_x * ca - raw_y * sa).astype(int)
             sy_arr = np.round(cy + raw_x * sa + raw_y * ca).astype(int)
-            pts    = list(zip(sx_arr.tolist(), sy_arr.tolist()))
+
+            h_arr = (self.hue + sym / self.N_SYM * 0.33 + t_arr * 0.55) % 1.0
 
             for lw_mul, l0, l1 in PASSES:
-                h_arr  = (self.hue + sym / self.N_SYM * 0.33 + t_arr * 0.55) % 1.0
                 l_arr  = l0 + t_arr * (l1 - l0)
-                colors = _hsl_batch(h_arr, l_arr)
+                colors = _hsl_batch(h_arr, l=l_arr)
                 lw_arr = np.maximum(1, lw_base * lw_mul)
                 for j in range(1, n):
                     pygame.draw.line(surf,
-                                     (int(colors[j, 0]), int(colors[j, 1]), int(colors[j, 2])),
-                                     pts[j - 1], pts[j], int(lw_arr[j]))
+                                     tuple(colors[j].astype(int)),
+                                     (int(sx_arr[j - 1]), int(sy_arr[j - 1])),
+                                     (int(sx_arr[j]), int(sy_arr[j])),
+                                     int(lw_arr[j]))
 
         hx, hy = raw_x[-1], raw_y[-1]
         for sym in range(self.N_SYM):
-            a      = sym / self.N_SYM * math.tau
-            ca, sa = math.cos(a), math.sin(a)
+            ca, sa = sym_ca_sa[sym]
             sx     = int(cx + hx * ca - hy * sa)
             sy_    = int(cy + hx * sa + hy * ca)
             r      = max(3, int(7 + clamped_beat * 5.0 + high * 3.0))

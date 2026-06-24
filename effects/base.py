@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import numpy as np
 import pygame
 import config
@@ -14,8 +16,12 @@ class Effect:
     # Set to True if the effect renders directly to the GL backbuffer
     IS_GL = False
 
+    # Cache for display info, invalidated when config dimensions change
+    _cached_info: ClassVar[tuple[int, int, pygame.Surface | None]] = (0, 0, None)
+
     def __init__(self, renderer=None, **kwargs):
         """One-time setup. Stores optional GLRenderer."""
+        config.assert_initialized()
         self.renderer = renderer
 
     def _auto_res_div(self) -> int:
@@ -26,12 +32,16 @@ class Effect:
         """
         w = max(1, config.WIDTH)
         h = max(1, config.HEIGHT)
-        try:
-            info = pygame.display.Info()
-            w = max(w, int(getattr(info, "current_w", 0) or 0))
-            h = max(h, int(getattr(info, "current_h", 0) or 0))
-        except Exception:
-            pass
+        cached_w, cached_h, cached_info = self._cached_info
+        if w != cached_w or h != cached_h or cached_info is None:
+            try:
+                cached_info = pygame.display.Info()
+            except Exception:
+                cached_info = None
+            self._cached_info = (w, h, cached_info)
+        if cached_info is not None:
+            w = max(w, int(getattr(cached_info, "current_w", 0) or 0))
+            h = max(h, int(getattr(cached_info, "current_h", 0) or 0))
 
         area = w * h
         if w >= 3200 or h >= 1800 or area >= 5_500_000:

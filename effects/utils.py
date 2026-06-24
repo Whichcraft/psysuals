@@ -7,7 +7,7 @@ def hsl(h, s=1.0, l=0.5):
     return (int(r * 255), int(g * 255), int(b * 255))
 
 
-def _hsl_batch(h, l, s=1.0):
+def _hsl_batch(h, s=np.float32(1.0), l=0.5):
     """Vectorised HSL→RGB for numpy arrays; returns uint8 array of shape (..., 3)."""
     h  = np.asarray(h, dtype=float) % 1.0
     l  = np.clip(np.asarray(l, dtype=float), 0.0, 1.0)

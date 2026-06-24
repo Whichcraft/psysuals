@@ -21,12 +21,13 @@ class Bars(Effect):
         self.display = np.zeros(self.n)
 
     def draw(self, surf, waveform, fft, beat, tick):
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
 
         self.hue += 0.003 + mid * 0.005
-        bar_w   = config.WIDTH // self.n
+        bar_w   = W // self.n
         sums    = np.add.reduceat(fft[:self.edges[-1]], self.edges[:-1])
         heights = sums / np.maximum(np.diff(self.edges), 1).astype(float)
         heights = heights[:self.n]
@@ -36,20 +37,22 @@ class Bars(Effect):
         self.peaks = np.maximum(self.peaks * 0.94, self.display)
 
         for i, h in enumerate(self.display):
-            bar_h = int(h * config.HEIGHT * 0.82)
-            peak  = int(self.peaks[i] * config.HEIGHT * 0.82)
+            bar_h = int(h * H * 0.82)
+            peak  = int(self.peaks[i] * H * 0.82)
             x     = i * bar_w
             hue   = (self.hue + i / self.n) % 1.0
+            bw = max(1, bar_w - 2)
             pygame.draw.rect(surf, hsl(hue, l=0.38 + h * 0.42),
-                             (x, config.HEIGHT - bar_h, bar_w - 2, bar_h))
-            pygame.draw.rect(surf, hsl(hue, l=0.9),
-                             (x, config.HEIGHT - peak - 3, bar_w - 2, 3))
+                             (x, H - bar_h, bw, bar_h))
+            if bar_h > 0:
+                pygame.draw.rect(surf, hsl(hue, l=0.9),
+                                 (x, H - peak - 3, bw, 3))
 
         # Waveform amplitude and thickness react to treble transients
-        step = max(1, len(waveform) // config.WIDTH)
+        step = max(1, len(waveform) // W)
         amp  = 120 + high * 120
-        pts  = [(int(i * config.WIDTH / (len(waveform) // step)),
-                 int(config.HEIGHT // 2 + waveform[i * step] * amp))
+        pts  = [(int(i * W / (len(waveform) // step)),
+                 int(H // 2 + waveform[i * step] * amp))
                 for i in range(len(waveform) // step)]
         if len(pts) > 1:
             lw = max(1, int(2 + high * 3))

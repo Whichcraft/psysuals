@@ -140,18 +140,15 @@ class PlasmaGL(Effect):
         self._time     = 0.0
         self._prog     = None   # compiled lazily on first draw
         self._vao      = None
-        self._fbo_cache: dict = {}  # (w,h) → Framebuffer, for draw_frame reuse
+        self._fbo_cache: dict = {}  # (w,h) → Framebuffer, for draw_frame reuse (max 8)
 
-        # CPU fallback grids — built only when pygame is available
-        if HAS_PYGAME:
-            rw = max(1, config.WIDTH  // 4)
-            rh = max(1, config.HEIGHT // 4)
-            self._fallback_surf = pygame.Surface((rw, rh))
-            xs = np.linspace(-math.pi * 2.5, math.pi * 2.5, rw)
-            ys = np.linspace(-math.pi * 2.5, math.pi * 2.5, rh)
-            X, Y = np.meshgrid(xs, ys)
-            self._X = X; self._Y = Y
-            self._R = np.sqrt(X ** 2 + Y ** 2)
+        # CPU fallback grids — built lazily on first draw
+        self._fallback_surf = None
+        self._X = None
+        self._Y = None
+        self._R = None
+        self._fb_w = 0
+        self._fb_h = 0
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
@@ -198,8 +195,24 @@ class PlasmaGL(Effect):
 
     # ── CPU numpy fallback ────────────────────────────────────────────────────
 
+    def _ensure_fallback(self, w: int, h: int):
+        if self._fallback_surf is not None and self._fb_w == w and self._fb_h == h:
+            return
+        self._fb_w, self._fb_h = w, h
+        div = self._render_div()
+        rw = max(1, w // div)
+        rh = max(1, h // div)
+        self._fallback_surf = pygame.Surface((rw, rh))
+        xs = np.linspace(-math.pi * 2.5, math.pi * 2.5, rw)
+        ys = np.linspace(-math.pi * 2.5, math.pi * 2.5, rh)
+        X, Y = np.meshgrid(xs, ys)
+        self._X = X; self._Y = Y
+        self._R = np.sqrt(X ** 2 + Y ** 2)
+
     def _draw_numpy(self, surf, bass: float, mid: float,
                     high: float, beat: float) -> None:
+        w, h = surf.get_size()
+        self._ensure_fallback(w, h)
         fm = 1.0 + mid * 0.7
         t  = self._time
         v  = (np.sin(self._X * fm              +  t       ) +
