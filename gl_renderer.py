@@ -49,6 +49,7 @@ class GLRenderer:
         self._feedback_prog: moderngl.Program | None = None
         self._feedback_vao: moderngl.VertexArray | None = None
         self._offscreen_cache: dict[tuple[int, int], tuple[moderngl.Texture, moderngl.Framebuffer]] = {}
+        self._upload_buf: np.ndarray | None = None
 
     # ── Shader helpers ────────────────────────────────────────────────────────
 
@@ -152,51 +153,61 @@ class GLRenderer:
         """
         target = fbo if fbo is not None else self.ctx.screen
         target.use()
-        if fbo is None:
+        if fbo is not None:
+            self.ctx.viewport = (0, 0, fbo.width, fbo.height)
+        else:
             self.ctx.viewport = (0, 0, self.width, self.height)
         # self.ctx.clear(0.0, 0.0, 0.0, 1.0) # Removed clear to allow layering
         vao.render(moderngl.TRIANGLE_STRIP)
+
+    def _upload_surface(self, surface: "pygame.Surface", tex: "moderngl.Texture | None") -> "moderngl.Texture":
+        size = surface.get_size()
+        if tex is None or tex.size != size:
+            if tex:
+                tex.release()
+            tex = self.ctx.texture(size, 4)
+            self._upload_buf = np.empty(size[0] * size[1] * 4, dtype=np.uint8)
+
+        w, h = size
+        has_alpha = bool(surface.get_flags() & pygame.SRCALPHA)
+        buf = self._upload_buf.reshape(h, w, 4)
+
+        rgb = pygame.surfarray.pixels3d(surface)
+        try:
+            buf[:, :, :3] = np.transpose(rgb, (1, 0, 2))
+            if has_alpha:
+                alpha = pygame.surfarray.pixels_alpha(surface)
+                try:
+                    buf[:, :, 3] = np.transpose(alpha)
+                finally:
+                    del alpha
+            else:
+                buf[:, :, 3] = 255
+        finally:
+            del rgb
+
+        tex.write(self._upload_buf)
+        tex.use(0)
+        return tex
 
     def blit(self, surface: "pygame.Surface") -> None:
         """Upload *surface* to a texture and render it as a fullscreen quad."""
         if self._blit_prog is None:
             self._blit_prog, self._blit_vao = self.blit_program()
-        
-        size = surface.get_size()
-        if self._blit_tex is None or self._blit_tex.size != size:
-            if self._blit_tex:
-                self._blit_tex.release()
-            self._blit_tex = self.ctx.texture(size, 4)
-            
-        if hasattr(pygame.image, "to_string"):
-            rgba = pygame.image.to_string(surface, "RGBA")
-        else:
-            rgba = pygame.image.tostring(surface, "RGBA")
-        self._blit_tex.write(rgba)
-        self._blit_tex.use(0)
+
+        self._blit_tex = self._upload_surface(surface, self._blit_tex)
         self._blit_prog["u_tex"] = 0
-        
+
         self.ctx.enable(moderngl.BLEND)
         self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
         self.render(self._blit_vao)
 
     def surface_texture(self, surface: "pygame.Surface") -> "moderngl.Texture":
         """Upload a pygame surface to a reusable texture."""
-        size = surface.get_size()
-        if self._feedback_tex is None or self._feedback_tex.size != size:
-            if self._feedback_tex:
-                self._feedback_tex.release()
-            self._feedback_tex = self.ctx.texture(size, 4)
-            self._feedback_tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
-            self._feedback_tex.repeat_x = False
-            self._feedback_tex.repeat_y = False
-
-        if hasattr(pygame.image, "to_string"):
-            rgba = pygame.image.to_string(surface, "RGBA")
-        else:
-            rgba = pygame.image.tostring(surface, "RGBA")
-        self._feedback_tex.write(rgba)
-        self._feedback_tex.use(0)
+        self._feedback_tex = self._upload_surface(surface, self._feedback_tex)
+        self._feedback_tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        self._feedback_tex.repeat_x = False
+        self._feedback_tex.repeat_y = False
         return self._feedback_tex
 
     def feedback_transform(self, surface: "pygame.Surface", fbo, zoom: float, rot: float) -> None:
@@ -219,20 +230,28 @@ class GLRenderer:
         """Release all GL resources."""
         if self._blit_tex:
             self._blit_tex.release()
+            self._blit_tex = None
         if self._feedback_tex:
             self._feedback_tex.release()
+            self._feedback_tex = None
         self._vbo.release()
+        self._vbo = None
         for prog, vao in list(self._program_cache.values()):
             vao.release()
             prog.release()
+        self._program_cache.clear()
         if self._blit_vao:
             self._blit_vao.release()
+            self._blit_vao = None
         if self._blit_prog:
             self._blit_prog.release()
+            self._blit_prog = None
         if self._feedback_vao:
             self._feedback_vao.release()
+            self._feedback_vao = None
         if self._feedback_prog:
             self._feedback_prog.release()
+            self._feedback_prog = None
         for tex, fbo in self._offscreen_cache.values():
             fbo.release()
             tex.release()
@@ -241,11 +260,16 @@ class GLRenderer:
     # ── Offscreen / Android ───────────────────────────────────────────────────
 
     def offscreen(self, width: int = 0, height: int = 0) -> "moderngl.Framebuffer":
-        """Return a cached RGBA framebuffer for the requested size."""
+        """Return a cached RGBA framebuffer for the requested size (max 8)."""
         w = width  or self.width
         h = height or self.height
         key = (w, h)
         if key not in self._offscreen_cache:
+            if len(self._offscreen_cache) >= 8:
+                old_key = next(iter(self._offscreen_cache))
+                old_tex, old_fbo = self._offscreen_cache.pop(old_key)
+                old_tex.release()
+                old_fbo.release()
             tex = self.ctx.texture((w, h), 4)
             fbo = self.ctx.framebuffer(color_attachments=[tex])
             self._offscreen_cache[key] = (tex, fbo)

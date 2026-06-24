@@ -12,7 +12,6 @@ preserved correctly on Android / OpenGL backends where the display
 backbuffer is not guaranteed between frames.
 """
 import math
-import random
 
 import numpy as np
 import pygame
@@ -53,28 +52,28 @@ def _wing_poly(x, y, heading, side, upper, flap, scale):
 # ── Single butterfly ──────────────────────────────────────────────────────────
 
 class _Butterfly:
-    def __init__(self, x, y, hue, scale=4.0):
+    def __init__(self, x, y, hue, rng, scale=4.0):
         self.x           = float(x)
         self.y           = float(y)
-        self.heading     = random.uniform(0, math.tau)
-        self.wing_phase  = random.uniform(0, math.tau)
+        self.heading     = float(rng.uniform(0, math.tau))
+        self.wing_phase  = float(rng.uniform(0, math.tau))
+        self._rng        = rng
         self.hue         = hue
         self.scale       = scale
         self._wander_des = self.heading
         self._wander_cd  = 0
         self._depart_ang = None
 
-    @property
-    def off_screen(self):
+    def off_screen(self, W, H):
         m = 80 * self.scale
-        return (self.x < -m or self.x > config.WIDTH  + m or
-                self.y < -m or self.y > config.HEIGHT + m)
+        return (self.x < -m or self.x > W + m or
+                self.y < -m or self.y > H + m)
 
     def start_depart(self):
         if self._depart_ang is None:
-            self._depart_ang = random.uniform(0, math.tau)
+            self._depart_ang = float(self._rng.uniform(0, math.tau))
 
-    def update(self, bass, beat, t, chase_pos=None):
+    def update(self, bass, beat, t, W, H, chase_pos=None):
         """Update position and wing phase.
 
         chase_pos: if set, the butterfly steers toward this (x, y) target
@@ -95,22 +94,22 @@ class _Butterfly:
             self._wander_cd -= 1
             if self._wander_cd <= 0:
                 self._wander_des = (self.heading
-                                    + random.uniform(-math.pi * 0.6, math.pi * 0.6))
-                self._wander_cd = random.randint(60, 180)
+                                    + float(self._rng.uniform(-math.pi * 0.6, math.pi * 0.6)))
+                self._wander_cd = int(self._rng.integers(60, 180))
             desired = self._wander_des
 
         # ── Boundary repulsion ────────────────────────────────────────────────
-        m = min(int(50 * self.scale), config.WIDTH // 5, config.HEIGHT // 5)
+        m = min(int(50 * self.scale), W // 5, H // 5)
         rx, ry = 0.0, 0.0
         if m > 0:
             if self.x < m:
                 rx = (m - self.x) / m
-            elif self.x > config.WIDTH - m:
-                rx = (config.WIDTH - m - self.x) / m
+            elif self.x > W - m:
+                rx = (W - m - self.x) / m
             if self.y < m:
                 ry = (m - self.y) / m
-            elif self.y > config.HEIGHT - m:
-                ry = (config.HEIGHT - m - self.y) / m
+            elif self.y > H - m:
+                ry = (H - m - self.y) / m
 
         if rx or ry:
             push = self.scale * max(abs(rx), abs(ry)) * 2.5
@@ -120,7 +119,7 @@ class _Butterfly:
             diff = (desired - self.heading + math.pi) % math.tau - math.pi
             self.heading += max(-0.35, min(0.35, diff * 0.50))
             self._wander_des = desired
-            self._wander_cd  = random.randint(60, 180)
+            self._wander_cd  = int(self._rng.integers(60, 180))
         else:
             diff = (desired - self.heading + math.pi) % math.tau - math.pi
             self.heading += max(-0.10, min(0.10, diff * 0.14))
@@ -130,8 +129,8 @@ class _Butterfly:
         self.y += math.sin(self.heading) * spd
 
         cl = int(28 * self.scale)
-        self.x = max(float(cl), min(float(config.WIDTH  - cl), self.x))
-        self.y = max(float(cl), min(float(config.HEIGHT - cl), self.y))
+        self.x = max(float(cl), min(float(W - cl), self.x))
+        self.y = max(float(cl), min(float(H - cl), self.y))
 
     def draw(self, surf, outline_col=None):
         flap     = math.sin(self.wing_phase) * 0.5 + 0.5
@@ -157,24 +156,18 @@ class _Butterfly:
         lw = max(1, int(2 * self.scale))
         pygame.draw.line(surf, body_col, (hx, hy), (tx, ty), lw)
 
-        # Skip antennas for better FPS
-        # for s in (-1, 1):
-        #     a_ang = self.heading + s * 0.38
-        #     aex = int(hx + math.cos(a_ang) * 9 * self.scale)
-        #     aey = int(hy + math.sin(a_ang) * 9 * self.scale)
-        #     pygame.draw.line(surf, body_col, (hx, hy), (aex, aey), 1)
 
 
 # ── Pair ──────────────────────────────────────────────────────────────────────
 
-def _edge_spawn():
+def _edge_spawn(W, H, rng):
     """Return a position just inside one screen edge."""
     m = 60
-    edge = random.choice("LRTB")
-    if edge == "L":  return float(m), random.uniform(m, config.HEIGHT - m)
-    if edge == "R":  return float(config.WIDTH - m), random.uniform(m, config.HEIGHT - m)
-    if edge == "T":  return random.uniform(m, config.WIDTH - m), float(m)
-    return random.uniform(m, config.WIDTH - m), float(config.HEIGHT - m)
+    edge = int(rng.integers(0, 4))
+    if edge == 0:  return float(m), float(rng.uniform(m, H - m))
+    if edge == 1:  return float(W - m), float(rng.uniform(m, H - m))
+    if edge == 2:  return float(rng.uniform(m, W - m)), float(m)
+    return float(rng.uniform(m, W - m)), float(H - m)
 
 
 # Scale is 70 % of the original 7.2 / 6.84
@@ -191,35 +184,35 @@ class _Pair:
     spiral pursuit that eventually settles into a tight mutual orbit.
     """
 
-    def __init__(self, hue, spawn_delay=0):
+    def __init__(self, hue, rng, spawn_delay=0):
         self.hue          = hue
+        self._rng         = rng
         self._spawn_delay = spawn_delay
-        self._join_delay  = random.randint(600, 1800)
-        self._lifetime    = random.randint(2400, 5400)
+        self._join_delay  = int(rng.integers(600, 1800))
+        self._lifetime    = int(rng.integers(2400, 5400))
         self._age         = -spawn_delay
-        self._orbit_ang   = random.uniform(0, math.tau)
+        self._orbit_ang   = float(rng.uniform(0, math.tau))
         self._orbit_r     = 240.0    # starts wide, shrinks to ~40
         self.solo         = None
         self.love         = None
         self._departing   = False
         # Wander-break: occasionally one butterfly leaves the orbit briefly
-        self._break_cd    = random.randint(800, 1600)  # frames until next break
+        self._break_cd    = int(rng.integers(800, 1600))  # frames until next break
         self._break_timer = 0                          # counts down during break
 
-    @property
-    def dead(self):
+    def dead(self, W, H):
         if not self._departing:
             return False
-        b1_gone = self.solo is None or self.solo.off_screen
-        b2_gone = self.love is None or self.love.off_screen
+        b1_gone = self.solo is None or self.solo.off_screen(W, H)
+        b2_gone = self.love is None or self.love.off_screen(W, H)
         return b1_gone and b2_gone
 
-    def update(self, bass, beat, global_hue, t):
+    def update(self, bass, beat, global_hue, t, W, H):
         self._age += 1
 
         if self.solo is None and self._age >= 0:
-            x, y = _edge_spawn()
-            self.solo = _Butterfly(x, y, hue=global_hue, scale=_SOLO_SCALE)
+            x, y = _edge_spawn(W, H, self._rng)
+            self.solo = _Butterfly(x, y, hue=global_hue, rng=self._rng, scale=_SOLO_SCALE)
 
         if self.solo is None:
             return
@@ -229,9 +222,10 @@ class _Pair:
             self.love.hue = (global_hue + 0.50) % 1.0
 
         if self.love is None and self._age >= self._join_delay:
-            x, y = _edge_spawn()
+            x, y = _edge_spawn(W, H, self._rng)
             self.love = _Butterfly(x, y,
                                    hue=(global_hue + 0.50) % 1.0,
+                                   rng=self._rng,
                                    scale=_LOVE_SCALE)
 
         if self._age >= self._lifetime and not self._departing:
@@ -247,15 +241,15 @@ class _Pair:
             else:
                 self._break_cd -= 1
                 if self._break_cd <= 0:
-                    self._break_timer = random.randint(200, 500)
-                    self._break_cd    = random.randint(900, 1800)
+                    self._break_timer = int(self._rng.integers(200, 500))
+                    self._break_cd    = int(self._rng.integers(900, 1800))
                     # Expand orbit radius back out so reunion feels fresh
                     self._orbit_r = min(self._orbit_r + 80.0, 200.0)
 
             if self._break_timer > 0:
                 # One butterfly wanders freely; the orbit pauses
-                self.solo.update(bass, beat, t)
-                self.love.update(bass, beat, t)
+                self.solo.update(bass, beat, t, W, H)
+                self.love.update(bass, beat, t, W, H)
             else:
                 # Mutual chase: orbit angle rotates faster as radius shrinks
                 # (conservation-of-angular-momentum feel)
@@ -275,12 +269,12 @@ class _Pair:
                     self.solo.x + math.cos(self._orbit_ang) * r,
                     self.solo.y + math.sin(self._orbit_ang) * r,
                 )
-                self.solo.update(bass, beat, t, chase_pos=solo_target)
-                self.love.update(bass, beat, t, chase_pos=love_target)
+                self.solo.update(bass, beat, t, W, H, chase_pos=solo_target)
+                self.love.update(bass, beat, t, W, H, chase_pos=love_target)
         else:
-            self.solo.update(bass, beat, t)
+            self.solo.update(bass, beat, t, W, H)
             if self.love:
-                self.love.update(bass, beat, t)
+                self.love.update(bass, beat, t, W, H)
 
         # Wing sync when close
         if self.love is not None:
@@ -303,11 +297,11 @@ class _Pair:
                 mx = (self.solo.x + self.love.x) / 2
                 my = (self.solo.y + self.love.y) / 2
                 for _ in range(4):
-                    sx = int(mx + random.gauss(0, 25))
-                    sy = int(my + random.gauss(0, 25))
+                    sx = int(mx + float(self._rng.normal(0, 25)))
+                    sy = int(my + float(self._rng.normal(0, 25)))
                     pygame.draw.circle(surf,
                                        hsl((global_hue + 0.12) % 1.0, l=0.80),
-                                       (sx, sy), random.randint(2, 5))
+                                       (sx, sy), int(self._rng.integers(2, 5)))
 
         oc1 = hsl((global_hue + 0.05) % 1.0, l=0.20)
         oc2 = hsl((global_hue + 0.55) % 1.0, l=0.20)
@@ -330,45 +324,54 @@ class Butterflies(Effect):
     TRAIL_ALPHA = 0    # owns its trail surface
     RES_DIV     = 2    # Render at 1/2 resolution
     MAX_PAIRS   = 3
+    _PAIR_OFFSET_1 = 0
+    _PAIR_OFFSET_2_LOW = 300
+    _PAIR_OFFSET_2_HIGH = 700
+    _PAIR_OFFSET_3_LOW = 800
+    _PAIR_OFFSET_3_HIGH = 1400
     # Fade equivalent to the old TRAIL_ALPHA=22 main-loop overlay:
     #   semi-transparent black at alpha 22 → multiply by (255-22)/255 ≈ 233/255
     _FADE_FILL  = (233, 233, 233)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
         W, H = self._render_size()[:2]
         self._tick       = 0
-        self._global_hue = random.random()
+        self._global_hue = float(self._rng.random())
         self._trail      = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
+        self._scaled     = pygame.Surface((1, 1))
         self._pairs: list[_Pair] = []
-        offsets = [0,
-                   random.randint(300, 700),
-                   random.randint(800, 1400)]
+        offsets = [self._PAIR_OFFSET_1,
+                   int(self._rng.integers(self._PAIR_OFFSET_2_LOW, self._PAIR_OFFSET_2_HIGH)),
+                   int(self._rng.integers(self._PAIR_OFFSET_3_LOW, self._PAIR_OFFSET_3_HIGH))]
         for i, off in enumerate(offsets):
             hue = (self._global_hue + i / self.MAX_PAIRS) % 1.0
-            self._pairs.append(_Pair(hue, spawn_delay=off))
+            self._pairs.append(_Pair(hue, self._rng, spawn_delay=off))
 
     def draw(self, surf, waveform, fft, beat, tick):
+        W, H = surf.get_size()
         self._tick       += 1
         self._global_hue  = (self._global_hue + 0.0014) % 1.0
-        bass = float(np.mean(fft[:6]))
+        bass = float(np.mean(fft[:min(6, len(fft))]))
 
-        self._pairs = [p for p in self._pairs if not p.dead]
+        self._pairs = [p for p in self._pairs if not p.dead(W, H)]
         while len(self._pairs) < self.MAX_PAIRS:
-            hue = (self._global_hue + random.random() * 0.5) % 1.0
-            self._pairs.append(_Pair(hue, spawn_delay=random.randint(60, 200)))
+            hue = (self._global_hue + float(self._rng.random()) * 0.5) % 1.0
+            self._pairs.append(_Pair(hue, self._rng, spawn_delay=int(self._rng.integers(60, 200))))
 
         # Fade the internal trail surface each frame
         self._trail.fill(self._FADE_FILL, special_flags=pygame.BLEND_RGB_MULT)
 
         for i, pair in enumerate(self._pairs):
             gh = (self._global_hue + i / self.MAX_PAIRS) % 1.0
-            pair.update(bass, beat, gh, self._tick)
+            pair.update(bass, beat, gh, self._tick, W, H)
             pair.draw(self._trail, beat, gh)
 
         if surf.get_size() != self._trail.get_size():
-            scaled = pygame.transform.scale(self._trail, surf.get_size())
-            surf.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+            self._trail = pygame.Surface(surf.get_size())
+            self._trail.fill((0, 0, 0))
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
-            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

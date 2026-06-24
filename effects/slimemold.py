@@ -34,9 +34,9 @@ class SlimeMold(Effect):
         self._surf = pygame.Surface((1, 1))
         self._scaled = pygame.Surface((1, 1))
         self._hue = 0.30
-        self._reset_sim()
+        self._reset_or_resize_sim()
 
-    def _reset_sim(self):
+    def _reset_or_resize_sim(self):
         W, H, RD = self._render_size()
         self._W, self._H = W, H
         area = W * H
@@ -52,7 +52,7 @@ class SlimeMold(Effect):
             np.random.normal(cy, r_spread * 0.3, self._n),
             0, H - 1).astype(np.float32)
         self._ang = np.random.uniform(0, math.tau, self._n).astype(np.float32)
-        self._trail = np.zeros((W, H), dtype=np.float32)
+        self._trail = np.zeros((H, W), dtype=np.float32)
         self._surf  = pygame.Surface((W, H))
         self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
 
@@ -64,12 +64,12 @@ class SlimeMold(Effect):
         sy = np.clip(
             (self._py + np.sin(self._ang + offset_ang) * dist).astype(np.int32),
             0, H - 1)
-        return self._trail[sx, sy]
+        return self._trail[sy, sx]
 
     def draw(self, surf, waveform, fft, beat, tick):
         W, H, RD = self._render_size()
         if self._W != W or self._H != H:
-            self._reset_sim()
+            self._reset_or_resize_sim()
             W, H, RD = self._render_size()
         W, H = self._W, self._H
         if self._scaled.get_width() != surf.get_width() or self._scaled.get_height() != surf.get_height():
@@ -122,7 +122,7 @@ class SlimeMold(Effect):
         # Deposit trail
         ix = self._px.astype(np.int32)
         iy = self._py.astype(np.int32)
-        np.add.at(self._trail, (ix, iy), 0.8 + bass * 0.6)
+        np.add.at(self._trail, (iy, ix), 0.8 + bass * 0.6)
 
         # Diffuse (approximate 3×3 box blur)
         t = self._trail
@@ -147,7 +147,7 @@ class SlimeMold(Effect):
 
         pix = surfarray.pixels2d(self._surf)
         try:
-            pix[:] = colors
+            pix[:] = colors.T
         finally:
             del pix
 

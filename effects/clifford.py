@@ -61,6 +61,15 @@ class Clifford(Effect):
         self._ys = np.random.uniform(-1.6, 1.6, self._n).astype(np.float32)
         self._xmin, self._xmax = -2.0, 2.0
         self._ymin, self._ymax = -2.0, 2.0
+
+        # Pre-allocated grid for cosine palette (O1)
+        self._x_g = np.linspace(-1.0, 1.0, W, dtype=np.float32)
+        self._y_g = np.linspace(-1.0, 1.0, H, dtype=np.float32)
+        self._xx, self._yy = np.meshgrid(self._x_g, self._y_g, indexing='ij')
+        # Pre-allocated multi-pass point buffer (O2)
+        self._all_x = np.empty((4, self._n), dtype=np.float32)
+        self._all_y = np.empty((4, self._n), dtype=np.float32)
+
         self._new_params(force=True)
 
     def _new_params(self, force=False):
@@ -80,8 +89,9 @@ class Clifford(Effect):
         if self._trail.get_width() != W or self._trail.get_height() != H:
             self._reset_state()
             W, H = self._W, self._H
-        if self._scaled.get_width() != config.WIDTH or self._scaled.get_height() != config.HEIGHT:
-            self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
+        sw, sh = surf.get_size()
+        if self._scaled.get_width() != sw or self._scaled.get_height() != sh:
+            self._scaled = pygame.Surface((sw, sh))
 
         self._hue = (self._hue + 0.0025 + high * 0.003) % 1.0
 
@@ -97,24 +107,24 @@ class Clifford(Effect):
         self._d = np.float32(self._d + (self._td - self._d) * spd)
 
         xs, ys = self._xs, self._ys
-        all_x = []
-        all_y = []
+        all_x = self._all_x
+        all_y = self._all_y
         # Multi-pass iteration to generate high point density
-        for _ in range(4):
+        for i in range(4):
             nx = np.sin(self._a * ys) - np.cos(self._b * xs)
             ny = np.sin(self._c * xs) - np.cos(self._d * ys)
             xs = nx.astype(np.float32)
             ys = ny.astype(np.float32)
-            all_x.append(xs)
-            all_y.append(ys)
+            all_x[i] = xs
+            all_y[i] = ys
         self._xs, self._ys = xs, ys
 
         if not np.isfinite(xs).all() or not np.isfinite(ys).all():
             self._reset_state()
             return
 
-        draw_x = np.concatenate(all_x)
-        draw_y = np.concatenate(all_y)
+        draw_x = all_x.ravel()
+        draw_y = all_y.ravel()
 
         # Dynamic bounding frame interpolation
         x_lo, x_hi = np.percentile(draw_x, (1.0, 99.0))
@@ -172,10 +182,7 @@ class Clifford(Effect):
             bright = np.zeros_like(norm_density)
 
         # Map color values across grid coordinates using cosine palette
-        x_g = np.linspace(-1.0, 1.0, W, dtype=np.float32)
-        y_g = np.linspace(-1.0, 1.0, H, dtype=np.float32)
-        xx, yy = np.meshgrid(x_g, y_g, indexing='ij')
-        
+        xx, yy = self._xx, self._yy
         r = np.hypot(xx, yy)
         ang = np.arctan2(yy, xx) / math.tau + 0.5
         h_arr = (self._hue + ang * 0.45 + r * 0.20) % 1.0

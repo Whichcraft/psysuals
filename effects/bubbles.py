@@ -1,5 +1,4 @@
 import math
-import random
 
 import numpy as np
 import pygame
@@ -17,6 +16,7 @@ class Bubbles(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
         self.hue        = 0.0
         self.pulse      = 0.0
         self.pvel       = 0.0
@@ -28,21 +28,22 @@ class Bubbles(Effect):
             self.max_bubbles = self.MAX // 2
             init_size = 100
             
-        self.pool = [self._make(y=random.uniform(0, config.HEIGHT)) for _ in range(init_size)]
+        self._W = config.WIDTH
+        self._H = config.HEIGHT
+        self.pool = [self._make(y=float(self._rng.uniform(0, self._H))) for _ in range(init_size)]
         self._surf_cache: dict = {}
 
-    @staticmethod
-    def _make(y=None):
-        r = random.uniform(8, 45)
+    def _make(self, y=None):
+        r = float(self._rng.uniform(8, 45))
         return {
-            "x":      random.uniform(config.WIDTH * 0.02, config.WIDTH * 0.98),
-            "y":      float(config.HEIGHT + r) if y is None else y,
+            "x":      float(self._rng.uniform(self._W * 0.02, self._W * 0.98)),
+            "y":      float(self._H + r) if y is None else y,
             "r":      r,
-            "vx":     random.gauss(0, 0.4),
-            "vy":    -random.uniform(1.0, 3.2),
-            "hue":    random.uniform(0, 1.0),
-            "wobble": random.uniform(0.025, 0.07),
-            "phase":  random.uniform(0, math.tau),
+            "vx":     float(self._rng.normal(0, 0.4)),
+            "vy":    -float(self._rng.uniform(1.0, 3.2)),
+            "hue":    float(self._rng.uniform(0, 1.0)),
+            "wobble": float(self._rng.uniform(0.025, 0.07)),
+            "phase":  float(self._rng.uniform(0, math.tau)),
         }
 
     def _get_bsurf(self, size):
@@ -77,7 +78,7 @@ class Bubbles(Effect):
                 b = self._make()
                 b["vy"]  *= (1 + beat_sel * 0.8 + mid * 0.6)
                 b["r"]   *= (1 + bass * 1.2)
-                b["hue"]  = (self.hue + random.uniform(0, hue_spread)) % 1.0
+                b["hue"]  = (self.hue + float(self._rng.uniform(0, hue_spread))) % 1.0
                 self.pool.append(b)
 
         # Mega-bubbles on strong bass hits: 1-3 extra large luminous bubbles
@@ -90,7 +91,7 @@ class Bubbles(Effect):
                     b = self._make()
                     b["r"]  *= (2.2 + bass * 2.0)
                     b["vy"] *= (1.4 + mid * 0.5)
-                    b["hue"] = (self.hue + random.uniform(0, 0.5)) % 1.0
+                    b["hue"] = (self.hue + float(self._rng.uniform(0, 0.5))) % 1.0
                     self.pool.append(b)
 
     def draw(self, surf, waveform, fft, beat, tick):
@@ -98,6 +99,9 @@ class Bubbles(Effect):
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
+        W, H = surf.get_size()
+        if W != self._W or H != self._H:
+            self._W, self._H = W, H
 
         self.pvel += bass * 0.75
         self.pvel += -self.pulse * 0.35
@@ -121,7 +125,7 @@ class Bubbles(Effect):
             if b["y"] + b["r"] < 0:
                 continue
 
-            life  = max(0.0, min(1.0, b["y"] / config.HEIGHT))
+            life  = max(0.0, min(1.0, b["y"] / H))
             r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.35 + high * 0.20 + self._bass_flash * 0.45)))
             pad   = r + 14
             alpha = int(life * 160)

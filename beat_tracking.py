@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 import importlib
+import sys
 import threading
 import time as _time
 
@@ -57,6 +59,10 @@ class LibrosaBeatTracker:
         self._last_onset_strength = 0.0
         self._bpm = 0.0
         self._analysis_running = False
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+    def release(self) -> None:
+        self._executor.shutdown(wait=True)
 
     @property
     def enabled(self) -> bool:
@@ -88,12 +94,10 @@ class LibrosaBeatTracker:
             self._last_analysis = now
             self._analysis_running = True
 
-        worker = threading.Thread(
-            target=self._run_analysis,
-            args=(blocks, block_end_time, fallback_bpm),
-            daemon=True,
+        self._executor.submit(
+            self._run_analysis,
+            blocks, block_end_time, fallback_bpm,
         )
-        worker.start()
         return self._bpm or fallback_bpm
 
     def _run_analysis(self, blocks, block_end_time: float, fallback_bpm: float) -> None:
@@ -125,7 +129,6 @@ class LibrosaBeatTracker:
                     bpm = self._bpm or fallback_bpm
                     if bpm:
                         self._bpm = bpm
-                    self._analysis_running = False
                     return
 
             tempo, beat_frames = librosa.beat.beat_track(
@@ -143,9 +146,8 @@ class LibrosaBeatTracker:
                 units="frames",
                 backtrack=False,
             )
-        except Exception:
-            with self._lock:
-                self._analysis_running = False
+        except Exception as exc:
+            print(f"BeatTracking: analysis error: {exc}", file=sys.stderr)
             return
 
         frame_seconds = self.hop_length / float(self.sample_rate)

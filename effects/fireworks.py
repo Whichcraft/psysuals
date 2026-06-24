@@ -1,4 +1,4 @@
-"""Fireworks — pixel feedback falling/zooming tunnel with fireworks.
+"""Fireworks — pixel feedback falling/zooming fireworks display.
 
 Each frame the previous frame is zoomed and multiplied dark, building
 an infinite falling psychedelic tunnel.  Firework rockets launch from the
@@ -78,11 +78,11 @@ class Fireworks(Effect):
         self._fade = pygame.Surface((W, H), pygame.SRCALPHA)
         self._fade.fill((0, 0, 0, self._FADE_ALPHA))
         self._feedback_fbo = None
-        self._hue     = random.random()
+        self._hue     = self._rng.random()
         self._beat_t  = 0
         self._rockets = []   # [x, y, vx, vy, hue, trail_pts]
         self._embers  = []   # [x, y, vx, vy, hue, radius, life, max_life]
-        self._auto_t  = random.randint(*self._AUTO_START_STAGGER)
+        self._auto_t  = int(self._rng.integers(*self._AUTO_START_STAGGER))
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ class Fireworks(Effect):
         self._rockets.append([float(x), float(H), vx, vy, h, []])
 
     def _explode(self, x, y, hue, treble=0.0, res_div: int = 1):
-        n = int(random.randint(*self._EXPLODE_EMBERS) * (1.0 + treble * self._EXPLODE_TREBLE_COUNT_GAIN))
+        n = int(self._rng.integers(*self._EXPLODE_EMBERS) * (1.0 + treble * self._EXPLODE_TREBLE_COUNT_GAIN))
         if getattr(config, "LOW_SPEC", False):
             n = max(5, n // 2)
         angs = self._rng.uniform(0.0, math.tau, n)
@@ -164,7 +164,7 @@ class Fireworks(Effect):
             fb = self.renderer.read_pixels(self._feedback_fbo)
             surfarray.blit_array(self._trail, fb[:, :, :3].transpose(1, 0, 2))
         else:
-            zw, zh = int(W * zoom), int(H * zoom)
+            zw, zh = round(W * zoom), round(H * zoom)
             zoomed = pygame.transform.scale(self._trail, (zw, zh))
             self._trail.fill((0, 0, 0))
             self._trail.blit(zoomed, (-((zw - W) // 2), -((zh - H) // 2)))
@@ -210,7 +210,7 @@ class Fireworks(Effect):
             vy *= _DRAG
             x += vx; y += vy
             life -= 1
-            em[0], em[1], em[2], em[3], em[6] = x, y, vx, vy, life
+            em[0], em[1], em[2], em[3], em[4], em[5], em[6] = x, y, vx, vy, hue, radius, life
             if life > 0 and -self._EMBER_CULL_MARGIN < x < W + self._EMBER_CULL_MARGIN and y < H + self._EMBER_CULL_MARGIN:
                 brightness = (
                     self._EMBER_LIGHT_BASE

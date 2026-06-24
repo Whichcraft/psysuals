@@ -2,6 +2,7 @@
 import math
 import random
 
+import numpy as np
 import pygame
 
 import config
@@ -27,8 +28,7 @@ class Chromatic(Effect):
         self._auto_cd = 45
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W = config.WIDTH
-        H = config.HEIGHT
+        W, H = surf.get_size()
         bass = beat
         mid = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -51,14 +51,16 @@ class Chromatic(Effect):
         self._trail.fill((232, 228, 236), special_flags=pygame.BLEND_RGB_MULT)
         split = 2.0 + high * 12.0
 
-        for ring in self._rings[:]:
-            cx, cy, r, max_r, speed, intensity, phase = ring
-            if r > max_r:
-                self._rings.remove(ring)
-                continue
+        self._rings = [
+            entry for entry in self._rings
+            if entry[2] <= entry[3]
+        ]
+        for ring in self._rings:
+            cx, cy, _, max_r, speed, intensity, phase = ring
 
             ring[2] += speed + bass * 3.0
             ring[6] += 0.08 + high * 0.22 + mid * 0.05
+            r = ring[2]
 
             fade = max(0.0, 1.0 - r / max_r)
             bright = intensity * fade
@@ -92,16 +94,12 @@ class Chromatic(Effect):
         self._rings.append([cx, cy, 0.0, max_r, speed, inten, random.random() * math.tau])
 
     def _wave_points(self, cx, cy, radius, warp, phase):
-        pts = []
         steps = 72
-        for i in range(steps):
-            a = i / steps * math.tau
-            rr = radius
-            rr += math.sin(a * 3.0 + phase) * warp
-            rr += math.sin(a * 7.0 - phase * 0.7) * warp * 0.38
-            rr += math.cos(a * 2.0 + phase * 1.6) * warp * 0.18
-            pts.append((
-                int(cx + math.cos(a) * rr),
-                int(cy + math.sin(a) * rr),
-            ))
-        return pts
+        a = np.arange(steps) / steps * math.tau
+        rr = radius
+        rr += np.sin(a * 3.0 + phase) * warp
+        rr += np.sin(a * 7.0 - phase * 0.7) * warp * 0.38
+        rr += np.cos(a * 2.0 + phase * 1.6) * warp * 0.18
+        xs = np.round(cx + np.cos(a) * rr).astype(int)
+        ys = np.round(cy + np.sin(a) * rr).astype(int)
+        return list(zip(xs.tolist(), ys.tolist()))

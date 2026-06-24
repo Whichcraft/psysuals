@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import threading
 from collections import deque
 import numpy as np
@@ -10,7 +11,7 @@ class AudioEngine:
     def __init__(self):
         self._lock = threading.RLock()
         self._waveform = np.zeros(config.BLOCK_SIZE, dtype=np.float32)
-        self._smooth_fft = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
+        self._smooth_fft = None
         self._raw_beat_energy = 0.0
         self._mid_energy = 0.0
         self._treble_energy = 0.0
@@ -18,16 +19,18 @@ class AudioEngine:
         self._blackman_window = np.blackman(config.BLOCK_SIZE).astype(np.float32)
 
         self._prev_spectrum = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
-        self._flux_avg = 1e-6
-        self._mid_avg = 1e-6
-        self._treble_avg = 1e-6
+        self._flux_avg = 0.01
+        self._mid_avg = 0.1
+        self._treble_avg = 0.1
         self._prev_beat_energy = 0.0
+        self._first_frame = True
 
         self._beat_times = deque(maxlen=8)
         self._last_onset_time = 0.0
         self._bpm = 0.0
 
-        self._genre_weights = np.ones(20, dtype=np.float32)
+        self._n_fft_bins = config.BLOCK_SIZE // 2
+        self._genre_weights = np.ones(self._n_fft_bins, dtype=np.float32)
         self._detect_accum = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
         self._detect_frames = 0
         self._DETECT_MIN = 300
@@ -52,15 +55,16 @@ class AudioEngine:
         return float(arr[start:end].mean()) if end > start else 0.0
 
     def apply_genre_weights(self, genre: str) -> None:
-        weights = np.ones(20, dtype=np.float32)
+        n = self._n_fft_bins
+        weights = np.ones(n, dtype=np.float32)
         if genre == "electronic":
-            weights[:5] = 1.5
-            weights[10:] = 0.7
+            weights[:n//4] = 1.5
+            weights[n//2:] = 0.7
         elif genre == "rock":
-            weights[2:9] = 1.3
+            weights[n//8:n//3] = 1.3
         elif genre == "classical":
-            weights[:10] = 0.6
-            weights[10:] = 1.4
+            weights[:n//4] = 0.6
+            weights[n//4:] = 1.4
         with self._lock:
             self._genre_weights[:] = weights
 
@@ -89,7 +93,7 @@ class AudioEngine:
 
     def _audio_cb(self, indata, frames, time_info, status) -> None:
         if status:
-            pass
+            print(f"AudioEngine: status={status}", file=sys.stderr)
         try:
             mono = np.asarray(indata[:, 0], dtype=np.float32)
             if mono.size != config.BLOCK_SIZE:
@@ -108,10 +112,13 @@ class AudioEngine:
 
             with self._lock:
                 self._audio_time = float(time_info.currentTime)
-                self._waveform = mono.copy()
+                self._waveform[:] = mono
 
-                alpha = 0.50
-                self._smooth_fft = (1.0 - alpha) * self._smooth_fft + alpha * spectrum
+                if self._smooth_fft is None:
+                    self._smooth_fft = spectrum.copy()
+                else:
+                    alpha = 0.50
+                    self._smooth_fft = (1.0 - alpha) * self._smooth_fft + alpha * spectrum
 
                 self._detect_accum[:] += spectrum
                 self._detect_frames += 1
@@ -119,27 +126,32 @@ class AudioEngine:
                 weights = self._genre_weights
 
                 beat_end = min(len(spectrum), len(weights))
-                diff = spectrum[:beat_end] * weights[:beat_end] - self._prev_spectrum[:beat_end] * weights[:beat_end]
-                flux = float(np.mean(np.maximum(0.0, diff)))
+                weighted = spectrum[:beat_end] * weights[:beat_end]
+                if self._first_frame:
+                    self._prev_spectrum[:] = weighted
+                    self._first_frame = False
+                else:
+                    diff = weighted - self._prev_spectrum[:beat_end]
+                    flux = float(np.mean(np.maximum(0.0, diff)))
 
-                self._flux_avg = self._flux_avg * 0.95 + flux * 0.05
-                self._raw_beat_energy = flux / (self._flux_avg + 1e-6)
+                    self._flux_avg = self._flux_avg * 0.95 + flux * 0.05
+                    self._raw_beat_energy = flux / (self._flux_avg + 1e-6)
 
-                t_now = float(time_info.currentTime)
-                if (
-                    self._raw_beat_energy > 2.2
-                    and self._prev_beat_energy <= 2.2
-                    and t_now - self._last_onset_time > 0.28
-                ):
-                    self._beat_times.append(t_now)
-                    self._last_onset_time = t_now
-                    if len(self._beat_times) >= 2:
-                        intervals = np.diff(list(self._beat_times))
-                        median_interval = float(np.median(intervals))
-                        if 0.25 <= median_interval <= 1.2:
-                            self._bpm = 60.0 / median_interval
+                    t_now = float(time_info.currentTime)
+                    if (
+                        self._raw_beat_energy > 2.2
+                        and self._prev_beat_energy <= 2.2
+                        and t_now - self._last_onset_time > 0.22
+                    ):
+                        self._beat_times.append(t_now)
+                        self._last_onset_time = t_now
+                        if len(self._beat_times) >= 2:
+                            intervals = np.diff(self._beat_times)
+                            median_interval = float(np.median(intervals))
+                            if 0.25 <= median_interval <= 1.2:
+                                self._bpm = 60.0 / median_interval
 
-                self._prev_beat_energy = self._raw_beat_energy
+                    self._prev_beat_energy = self._raw_beat_energy
 
                 mid = self._band_mean(self._smooth_fft, 0.04, 0.20)
                 self._mid_avg = self._mid_avg * 0.98 + mid * 0.02
@@ -148,17 +160,20 @@ class AudioEngine:
                 treble = self._band_mean(self._smooth_fft, 0.20, 0.50)
                 self._treble_avg = self._treble_avg * 0.98 + treble * 0.02
                 self._treble_energy = treble / (self._treble_avg + 1e-6)
-
-                self._prev_spectrum[:] = spectrum
         except Exception:
-            pass
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+
+    def release(self):
+        self.stop_input_stream()
+        self.beat_tracker.release()
 
     def get_audio(self):
         """Return a thread-safe copy of the current audio analysis state."""
         with self._lock:
             return (
                 self._waveform.copy(),
-                self._smooth_fft.copy(),
+                self._smooth_fft.copy() if self._smooth_fft is not None else np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32),
                 self._raw_beat_energy,
                 self._mid_energy,
                 self._treble_energy,
@@ -240,18 +255,18 @@ class AudioEngine:
         self.active_dev = None
 
     def open_input_stream(self, *candidates):
-        seen = []
+        seen: list[int | None] = []
+        expanded: list[int | None] = []
         for candidate in candidates:
-            expanded = (
-                self.preferred_input_candidates(candidate)
-                if candidate is None
-                else [candidate]
-            )
-            for resolved in expanded:
-                if resolved in seen:
-                    continue
-                seen.append(resolved)
-                stream = self.start_input_stream(resolved)
-                if stream:
-                    return stream, resolved
+            if candidate is None:
+                expanded.extend(self.preferred_input_candidates(candidate))
+            else:
+                expanded.append(candidate)
+        for resolved in expanded:
+            if resolved in seen:
+                continue
+            seen.append(resolved)
+            stream = self.start_input_stream(resolved)
+            if stream:
+                return stream, resolved
         return None, None

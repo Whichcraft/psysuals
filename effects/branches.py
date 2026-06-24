@@ -82,6 +82,7 @@ class Branches(Effect):
     # ------------------------------------------------------------------
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.012
+        W, H = surf.get_size()
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -89,13 +90,10 @@ class Branches(Effect):
         self.time       += 0.025 + bass * 0.06 + mid * 0.04 + high * 0.02
         self.beat_flash  = self.beat_flash * 0.72 + bass * 0.28
 
-        cx = config.WIDTH  // 2
-        cy = config.HEIGHT // 2
+        cx = W // 2
+        cy = H // 2
 
-        # Cap at 0.27 × smaller-side so cumulative branch reach (×1.7)
-        # never exceeds half the smaller screen dimension → always on screen.
-        # Base 0.22 fills ~75 % at rest; cap clamps peak to ~92 %.
-        sc    = min(config.WIDTH, config.HEIGHT)
+        sc    = min(W, H)
         trunk = min(sc * 0.22 * (1.0 + bass * 0.70 + mid * 0.25), sc * 0.27)
 
         # Extra arms on strong beats (up to +5); treble has minimal influence

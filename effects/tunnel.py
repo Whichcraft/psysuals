@@ -1,5 +1,4 @@
 import math
-import random
 
 import numpy as np
 import pygame
@@ -23,9 +22,11 @@ class Tunnel(Effect):
     TUBE_R  = 2.8
     Z_FAR   = 10.0
     Z_NEAR  = 0.06
+    MAX_TRIS = 30
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
         self.hue  = 0.0
         self.time = 0.0
         spacing = (self.Z_FAR - self.Z_NEAR) / self.N_RINGS
@@ -34,7 +35,13 @@ class Tunnel(Effect):
              "pt": self.Z_NEAR + i * spacing}
             for i in range(self.N_RINGS)
         ]
-        self.tris = []
+        self._tri_count = 0
+        self._tz    = np.empty(self.MAX_TRIS, dtype=np.float32)
+        self._tpt   = np.empty(self.MAX_TRIS, dtype=np.float32)
+        self._trot  = np.empty(self.MAX_TRIS, dtype=np.float32)
+        self._trvel = np.empty(self.MAX_TRIS, dtype=np.float32)
+        self._tsize = np.empty(self.MAX_TRIS, dtype=np.float32)
+        self._thue  = np.empty(self.MAX_TRIS, dtype=np.float32)
 
     def _path(self, t, treble=0.0):
         # Treble increases path wobble amplitude
@@ -42,15 +49,16 @@ class Tunnel(Effect):
         return (math.sin(t * 0.21) * 0.8 * scale,
                 math.cos(t * 0.16) * 0.6 * scale)
 
-    def _proj(self, wx, wy, wz):
-        fov = min(config.WIDTH, config.HEIGHT) * 0.75
+    def _proj(self, wx, wy, wz, W, H):
+        fov = min(W, H) * 0.75
         z   = max(wz, 0.01)
-        return (int(wx * fov / z + config.WIDTH  / 2),
-                int(wy * fov / z + config.HEIGHT / 2),
+        return (int(wx * fov / z + W / 2),
+                int(wy * fov / z + H / 2),
                 fov / z)
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue  += 0.006
+        W, H = surf.get_size()
         bass       = beat
         mid        = config.MID_ENERGY
         high       = config.TREBLE_ENERGY
@@ -61,16 +69,15 @@ class Tunnel(Effect):
         # Spawn only in the far third of the tube and cap the live count so the
         # mid-range doesn't fill up with spinning triangles.
         spawn_n = int(bass * 1.2 + (mid * 1.5 if mid > 0.5 else 0))
-        for _ in range(spawn_n):
-            z = self.Z_FAR * random.uniform(0.80, 0.98)
-            self.tris.append({
-                "z":    z,
-                "pt":   self.time + z,
-                "rot":  random.uniform(0, math.tau),
-                "rvel": random.choice([-1, 1]) * random.uniform(0.04, 0.12) * (1.0 + mid * 1.5),
-                "size": random.uniform(0.45, 1.1) * (1.0 + bass * 1.5 + high * 0.5),
-                "hue":  (self.hue + random.uniform(0, 0.5)) % 1.0,
-            })
+        for _ in range(min(spawn_n, self.MAX_TRIS - self._tri_count)):
+            i = self._tri_count
+            self._tz[i]    = float(self._rng.uniform(self.Z_FAR * 0.80, self.Z_FAR * 0.98))
+            self._tpt[i]   = self.time + self._tz[i]
+            self._trot[i]  = float(self._rng.uniform(0, math.tau))
+            self._trvel[i] = float(self._rng.choice([-1, 1]) * self._rng.uniform(0.04, 0.12) * (1.0 + mid * 1.5))
+            self._tsize[i] = float(self._rng.uniform(0.45, 1.1) * (1.0 + bass * 1.5 + high * 0.5))
+            self._thue[i]  = float((self.hue + self._rng.uniform(0, 0.5)) % 1.0)
+            self._tri_count += 1
 
         for r in self.rings:
             r["z"] -= dt
@@ -87,8 +94,8 @@ class Tunnel(Effect):
             cx1, cy1 = self._path(r1["pt"], treble=high)
             cx2, cy2 = self._path(r2["pt"], treble=high)
 
-            sx1, sy1, sc1 = self._proj(cx1, cy1, r1["z"])
-            sx2, sy2, sc2 = self._proj(cx2, cy2, r2["z"])
+            sx1, sy1, sc1 = self._proj(cx1, cy1, r1["z"], W, H)
+            sx2, sy2, sc2 = self._proj(cx2, cy2, r2["z"], W, H)
 
             sr1 = max(1, int(self.TUBE_R * sc1))
             sr2 = max(1, int(self.TUBE_R * sc2))
@@ -123,25 +130,33 @@ class Tunnel(Effect):
             ]
             pygame.draw.polygon(surf, hsl(s_h, l=s_l), s_pts, max(1, lw))
 
-        live = []
-        for tri in self.tris:
-            tri["z"]   -= dt
-            tri["rot"] += tri["rvel"] * (1.0 + mid * 1.5)
-            if tri["z"] < self.Z_NEAR:
+        # Update + compact triangles in-place (struct-of-arrays)
+        new_n = 0
+        for i in range(self._tri_count):
+            self._tz[i]   -= dt
+            self._trot[i] += self._trvel[i] * (1.0 + mid * 1.5)
+            if self._tz[i] < self.Z_NEAR:
                 continue
-            tcx, tcy   = self._path(tri["pt"], treble=high)
-            sx, sy, sc = self._proj(tcx, tcy, tri["z"])
-            near_t     = max(0.0, 1.0 - tri["z"] / self.Z_FAR)
-            tr         = max(3, int(tri["size"] * sc))
-            h          = (tri["hue"] + near_t * 0.4) % 1.0
+            tcx, tcy   = self._path(self._tpt[i], treble=high)
+            sx, sy, sc = self._proj(tcx, tcy, self._tz[i], W, H)
+            near_t     = max(0.0, 1.0 - self._tz[i] / self.Z_FAR)
+            tr         = max(3, int(self._tsize[i] * sc))
+            h          = (self._thue[i] + near_t * 0.4) % 1.0
             bright     = 0.35 + near_t * 0.60
             lw         = max(1, int(1 + near_t * 3 + high * 1.5))
             pts = [
-                (sx + int(math.cos(tri["rot"] + v * math.tau / 3) * tr),
-                 sy + int(math.sin(tri["rot"] + v * math.tau / 3) * tr))
+                (sx + int(math.cos(self._trot[i] + v * math.tau / 3) * tr),
+                 sy + int(math.sin(self._trot[i] + v * math.tau / 3) * tr))
                 for v in range(3)
             ]
             pygame.draw.polygon(surf, hsl(h, l=bright * 0.30), pts, lw + 4)
             pygame.draw.polygon(surf, hsl(h, l=bright),         pts, lw)
-            live.append(tri)
-        self.tris = live[-30:]
+            if new_n != i:
+                self._tz[new_n]    = self._tz[i]
+                self._tpt[new_n]   = self._tpt[i]
+                self._trot[new_n]  = self._trot[i]
+                self._trvel[new_n] = self._trvel[i]
+                self._tsize[new_n] = self._tsize[i]
+                self._thue[new_n]  = self._thue[i]
+            new_n += 1
+        self._tri_count = new_n

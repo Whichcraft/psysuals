@@ -24,7 +24,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.10.0"
+__version__ = "3.11.0"
 
 import argparse
 import atexit
@@ -62,16 +62,20 @@ class VisualizerApp:
         self.audio = AudioEngine()
         
         self._init_display()
+        self._setup_signals()
+        atexit.register(self.display.kill_children)
+        
         self.ui = UIManager()
         self._init_audio()
         
-        self.mode_idx = min(self.settings.get("mode_idx", 0), len(MODES) - 1)
+        self.mode_idx = max(0, min(self.settings.get("mode_idx", 0), len(MODES) - 1))
         if self.args.mode is not None:
             self.mode_idx = self.args.mode % len(MODES)
         
         self.name, self.VisCls = MODES[self.mode_idx]
         self.vis = self.VisCls(renderer=self.display.renderer)
         
+        self.using_tap = False
         # Initialize target resolution based on effect
         self._update_target_res()
         
@@ -93,6 +97,7 @@ class VisualizerApp:
         self.beat_decay = 0.0
         self.effect_gain = self.settings.get("effect_gain", config.DEFAULT_EFFECT_GAIN)
         self.current_genre = "detecting..."
+        self._genre_check_cd = 0
         self.silence_frames = 0
         self.is_silent = True
         
@@ -118,11 +123,10 @@ class VisualizerApp:
         self.dev_name_cache = {}
         
         self.clock = pygame.time.Clock()
-        if not hasattr(self, "fade"):
-            self.fade = self._make_fade(self.fade_alpha)
-        
-        self._setup_signals()
-        atexit.register(self.display.kill_children)
+        tw, th = self.display.target.get_size()
+        self._fade_surf = pygame.Surface((tw, th), pygame.SRCALPHA)
+        self._fade_surf.fill((0, 0, 0, self.fade_alpha))
+        self.fade = self._fade_surf
 
     def _setup_signals(self):
         def _sig_handler(sig, frame):
@@ -187,22 +191,21 @@ class VisualizerApp:
             self.fade = self._make_fade(self.fade_alpha)
 
     def _make_fade(self, alpha: int):
-        # Use local target dimensions
-        tw, th = self.display.target.get_size()
-        surf = pygame.Surface((tw, th), pygame.SRCALPHA)
-        surf.fill((0, 0, 0, alpha))
-        return surf
+        self._fade_surf.fill((0, 0, 0, alpha))
+        return self._fade_surf
 
     def _quit(self):
+        self._save_settings()
         if hasattr(self, "display") and self.display is not None:
             self.display.kill_children()
             if self.display.renderer:
                 self.display.renderer.release()
+        if hasattr(self, "audio"):
+            self.audio.release()
         try:
             pygame.display.set_mode((1, 1))
         except Exception:
             pass
-        self.audio.stop_input_stream()
         pygame.quit()
         sys.exit(0)
 
@@ -226,7 +229,11 @@ class VisualizerApp:
     def _switch_mode(self, new_idx: int):
         if hasattr(self.vis, "release") and callable(self.vis.release):
             self.vis.release()
-        self.prev_surf = self.display.target.copy()
+        if not (self.args.gl and self.vis.IS_GL):
+            self.prev_surf = self.display.target.copy()
+        else:
+            self.prev_surf = None
+        self.display.target.fill((0, 0, 0))
         self.prev_surf_scaled = None
         self.crossfade_frame = 0
         self.mode_idx = new_idx % len(MODES)
@@ -236,6 +243,10 @@ class VisualizerApp:
         self._update_target_res()
 
     def _rebuild_effects(self):
+        prev_size = (config.WIDTH, config.HEIGHT)
+        if getattr(self, "_last_rebuild_size", None) == prev_size:
+            return
+        self._last_rebuild_size = prev_size
         if hasattr(self.vis, "release") and callable(self.vis.release):
             self.vis.release()
         if hasattr(self.bg_vis, "release") and callable(self.bg_vis.release):
@@ -270,7 +281,6 @@ class VisualizerApp:
     def _handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self._save_settings()
                 self._quit()
             
             elif event.type == pygame.KEYDOWN:
@@ -288,7 +298,6 @@ class VisualizerApp:
                     continue
 
                 if event.key in (pygame.K_ESCAPE, pygame.K_q):
-                    self._save_settings()
                     self._quit()
                 elif event.key == pygame.K_f:
                     self.display.toggle_fullscreen()
@@ -313,7 +322,7 @@ class VisualizerApp:
                         t = _time.monotonic()
                         self.tap_times.append(t)
                         if len(self.tap_times) >= 2:
-                            self.tap_bpm = 60.0 / np.median(np.diff(list(self.tap_times)))
+                            self.tap_bpm = 60.0 / np.median(np.diff(self.tap_times))
                             self.tap_bpm_expiry = t + 8.0
                             self.tap_flash_end = t + 0.5
                 elif event.key == pygame.K_a:
@@ -348,15 +357,13 @@ class VisualizerApp:
                             self.bg_mode_i = p.get("bg_mode_i", 0)
                             self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
                             self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+                            self._update_target_res()
                     else:
                         preset_name = f"Preset {len(self.presets) + 1}"
-                        sett.save_preset(preset_name, {
-                            "mode_idx": self.mode_idx,
-                            "intensity": self.effect_gain,
-                            "bg_on": self.bg_on,
-                            "bg_mode_i": self.bg_mode_i,
-                        })
-                        self.presets = sett.load_presets()
+                        entry = {"mode_idx": self.mode_idx, "intensity": self.effect_gain,
+                                 "bg_on": self.bg_on, "bg_mode_i": self.bg_mode_i}
+                        self.presets.append({"name": preset_name, **entry})
+                        sett.save_preset(preset_name, entry)
                         self.active_preset = len(self.presets) - 1
                 elif event.key == pygame.K_RIGHT:
                     if self.ui.pane_open:
@@ -393,11 +400,15 @@ class VisualizerApp:
             self.cf_frames = min(90, max(0, self.cf_frames + delta * 5))
 
     def _update(self):
-        detected = self.audio.detect_genre()
-        if detected:
-            self.current_genre = detected
-            self.audio.apply_genre_weights(detected)
-            palette.set_genre(detected)
+        if self.is_silent:
+            self._genre_check_cd -= 1
+        if self._genre_check_cd <= 0:
+            detected = self.audio.detect_genre()
+            if detected:
+                self.current_genre = detected
+                self.audio.apply_genre_weights(detected)
+                palette.set_genre(detected)
+            self._genre_check_cd = 60 if self.is_silent else 1
             
         self.waveform, self.fft, raw_beat, mid_e, treble_e, bpm, audio_time = self.audio.get_audio()
         if self.audio.beat_tracker.enabled:
@@ -446,9 +457,9 @@ class VisualizerApp:
             self.energy_hist.clear()
             self.energy_sum = 0.0
         else:
+            silence_beat_floor = 0.0
             mid_e = max(mid_e, config.SILENCE_MID_FLOOR * 0.5)
             treble_e = max(treble_e, config.SILENCE_TREBLE_FLOOR * 0.5)
-            silence_beat_floor = 0.0
             
         config.MID_ENERGY = mid_e
         config.TREBLE_ENERGY = treble_e
@@ -489,7 +500,12 @@ class VisualizerApp:
             for child_idx, child in list(self.display.span_children.items()):
                 if child.poll() is not None:
                     print(f"  Span child {child_idx} died, respawning...")
-                    self.display._spawn_child(child_idx, self.span_vis2_idx, os.path.abspath(__file__))
+                    try:
+                        child.wait(timeout=1)
+                    except Exception:
+                        pass
+                    self.display.requery_xmonitors()
+                    self.display.spawn_child(child_idx, self.span_vis2_idx, os.path.abspath(__file__))
 
     def _render(self):
         target = self.display.target
@@ -498,12 +514,14 @@ class VisualizerApp:
         new_alpha = genre_alpha if genre_alpha is not None else getattr(self.vis, "TRAIL_ALPHA", 28)
         if new_alpha != self.fade_alpha:
             self.fade_alpha = new_alpha
-            self.fade = self._make_fade(self.fade_alpha)
+            self._make_fade(self.fade_alpha)
             
-        if not (self.args.gl and self.vis.IS_GL):
+        is_gl_fg = self.args.gl and self.vis.IS_GL
+        
+        if not is_gl_fg:
             target.blit(self.fade, (0, 0))
         
-        if self.bg_on:
+        if self.bg_on and not is_gl_fg:
             self.bg_surf.fill((0, 0, 0))
             self.bg_vis.draw(self.bg_surf, self.waveform, self.fft, self.draw_beat, self.tick)
             self.bg_surf.set_alpha(self.bg_alpha)
@@ -515,7 +533,7 @@ class VisualizerApp:
             
         self.vis.draw(target, self.waveform, self.fft, self.draw_beat, self.tick)
         
-        if self.prev_surf:
+        if self.prev_surf and not is_gl_fg:
             tw, th = target.get_size()
             if self.prev_surf_scaled is None or self.prev_surf_scaled.get_size() != (tw, th):
                 self.prev_surf_scaled = pygame.transform.scale(self.prev_surf, (tw, th))
@@ -581,25 +599,15 @@ class VisualizerApp:
                 pname = self.presets[self.active_preset]["name"]
                 lines.append(self.ui.font_s.render(f"Preset: {pname}", True, (100, 200, 255)))
                 
-        # Draw dark semi-transparent panel for high readability
-        max_w = max(line.get_width() for line in lines)
-        spacing = 3
-        total_h = sum(line.get_height() for line in lines) + spacing * (len(lines) - 1)
-        
-        bg_surf = pygame.Surface((max_w + 16, total_h + 12), pygame.SRCALPHA)
-        bg_surf.fill((0, 0, 0, 110)) # semi-transparent black background
-        target.blit(bg_surf, (4, 4))
+        self.ui.draw_hud_background(target, lines)
         
         # Render text lines onto target
         y = 10
+        spacing = 3
         for line in lines:
             target.blit(line, (12, y))
             y += line.get_height() + spacing
 
 if __name__ == "__main__":
-    try:
-        app = VisualizerApp()
-        app.run()
-    except KeyboardInterrupt:
-        pygame.quit()
-        sys.exit(130)
+    app = VisualizerApp()
+    app.run()

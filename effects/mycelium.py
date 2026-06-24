@@ -1,13 +1,12 @@
 """Mycelium — psychedelic hyphae colonies with swirling spores."""
 import math
-import random
 
 import numpy as np
 import pygame
 
 import config
 from .base import Effect
-from .utils import hsl
+from .utils import hsl, _hsl_batch
 
 _MAX_SEGS = 900
 _MAX_TIPS = 240
@@ -19,14 +18,15 @@ class Mycelium(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._hue = random.random()
+        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._hue = self._rng.random()
         self._phase = 0.0
         self._pulse = 0.0
         self._segs: list = []
         self._tips: list = []
         self._spores: list = []
         self._cores: list[tuple[float, float, float]] = []
-        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._W = self._H = 0
         self.max_segs = _MAX_SEGS
         self.max_tips = _MAX_TIPS
         if getattr(config, "LOW_SPEC", False):
@@ -37,7 +37,7 @@ class Mycelium(Effect):
         self._seed_tips(14 if getattr(config, "LOW_SPEC", False) else 28)
 
     def _build_cores(self):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = self._W, self._H
         cx, cy = W / 2.0, H / 2.0
         rad = min(W, H) * 0.22
         self._cores = []
@@ -62,7 +62,7 @@ class Mycelium(Effect):
         else:
             idxs = np.full(n, core_idx, dtype=np.int32)
         angs = self._rng.uniform(0.0, math.tau, n)
-        radii = self._rng.uniform(4.0, min(config.WIDTH, config.HEIGHT) * 0.035, n)
+        radii = self._rng.uniform(4.0, min(self._W, self._H) * 0.035, n)
         hoffs = self._rng.uniform(0.0, 0.15, n)
         for idx, ang, radius, hoff in zip(idxs, angs, radii, hoffs):
             cx, cy, h_off = self._cores[int(idx)]
@@ -76,7 +76,10 @@ class Mycelium(Effect):
             ])
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = config.WIDTH, config.HEIGHT
+        W, H = surf.get_size()
+        if W != self._W or H != self._H:
+            self._W, self._H = W, H
+            self._cores = []
         bass = beat
         mid = config.MID_ENERGY
         high = config.TREBLE_ENERGY
@@ -97,16 +100,16 @@ class Mycelium(Effect):
         # Beat spawns spores from cores
         if bass > 0.65:
             for cx, cy, h_off in self._cores:
-                for _ in range(random.randint(2, 5)):
+                for _ in range(int(self._rng.integers(2, 5))):
                     ang = self._rng.uniform(0.0, math.tau)
                     spd = self._rng.uniform(1.0, 3.5)
                     self._spores.append([
                         cx, cy,
                         math.cos(ang) * spd, math.sin(ang) * spd,
                         h_off,
-                        random.randint(120, 240), # life
+                        int(self._rng.integers(120, 240)), # life
                         240, # max_life
-                        random.uniform(2.0, 4.5) # size
+                        self._rng.uniform(2.0, 4.5) # size
                     ])
 
         speed = 6.5 + bass * 18.0 + mid * 5.0
@@ -146,9 +149,9 @@ class Mycelium(Effect):
                         math.cos(ta2 + math.pi) * 0.5 + self._rng.uniform(-0.5, 0.5),
                         math.sin(ta2 + math.pi) * 0.5 + self._rng.uniform(-0.5, 0.5),
                         h_off,
-                        random.randint(80, 160),
+                        int(self._rng.integers(80, 160)),
                         160,
-                        random.uniform(1.5, 3.5)
+                        self._rng.uniform(1.5, 3.5)
                     ])
 
                 if len(self._segs) < self.max_segs:
@@ -246,10 +249,13 @@ class Mycelium(Effect):
             p2 = (int(x2), int(y2))
             
             # Bioluminescent glow style drawing:
-            # Broad soft color glow
-            pygame.draw.line(surf, hsl(hue, s=0.9, l=bright * 0.3), p1, p2, glow_w + 3)
-            # Bright thin core line
-            pygame.draw.line(surf, hsl(hue, s=0.4, l=min(0.95, bright * 1.5)), p1, p2, core_w)
+            # Broad soft color glow + bright thin core line (batched)
+            h_arr = np.full(2, hue)
+            s_arr = np.array([0.9, 0.4])
+            l_arr = np.array([bright * 0.3, min(0.95, bright * 1.5)])
+            cols  = _hsl_batch(h_arr, s_arr, l_arr)
+            pygame.draw.line(surf, tuple(cols[0].astype(int)), p1, p2, glow_w + 3)
+            pygame.draw.line(surf, tuple(cols[1].astype(int)), p1, p2, core_w)
             
             if depth > 5 and age < max_age * 0.25 and (depth + age) % 5 == 0:
                 pygame.draw.circle(surf, hsl(hue, l=bright * 0.85), p2, max(1, 3 - depth // 8))
