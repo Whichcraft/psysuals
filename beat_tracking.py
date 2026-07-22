@@ -13,15 +13,18 @@ import numpy as np
 
 _LIBROSA = None
 _LIBROSA_FAILED = False
+_LIBROSA_ERROR = None
 
 
 def _get_librosa():
-    global _LIBROSA, _LIBROSA_FAILED
+    global _LIBROSA, _LIBROSA_FAILED, _LIBROSA_ERROR
     if _LIBROSA is None and not _LIBROSA_FAILED:
         try:
             _LIBROSA = importlib.import_module("librosa")
-        except ImportError:  # pragma: no cover - optional dependency at runtime
+        except Exception as exc:  # pragma: no cover - optional dependency at runtime
             _LIBROSA_FAILED = True
+            _LIBROSA_ERROR = exc
+            print(f"BeatTracking: librosa unavailable: {exc}", file=sys.stderr)
     return _LIBROSA
 
 
@@ -59,9 +62,14 @@ class LibrosaBeatTracker:
         self._last_onset_strength = 0.0
         self._bpm = 0.0
         self._analysis_running = False
+        self._released = False
         self._executor = ThreadPoolExecutor(max_workers=1)
 
     def release(self) -> None:
+        with self._lock:
+            if self._released:
+                return
+            self._released = True
         self._executor.shutdown(wait=True)
 
     @property
@@ -69,19 +77,25 @@ class LibrosaBeatTracker:
         return _get_librosa() is not None
 
     def push_audio(self, block: np.ndarray, end_time: float) -> None:
-        if _get_librosa() is None:
-            return
+        with self._lock:
+            if self._released:
+                return
         chunk = np.asarray(block, dtype=np.float32).copy()
         with self._lock:
             self._blocks.append(chunk)
             self._block_end_time = float(end_time)
 
     def analyze(self, fallback_bpm: float = 0.0) -> float:
+        with self._lock:
+            if self._released:
+                return self._bpm or fallback_bpm
         if _get_librosa() is None:
             return fallback_bpm
 
         now = _time.monotonic()
         with self._lock:
+            if self._released:
+                return self._bpm or fallback_bpm
             if now - self._last_analysis < self.analysis_interval:
                 return self._bpm or fallback_bpm
             if not self._blocks:
@@ -94,15 +108,21 @@ class LibrosaBeatTracker:
             self._last_analysis = now
             self._analysis_running = True
 
-        self._executor.submit(
-            self._run_analysis,
-            blocks, block_end_time, fallback_bpm,
-        )
+        try:
+            self._executor.submit(
+                self._run_analysis,
+                blocks, block_end_time, fallback_bpm,
+            )
+        except RuntimeError:
+            with self._lock:
+                self._analysis_running = False
         return self._bpm or fallback_bpm
 
     def _run_analysis(self, blocks, block_end_time: float, fallback_bpm: float) -> None:
         try:
             self._analyze_blocks(blocks, block_end_time, fallback_bpm)
+        except Exception as exc:
+            print(f"BeatTracking: analysis worker failed: {exc}", file=sys.stderr)
         finally:
             with self._lock:
                 self._analysis_running = False

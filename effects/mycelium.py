@@ -18,7 +18,7 @@ class Mycelium(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self._hue = self._rng.random()
         self._phase = 0.0
         self._pulse = 0.0
@@ -26,7 +26,7 @@ class Mycelium(Effect):
         self._tips: list = []
         self._spores: list = []
         self._cores: list[tuple[float, float, float]] = []
-        self._W = self._H = 0
+        self._W, self._H = config.WIDTH, config.HEIGHT
         self.max_segs = _MAX_SEGS
         self.max_tips = _MAX_TIPS
         if getattr(config, "LOW_SPEC", False):
@@ -62,7 +62,9 @@ class Mycelium(Effect):
         else:
             idxs = np.full(n, core_idx, dtype=np.int32)
         angs = self._rng.uniform(0.0, math.tau, n)
-        radii = self._rng.uniform(4.0, min(self._W, self._H) * 0.035, n)
+        radius_low = 2.0
+        radius_high = max(radius_low + 1.0, min(self._W, self._H) * 0.035)
+        radii = self._rng.uniform(radius_low, radius_high, n)
         hoffs = self._rng.uniform(0.0, 0.15, n)
         for idx, ang, radius, hoff in zip(idxs, angs, radii, hoffs):
             cx, cy, h_off = self._cores[int(idx)]

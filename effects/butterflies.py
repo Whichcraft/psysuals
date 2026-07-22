@@ -335,7 +335,7 @@ class Butterflies(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         W, H = self._render_size()[:2]
         self._tick       = 0
         self._global_hue = float(self._rng.random())

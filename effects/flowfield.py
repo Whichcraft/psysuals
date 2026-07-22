@@ -1,10 +1,9 @@
-"""FlowField — 12 000+ particles surfing a continuously-evolving noise field.
+"""FlowField — 8 000+ particles surfing a continuously-evolving noise field.
 
 Particles ride a multi-layered noise field and paint vivid rainbow trails.
 Optimized for high particle count and high frame rates using NumPy surfarray vectorisation.
 """
 import math
-import random
 import numpy as np
 import pygame
 import pygame.surfarray as surfarray
@@ -20,6 +19,7 @@ class FlowField(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         W, H, RD = self._render_size()
         self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
         # Scale particle count dynamically based on screen area.
@@ -28,19 +28,39 @@ class FlowField(Effect):
         self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
         if getattr(config, "LOW_SPEC", False):
             self._n = max(4000, self._n // 2)
-        self._px = np.random.uniform(0, W, self._n).astype(np.float32)
-        self._py = np.random.uniform(0, H, self._n).astype(np.float32)
-        self._hue = random.random()
+        self._allocate_particles(self._n, W, H)
+        self._hue = float(self._rng.random())
         self._t = 0.0
         self._boost = 0.0
+        # Internal trail is always 24-bit for BLEND_RGB_MULT speed
+        self._trail = pygame.Surface((W, H))
+        self._trail.fill((0, 0, 0))
+
+    def _allocate_particles(self, count, W, H):
+        """Allocate particle state, preserving existing particles when possible."""
+        old_px = getattr(self, "_px", None)
+        old_py = getattr(self, "_py", None)
+        old_n = len(old_px) if old_px is not None else 0
+        self._n = int(count)
+        self._px = self._rng.uniform(0, W, self._n).astype(np.float32)
+        self._py = self._rng.uniform(0, H, self._n).astype(np.float32)
+        if old_n:
+            keep = min(old_n, self._n)
+            self._px[:keep] = old_px[:keep] % W
+            self._py[:keep] = old_py[:keep] % H
         self._angles = np.empty(self._n, dtype=np.float32)
         self._ir = np.empty(self._n, dtype=np.uint32)
         self._ig = np.empty(self._n, dtype=np.uint32)
         self._ib = np.empty(self._n, dtype=np.uint32)
         self._colors_arr = np.empty(self._n, dtype=np.uint32)
-        # Internal trail is always 24-bit for BLEND_RGB_MULT speed
-        self._trail = pygame.Surface((W, H))
-        self._trail.fill((0, 0, 0))
+
+    def adjust_particles(self, delta=2000):
+        """Add or remove particles in fixed steps for interactive tuning."""
+        minimum = 4000 if getattr(config, "LOW_SPEC", False) else 8000
+        target = max(minimum, min(100000, self._n + int(delta)))
+        if target != self._n:
+            W, H, _ = self._render_size()
+            self._allocate_particles(target, W, H)
 
     def _field_angles(self, bass):
         x, y, t = self._px, self._py, self._t
@@ -61,8 +81,7 @@ class FlowField(Effect):
             self._n = int(max(8000, min(100000, 25000 * area / (1920 * 1080))))
             if getattr(config, "LOW_SPEC", False):
                 self._n = max(4000, self._n // 2)
-            self._px = np.random.uniform(0, W, self._n).astype(np.float32)
-            self._py = np.random.uniform(0, H, self._n).astype(np.float32)
+            self._allocate_particles(self._n, W, H)
         sw, sh = surf.get_size()
         if self._scaled.get_width() != sw or self._scaled.get_height() != sh:
             self._scaled = pygame.Surface((sw, sh))

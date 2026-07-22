@@ -36,7 +36,7 @@ class Corridor(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._rng  = np.random.default_rng(config.RNG_SEED or None)
+        self._rng  = np.random.default_rng(config.RNG_SEED)
         self.hue    = 0.0
         self.time   = 0.0
         spacing     = (self.Z_FAR - self.Z_NEAR) / self.N_FRAMES
@@ -76,14 +76,18 @@ class Corridor(Effect):
         bass       = beat
         mid        = config.MID_ENERGY
         high       = config.TREBLE_ENERGY
+        motion     = self._display_motion_scale()
+        bass_m     = bass * motion
+        mid_m      = mid * motion
+        high_m     = high * motion
 
-        dt         = 0.028 + bass * 0.08 + mid * 0.06 + high * 0.04
+        dt         = 0.022 + bass_m * 0.08 + mid_m * 0.06 + high_m * 0.04
         self.time += dt
 
         fov = min(W, H) * 0.72
 
         # Spawn rate is driven heavily by treble transients (sparkles) and bass
-        spawn_n = int(bass * 4.0 + high * 6.0)
+        spawn_n = int(bass_m * 4.0 + high_m * 6.0)
         for _ in range(min(spawn_n, self._MAX_SPARKS - self._spark_count)):
             i = self._spark_count
             self._sz[i]   = self.Z_FAR * (0.55 + float(self._rng.random()) * 0.37)
@@ -119,13 +123,13 @@ class Corridor(Effect):
         for f in sorted(self.frames, key=lambda f: -f["z"]):
             z      = max(f["z"], 0.01)
             near_t = max(0.0, 1.0 - z / self.Z_FAR)
-            pcx, pcy = self._path(self.time - z * 0.5, mid=mid)
+            pcx, pcy = self._path(self.time - z * 0.5, mid=mid_m)
             cx_s   = int(pcx * fov / z + W / 2)
             cy_s   = int(pcy * fov / z + H / 2)
 
             h      = (self.hue + near_t) % 1.0
-            bright = 0.06 + near_t * 0.70 + mid * 0.15 * near_t + bass * near_t * 0.50
-            lw     = max(1, int(1 + bass * 3 * near_t + mid * 1.5 * near_t))
+            bright = 0.06 + near_t * 0.70 + mid_m * 0.15 * near_t + bass_m * near_t * 0.50
+            lw     = max(1, int(1 + bass_m * 3 * near_t + mid_m * 1.5 * near_t))
 
             half_h = int(self.WORLD_H * fov / z)
             half_w = int(self.WORLD_H * self.ASPECT * fov / z)
@@ -145,13 +149,13 @@ class Corridor(Effect):
         for i in range(self._spark_count):
             z      = max(self._sz[i], 0.01)
             near_t = max(0.0, 1.0 - z / self.Z_FAR)
-            pcx, pcy = self._path(self.time - z * 0.5, mid=mid)
+            pcx, pcy = self._path(self.time - z * 0.5, mid=mid_m)
             sx     = int((pcx + self._sox[i]) * fov / z + W / 2)
             sy     = int((pcy + self._soy[i]) * fov / z + H / 2)
             # Spark size scales with treble transients
-            r      = max(2, int((fov / z * 0.05) * (1.0 + high * 1.5)))
+            r      = max(2, int((fov / z * 0.05) * (1.0 + high_m * 1.5)))
             h      = (self._shue[i] + near_t * 0.35) % 1.0
-            bright = 0.35 + near_t * 0.60 + high * 0.25
+            bright = 0.35 + near_t * 0.60 + high_m * 0.25
             pygame.draw.circle(self.spark_surf, hsl(h, l=bright * 0.25), (sx, sy), r + 4)
             pygame.draw.circle(self.spark_surf, hsl(h, l=bright),         (sx, sy), max(1, r))
 

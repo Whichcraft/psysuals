@@ -11,7 +11,6 @@ holographic mandala.
   Beat   → speed spike + hue jump
 """
 import math
-import random
 import numpy as np
 import pygame
 
@@ -43,11 +42,12 @@ class Persistence(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self._hue = 0.0
         # Initialize 3D rotation angles for each shape
-        self._rot_x = [random.uniform(0, math.tau) for _ in range(_MAX_SHAPES)]
-        self._rot_y = [random.uniform(0, math.tau) for _ in range(_MAX_SHAPES)]
-        self._rot_z = [random.uniform(0, math.tau) for _ in range(_MAX_SHAPES)]
+        self._rot_x = self._rng.uniform(0, math.tau, _MAX_SHAPES).tolist()
+        self._rot_y = self._rng.uniform(0, math.tau, _MAX_SHAPES).tolist()
+        self._rot_z = self._rng.uniform(0, math.tau, _MAX_SHAPES).tolist()
         
         # Non-coplanar speed ratios for complex 3D orbital dynamics
         self._speeds_x = [0.008 * (1 + i * 0.12) for i in range(_MAX_SHAPES)]
@@ -139,7 +139,11 @@ class Persistence(Effect):
         self._beat_prev = bass
 
         cx, cy = W // 2, H // 2
-        base_r = min(W, H) * 0.38
+        # This is the camera focal scale, not the model radius. A 0.40*H
+        # scale leaves the projected solids visually undersized because of
+        # perspective depth. Use a substantially wider focal scale so the
+        # outer figures occupy most of the viewport height.
+        base_r = H * 0.95
         fov = base_r
         spd_mul = 1.0 + bass * 2.5 + self._boost
 
@@ -196,12 +200,6 @@ class Persistence(Effect):
                 # Double-pass drawing for neon/glowing effect
                 pygame.draw.line(self._scaled, glow, p1, p2, thickness + 2)
                 pygame.draw.line(self._scaled, col, p1, p2, thickness)
-
-        # Treble: brief radial flash ring in background
-        if high > 0.50:
-            flash_r = int(min(W, H) * 0.48 * high)
-            pygame.draw.circle(self._scaled, hsl(self._hue, l=0.15 * high),
-                               (cx, cy), flash_r, 2)
 
         # Scale up to full resolution
         scaled = pygame.transform.smoothscale(self._scaled, surf.get_size())

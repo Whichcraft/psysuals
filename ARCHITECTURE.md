@@ -7,7 +7,7 @@ psysualizer.py   ← main entry point: sounddevice callback + pygame loop
                  (Supports --gl for hardware-accelerated ModernGL rendering)
 beat_tracking.py ← optional librosa beat/BPM refinement, off the render thread
 config.py        ← shared mutable runtime state
-effects/         ← one file per effect, registered in MODES
+effects/         ← effect modules and shared helpers, registered in MODES
 requirements-gl.txt ← optional dependency set for the GL path
 ```
 
@@ -25,7 +25,7 @@ _audio_cb()
     │  push block to LibrosaBeatTracker history
     │  Blackman-windowed rfft → log1p scale → /10
     │  exponential smoothing (α = 0.50) → _smooth_fft
-    │  spectral flux on bins 0..19 → raw beat energy
+    │  weighted spectral flux across available FFT bins → raw beat energy
     │  onset timestamps → fallback BPM
     │  mid / treble rolling normalisation
     ▼
@@ -33,7 +33,7 @@ get_audio()
     returns (waveform, fft, raw_beat, mid_energy, treble_energy, bpm, audio_time)
 ```
 
-The callback stays cheap and deterministic. It computes the always-available fallback beat/BPM path and pushes raw audio into `LibrosaBeatTracker`.
+The callback keeps its per-block work bounded. It computes the always-available fallback beat/BPM path and pushes raw audio into `LibrosaBeatTracker`; the optional refinement layer may be unavailable when its dependency is missing.
 
 Input-stream startup is tolerant now: the app tries the saved device first, then preferred concrete inputs (favoring PipeWire/Pulse and other explicit devices ahead of Linux's brittle `default` wrappers), and if all candidates fail it keeps running with no live input stream so the UI can still come up.
 
@@ -51,8 +51,8 @@ The main loop converts callback-time raw beat energy into the value passed to ef
 
 ```python
 impulse = max(0.0, min(raw_beat / (avg + 1e-6) - 1.0, 3.0))
-beat_decay = max(impulse, beat_decay * 0.90)
-beat = beat_decay
+beat_decay = max(impulse, beat_decay * (0.82 if is_silent else 0.90))
+beat = max(beat_decay, silence_beat_floor if is_silent else 0.0)
 ```
 
 `avg` is the rolling average of the last 40 raw-beat samples. The result is volume-adaptive and decays smoothly between kicks.
@@ -73,7 +73,7 @@ This prevents normalization noise from turning silence into fake beat spikes whi
 
 The render loop in `psysualizer.py` uses a dual-target strategy to support both CPU and GPU effects:
 
-1. **Target Abstraction**: All drawing operations target a `target` surface.
+1. **Target Abstraction**: CPU drawing operations target a `target` surface.
    - In CPU mode: `target` is the display surface.
    - In GL mode: `target` is an offscreen transparent surface used for UI/HUD.
 2. **Effect Execution**: Effects are instantiated with an optional `GLRenderer`.
@@ -122,7 +122,7 @@ Fullscreen/display changes also recreate the background effect so display-bound 
 
 ## Effect contract
 
-Effects are simple classes that can draw to a `pygame.Surface` or use a `GLRenderer`:
+Effects are simple classes that can draw to a `pygame.Surface` or use a `GLRenderer`. Direct GL effects render through the active context and may ignore the surface argument:
 
 ```python
 class MyEffect(Effect):
@@ -201,17 +201,4 @@ Rules that matter in this repo:
 
 ---
 
-## File sizes
-
-| File | Lines | Role |
-|------|-------|------|
-| `psysualizer.py` | `~600` | thin orchestrator |
-| `core/audio_engine.py` | `~260` | audio logic |
-| `core/display_manager.py` | `~220` | window/span logic |
-| `core/ui_manager.py` | `~140` | UI rendering |
-| `config.py` | `~40` | shared runtime state |
-| `effects/__init__.py` | `~60` | mode registry |
-| `effects/utils.py` | `27` | colour helpers |
-| `gl_renderer.py` | `~260` | GL helper and shader-asset loader |
-| `settings.py` | `~80` | settings and preset persistence |
-| `effects/*.py` | `27` active modes + shared helpers | visual implementations |
+Line counts are intentionally not part of this document because they change with ordinary maintenance. The helper-module table above describes the stable responsibilities and file boundaries.

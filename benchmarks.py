@@ -8,7 +8,6 @@ from effects import MODES
 from gl_renderer import GLRenderer, HAS_MODERNGL
 
 def run_benchmark(duration_s=2.0):
-    global HAS_MODERNGL
     print(f"Running benchmarks (duration: {duration_s}s per mode)...")
     
     # Mock audio data
@@ -21,22 +20,25 @@ def run_benchmark(duration_s=2.0):
     pygame.init()
     W, h = 1920, 1080 # Benchmark at Full HD
     _old_w, _old_h = config.WIDTH, config.HEIGHT
+    _old_initialized = config._INITIALIZED
     config.WIDTH, config.HEIGHT = W, h
+    config._INITIALIZED = True
+    renderer = None
+    gl_available = HAS_MODERNGL
     
     try:
         # CPU Target
         cpu_surf = pygame.Surface((W, h))
 
-        renderer = None
         gl_target = None
-        if HAS_MODERNGL:
+        if gl_available:
             try:
                 pygame.display.set_mode((W, h), pygame.OPENGL | pygame.DOUBLEBUF)
                 renderer = GLRenderer(W, h)
                 gl_target = pygame.Surface((W, h), pygame.SRCALPHA)
             except Exception as e:
                 print(f"  ⚠️ ModernGL init failed for benchmark: {e}")
-                HAS_MODERNGL = False
+                gl_available = False
 
         results = []
 
@@ -45,15 +47,19 @@ def run_benchmark(duration_s=2.0):
 
             # CPU Test
             vis_cpu = VisCls()
-            tick = 0
-            start = time.perf_counter()
-            frames = 0
-            end_time = start + duration_s
-            while time.perf_counter() < end_time:
-                vis_cpu.draw(cpu_surf, waveform, fft, beat, tick)
-                frames += 1
-                tick += 1
-            cpu_fps = frames / (time.perf_counter() - start)
+            try:
+                tick = 0
+                start = time.perf_counter()
+                frames = 0
+                end_time = start + duration_s
+                while time.perf_counter() < end_time:
+                    vis_cpu.draw(cpu_surf, waveform, fft, beat, tick)
+                    frames += 1
+                    tick += 1
+                cpu_fps = frames / (time.perf_counter() - start)
+            finally:
+                if hasattr(vis_cpu, "release"):
+                    vis_cpu.release()
 
             # GL Test
             gl_fps = None
@@ -87,3 +93,11 @@ def run_benchmark(duration_s=2.0):
         print("="*60)
     finally:
         config.WIDTH, config.HEIGHT = _old_w, _old_h
+        config._INITIALIZED = _old_initialized
+        if renderer is not None:
+            renderer.release()
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    run_benchmark()

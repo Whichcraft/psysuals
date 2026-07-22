@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 def _load_gl_renderer():
     try:
         mod = importlib.import_module("gl_renderer")
-    except ImportError:
+    except Exception as exc:
+        print(f"  ⚠️ ModernGL renderer import failed: {exc}", file=sys.stderr)
         return None, False
     return mod.GLRenderer, bool(getattr(mod, "HAS_MODERNGL", False))
 
@@ -31,7 +32,7 @@ class DisplayManager:
         self.screen = None
         self.target = None
         self.fullscreen = True
-        self.xmonitors = self._xrandr_monitors()
+        self.xmonitors = self._xrandr_monitors() or []
         self.num_displays = max(len(self.xmonitors), 1)
         self.display_idx = 0
         self.span_children: dict[int, subprocess.Popen] = {}
@@ -76,7 +77,7 @@ class DisplayManager:
         except Exception:
             pass
 
-    def _xrandr_monitors(self) -> list[tuple[int, int, int, int]]:
+    def _xrandr_monitors(self) -> list[tuple[int, int, int, int]] | None:
         """Return list of (x, y, w, h) for each physical monitor."""
         try:
             out = subprocess.check_output(
@@ -86,14 +87,14 @@ class DisplayManager:
             )
             monitors = []
             for line in out.splitlines():
-                match = _re.search(r"(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
+                match = _re.search(r"(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)", line)
                 if match:
                     w, h, x, y = (int(match.group(i)) for i in range(1, 5))
                     monitors.append((x, y, w, h))
             monitors.sort(key=lambda mon: mon[0])
             return monitors
         except Exception:
-            return []
+            return None
 
     def open_display(self, idx: int, fullscreen: bool):
         # Validate index
@@ -111,7 +112,11 @@ class DisplayManager:
                 self._gl_renderer_cls, self._has_moderngl = _load_gl_renderer()
             if not self._has_moderngl:
                 print("  ⚠️ --gl requested but moderngl is not installed in this environment; running without the ModernGL renderer.")
-            if not getattr(self, "_gl_attrs_set", False):
+                # An OpenGL display without a renderer cannot present the
+                # Pygame target surface, so use the CPU display path.
+                self.args.gl = False
+                flags = 0
+            if self.args.gl and not getattr(self, "_gl_attrs_set", False):
                 try:
                     pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
                     pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
@@ -153,8 +158,11 @@ class DisplayManager:
                 config.WIDTH, config.HEIGHT = self.screen.get_size()
         except Exception as _dm_exc:
             print(f"  ⚠️ Display init failed: {_dm_exc}", file=sys.stderr)
-            # Last resort fallback: windowed mode
-            self.screen = pygame.display.set_mode((1280, 720), flags)
+            # Last resort fallback: plain CPU/windowed mode. Reusing OPENGL
+            # flags here would repeat the failure this branch is recovering.
+            self.args.gl = False
+            self.renderer = None
+            self.screen = pygame.display.set_mode((1280, 720), 0)
             config.WIDTH, config.HEIGHT = 1280, 720
         config._INITIALIZED = True
         
@@ -166,6 +174,11 @@ class DisplayManager:
             except Exception as e:
                 print(f"  ⚠️ ModernGL renderer initialization failed: {e}")
                 self.renderer = None
+                # A context can fail even when moderngl imports correctly.
+                # Reopen the window without OPENGL so --gl still degrades to
+                # the working CPU renderer.
+                self.args.gl = False
+                return self.open_display(idx, fullscreen)
         
         self.target = self.screen
         return self.screen
@@ -179,12 +192,17 @@ class DisplayManager:
             self._libX11.XMoveWindow(dpy, win, mx, my)
             self._libX11.XSync(dpy, 0)
 
-    def requery_xmonitors(self) -> None:
+    def requery_xmonitors(self) -> bool:
         """Re-query xrandr monitor list (handles hotplug changes)."""
         new_mons = self._xrandr_monitors()
-        if len(new_mons) != len(self.xmonitors):
+        if new_mons is None:
+            return False
+        if new_mons != self.xmonitors:
             self.xmonitors = new_mons
             self.num_displays = max(len(self.xmonitors), 1)
+            self.display_idx = max(0, min(getattr(self, "display_idx", 0), self.num_displays - 1))
+            return True
+        return False
 
     def spawn_child(self, child_idx: int, mode_i: int, entry_script: str) -> None:
         cmd = [
@@ -212,23 +230,33 @@ class DisplayManager:
 
     def kill_children(self) -> None:
         """Terminate all span child processes and wait for them to exit."""
+        children = getattr(self, "span_children", {})
         # 1. Send SIGTERM to all first (parallel)
-        for child in self.span_children.values():
+        for child in children.values():
             if child.poll() is None:
-                child.terminate()
+                try:
+                    child.terminate()
+                except (ProcessLookupError, OSError):
+                    pass
         
         # 2. Wait a bit for all to exit gracefully
-        for child in self.span_children.values():
+        for child in children.values():
             try:
                 child.wait(timeout=0.15)
             except subprocess.TimeoutExpired:
                 pass
         
         # 3. Kill any survivors and wait to clean up zombies
-        for child in self.span_children.values():
+        for child in children.values():
             if child.poll() is None:
-                child.kill()
-                child.wait()
+                try:
+                    child.kill()
+                except (ProcessLookupError, OSError):
+                    pass
+                try:
+                    child.wait()
+                except (ChildProcessError, OSError):
+                    pass
         
         self.span_children = {}
 

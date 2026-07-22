@@ -27,6 +27,7 @@ class Magnetar(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self._hue   = 0.62
         self._rot   = 0.0
         self._boost = 0.0
@@ -39,8 +40,8 @@ class Magnetar(Effect):
         W, H, RD = self._render_size()
         area = W * H
         self._n = max(6000, min(40000, int(10000 * area / (960 * 540))))
-        self._px = np.random.uniform(0, W, self._n).astype(np.float32)
-        self._py = np.random.uniform(0, H, self._n).astype(np.float32)
+        self._px = self._rng.uniform(0, W, self._n).astype(np.float32)
+        self._py = self._rng.uniform(0, H, self._n).astype(np.float32)
         self._trail = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
         self._fade = pygame.Surface((W, H), pygame.SRCALPHA)

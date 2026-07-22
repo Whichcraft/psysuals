@@ -31,7 +31,7 @@ class Attractor(Effect):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.hue        = 0.0
-        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self.tiles      = []
         self.filled_ids = []
         self.active_ids = []

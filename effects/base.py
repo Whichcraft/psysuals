@@ -58,6 +58,16 @@ class Effect:
         """Return (internal_width, internal_height, divisor)."""
         div = self._render_div()
         return max(1, config.WIDTH // div), max(1, config.HEIGHT // div), div
+
+    def _display_motion_scale(self) -> float:
+        """Scale high-energy motion for smaller laptop-sized displays.
+
+        Large TVs retain the original intensity. Smaller displays get a
+        gentler response so rapid perspective effects do not become visually
+        overwhelming at close viewing distance.
+        """
+        shortest = min(max(1, config.WIDTH), max(1, config.HEIGHT))
+        return max(0.55, min(1.0, shortest / 1080.0))
     
     def draw(self, surf: pygame.Surface | None, waveform: np.ndarray,
              fft: np.ndarray, beat: float, tick: int) -> None:

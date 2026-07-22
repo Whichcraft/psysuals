@@ -25,6 +25,7 @@ class Cube(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self.rx = self.ry = self.rz = 0.0
         self.hue      = 0.0
         self.fade_hue = 0.0
@@ -94,14 +95,18 @@ class Cube(Effect):
         bass = beat
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
+        motion = self._display_motion_scale()
+        bass_m = bass * motion
+        mid_m = mid * motion
+        high_m = high * motion
 
-        self.rvx += 0.00025 + mid  * 0.025 + bass * 0.08
-        self.rvy += 0.00035 + bass * 0.12
-        self.rvz += 0.00018 + high * 0.035 + bass * 0.04
+        self.rvx += 0.00025 + mid_m * 0.025 + bass_m * 0.08
+        self.rvy += 0.00035 + bass_m * 0.12
+        self.rvz += 0.00018 + high_m * 0.035 + bass_m * 0.04
         self.rvx *= 0.94; self.rvy *= 0.94; self.rvz *= 0.94
         self.rx += self.rvx; self.ry += self.rvy; self.rz += self.rvz
 
-        self.svel += bass * 0.32 + (1.0 - self.scale) * 0.18
+        self.svel += bass_m * 0.32 + (1.0 - self.scale) * 0.18 * motion
         self.svel *= 0.68
         self.scale += self.svel
         self.scale = max(0.5, min(1.25, self.scale))
@@ -109,23 +114,23 @@ class Cube(Effect):
         R = self._Rx(self.rx) @ self._Ry(self.ry) @ self._Rz(self.rz)
 
         # High energy treble adds physical vertex jitter to the cubes
-        jitter_amp = high * 0.08
+        jitter_amp = high_m * 0.08
         for base_scale, hue_off in ((self.scale, 0.0), (self.scale * 0.45, 0.5)):
             cube_verts = self.VERTS * base_scale
             if jitter_amp > 0.001:
-                cube_verts = cube_verts + (np.random.normal(0, jitter_amp, cube_verts.shape))
+                cube_verts = cube_verts + self._rng.normal(0, jitter_amp, cube_verts.shape)
             verts = (R @ cube_verts.T).T
             proj  = [self._project(v, W, H) for v in verts]
             for ei, (a, b) in enumerate(self.EDGES):
                 h = (self.fade_hue + hue_off + ei / len(self.EDGES) * 0.4) % 1.0
-                lw = max(1, int(2 + self.svel * 4 + high * 2.0)) if base_scale > 0.4 else 1
-                color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25 + mid * 0.10)
+                lw = max(1, int(2 + self.svel * 4 + high_m * 2.0)) if base_scale > 0.4 else 1
+                color = hsl(h, l=0.40 + min(self.svel, 1.0) * 0.25 + mid_m * 0.10)
                 pygame.draw.line(surf, color, proj[a], proj[b], lw)
 
         sat_scale = min(self.scale * 0.28, 0.55)
-        ORB_R = 2.6 + mid * 0.4
-        self.orb_angle += 0.012 + bass * 0.04 + mid * 0.03
-        self.sat_rx += 0.018 + high * 0.04; self.sat_ry += 0.026 + high * 0.03
+        ORB_R = 2.6 + mid_m * 0.4
+        self.orb_angle += 0.012 + bass_m * 0.04 + mid_m * 0.03
+        self.sat_rx += 0.018 + high_m * 0.04; self.sat_ry += 0.026 + high_m * 0.03
         Rs = self._Rx(self.sat_rx) @ self._Ry(self.sat_ry)
 
         # Fade satellite trail
@@ -136,15 +141,15 @@ class Cube(Effect):
             ox, oy = ORB_R * math.cos(theta), ORB_R * math.sin(theta)
             sat_verts = self.VERTS * sat_scale
             if jitter_amp > 0.001:
-                sat_verts = sat_verts + (np.random.normal(0, jitter_amp, sat_verts.shape))
+                sat_verts = sat_verts + self._rng.normal(0, jitter_amp, sat_verts.shape)
             verts = (Rs @ sat_verts.T).T
             proj  = self._project_sat(verts, ox, oy, sat_scale, W, H)
             h_off = si * 0.5
             for ei, (a, b) in enumerate(self.EDGES):
                 h = (self.fade_hue + h_off + ei / len(self.EDGES) * 0.4) % 1.0
                 # Treble increases satellite line width shimmer
-                sat_lw = max(1, int(1 + high * 2))
-                color = hsl(h, l=0.18 + min(self.svel, 1.0) * 0.28 + mid * 0.15)
+                sat_lw = max(1, int(1 + high_m * 2))
+                color = hsl(h, l=0.18 + min(self.svel, 1.0) * 0.28 + mid_m * 0.15)
                 pygame.draw.line(self.sat_surf, color, proj[a], proj[b], sat_lw)
 
         # Use BLEND_RGBA_MAX to preserve alpha 255 from satellite lines

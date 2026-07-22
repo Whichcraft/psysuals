@@ -26,8 +26,16 @@ class SlimeMold(Effect):
     TRAIL_ALPHA = 0
     RES_DIV     = 3
 
+    def _render_div(self) -> int:
+        # Keep the deliberately chunky laptop look, but use a finer grid on
+        # TV-sized displays where enlarged pixels become distracting.
+        auto = self._auto_res_div()
+        preferred = 2 if min(config.WIDTH, config.HEIGHT) >= 900 else 3
+        return max(1, min(preferred, auto))
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self._W, self._H = 1, 1
         self._n = 0
         self._trail = np.zeros((1, 1), dtype=np.float32)
@@ -46,12 +54,12 @@ class SlimeMold(Effect):
         cx, cy   = W / 2.0, H / 2.0
         r_spread = min(W, H) * 0.25
         self._px  = np.clip(
-            np.random.normal(cx, r_spread * 0.3, self._n),
+            self._rng.normal(cx, r_spread * 0.3, self._n),
             0, W - 1).astype(np.float32)
         self._py  = np.clip(
-            np.random.normal(cy, r_spread * 0.3, self._n),
+            self._rng.normal(cy, r_spread * 0.3, self._n),
             0, H - 1).astype(np.float32)
-        self._ang = np.random.uniform(0, math.tau, self._n).astype(np.float32)
+        self._ang = self._rng.uniform(0, math.tau, self._n).astype(np.float32)
         self._trail = np.zeros((H, W), dtype=np.float32)
         self._surf  = pygame.Surface((W, H))
         self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
@@ -87,14 +95,14 @@ class SlimeMold(Effect):
         # Beat: teleport a fraction of agents back toward center
         if bass > 0.7:
             n_tp = int(self._n * 0.05)
-            idx  = np.random.randint(0, self._n, n_tp)
+            idx  = self._rng.integers(0, self._n, n_tp)
             cx, cy = W / 2.0, H / 2.0
             r_spread = min(W, H) * 0.20
             self._px[idx]  = np.clip(
-                np.random.normal(cx, r_spread, n_tp), 0, W - 1).astype(np.float32)
+                self._rng.normal(cx, r_spread, n_tp), 0, W - 1).astype(np.float32)
             self._py[idx]  = np.clip(
-                np.random.normal(cy, r_spread, n_tp), 0, H - 1).astype(np.float32)
-            self._ang[idx] = np.random.uniform(0, math.tau, n_tp).astype(np.float32)
+                self._rng.normal(cy, r_spread, n_tp), 0, H - 1).astype(np.float32)
+            self._ang[idx] = self._rng.uniform(0, math.tau, n_tp).astype(np.float32)
 
         fwd   = self._sense(0.0,  sd)
         left  = self._sense(-sa,  sd)
@@ -105,7 +113,7 @@ class SlimeMold(Effect):
         go_left  = (left  > fwd) & (left  >= right)
         go_right = (right > fwd) & (right >  left)
         go_rand  = (~go_left) & (~go_right) & (
-            np.random.random(self._n) < 0.05)
+            self._rng.random(self._n) < 0.05)
 
         d_ang = np.zeros(self._n, dtype=np.float32)
         d_ang[go_left]  = -rot
@@ -113,15 +121,18 @@ class SlimeMold(Effect):
         rnd_n = int(go_rand.sum())
         if rnd_n:
             d_ang[go_rand] = (
-                (np.random.random(rnd_n) - 0.5) * rot * 2).astype(np.float32)
+                (self._rng.random(rnd_n) - 0.5) * rot * 2).astype(np.float32)
         self._ang += d_ang
 
         self._px = (self._px + np.cos(self._ang) * spd) % W
         self._py = (self._py + np.sin(self._ang) * spd) % H
 
         # Deposit trail
-        ix = self._px.astype(np.int32)
-        iy = self._py.astype(np.int32)
+        trail_h, trail_w = self._trail.shape
+        # Float32 modulo can round a value at the upper edge back to W/H;
+        # clamp against the actual NumPy trail shape before indexed writes.
+        ix = np.clip(self._px.astype(np.int32), 0, trail_w - 1)
+        iy = np.clip(self._py.astype(np.int32), 0, trail_h - 1)
         np.add.at(self._trail, (iy, ix), 0.8 + bass * 0.6)
 
         # Diffuse (approximate 3×3 box blur)
