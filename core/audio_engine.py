@@ -1,11 +1,39 @@
 from __future__ import annotations
 import sys
 import threading
+import importlib
 from collections import deque
 import numpy as np
-import sounddevice as sd
 import config
 from beat_tracking import LibrosaBeatTracker
+
+sd = None
+_sd_lock = threading.Lock()
+_sd_loading = False
+_sd_error = None
+
+
+def _load_sounddevice() -> None:
+    global sd, _sd_loading, _sd_error
+    try:
+        sd = importlib.import_module("sounddevice")
+    except Exception as exc:  # Optional audio backend.
+        _sd_error = exc
+    finally:
+        _sd_loading = False
+
+
+def _get_sounddevice():
+    """Start loading PortAudio without blocking visualizer startup."""
+    global _sd_loading
+    if sd is not None:
+        return sd
+    with _sd_lock:
+        if sd is None and not _sd_loading and _sd_error is None:
+            _sd_loading = True
+            thread = threading.Thread(target=_load_sounddevice, daemon=True)
+            thread.start()
+    return sd
 
 class AudioEngine:
     def __init__(self):
@@ -42,6 +70,11 @@ class AudioEngine:
         self.stream = None
         self.active_dev = None
         self.last_error = None
+        self._initial_stream_pending = True
+
+    @property
+    def initial_stream_pending(self) -> bool:
+        return self._initial_stream_pending
 
     def _band_bounds(self, size: int, start_frac: float, end_frac: float) -> tuple[int, int]:
         start = max(0, min(size - 1, int(size * start_frac))) if size else 0
@@ -187,8 +220,11 @@ class AudioEngine:
 
     def input_devices(self) -> list[tuple[int, str]]:
         """Return list of (index, name) for all input-capable devices."""
+        sounddevice = _get_sounddevice()
+        if sounddevice is None:
+            return []
         try:
-            queried = sd.query_devices()
+            queried = sounddevice.query_devices()
         except Exception:
             return []
 
@@ -225,16 +261,24 @@ class AudioEngine:
     def start_input_stream(self, device_idx: int | None):
         if self.stream is not None:
             self.stop_input_stream()
-        
+
+        sounddevice = _get_sounddevice()
+        if sounddevice is None:
+            self.last_error = _sd_error or RuntimeError("sounddevice is still loading or unavailable")
+            return None
+
+        self._initial_stream_pending = False
+        stream = None
         try:
-            self.stream = sd.InputStream(
+            stream = sounddevice.InputStream(
                 samplerate=config.SAMPLE_RATE,
                 blocksize=config.BLOCK_SIZE,
                 channels=config.CHANNELS,
                 device=device_idx,
                 callback=self._audio_cb,
             )
-            self.stream.start()
+            stream.start()
+            self.stream = stream
             self.active_dev = device_idx
             self.last_error = None
             return self.stream
@@ -242,17 +286,27 @@ class AudioEngine:
             self.stream = None
             self.active_dev = None
             self.last_error = exc
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception as close_exc:
+                    self.last_error = close_exc
             return None
 
     def stop_input_stream(self) -> None:
-        if self.stream is None:
-            return
-        try:
-            self.stream.stop()
-        finally:
-            self.stream.close()
+        stream = self.stream
         self.stream = None
         self.active_dev = None
+        if stream is None:
+            return
+        try:
+            stream.stop()
+        except Exception as exc:
+            self.last_error = exc
+        try:
+            stream.close()
+        except Exception as exc:
+            self.last_error = exc
 
     def open_input_stream(self, *candidates):
         seen: list[int | None] = []

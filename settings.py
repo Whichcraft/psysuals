@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 
 _CONFIG_DIR    = os.path.join(os.path.expanduser("~"), ".config", "psysuals")
 _SETTINGS_FILE = os.path.join(_CONFIG_DIR, "settings.json")
@@ -22,26 +23,66 @@ _DEFAULTS = {
 }
 
 
+def _ensure_config_dir() -> bool:
+    try:
+        os.makedirs(_CONFIG_DIR, exist_ok=True)
+        return True
+    except OSError as exc:
+        print(f"Settings: cannot create config directory: {exc}", file=sys.stderr)
+        return False
+
+
+def _normalise(data: object) -> dict:
+    if not isinstance(data, dict):
+        return dict(_DEFAULTS)
+    result = {**_DEFAULTS, **data}
+    int_ranges = {
+        "mode_idx": (0, 10_000), "display_idx": (0, 10_000),
+        "hud_level": (0, 2), "bg_mode_i": (0, 10_000),
+        "bg_alpha": (0, 255), "cf_frames": (0, 300),
+    }
+    for key, (low, high) in int_ranges.items():
+        value = result[key]
+        if isinstance(value, bool) or not isinstance(value, int):
+            result[key] = _DEFAULTS[key]
+        else:
+            result[key] = max(low, min(high, value))
+    value = result["effect_gain"]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        result["effect_gain"] = _DEFAULTS["effect_gain"]
+    else:
+        result["effect_gain"] = max(0.0, min(2.0, float(value)))
+    for key in ("show_hud", "auto_gain", "bg_on"):
+        if not isinstance(result[key], bool):
+            result[key] = _DEFAULTS[key]
+    return result
+
+
 def load() -> dict:
-    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    if not _ensure_config_dir():
+        return dict(_DEFAULTS)
     try:
         with open(_SETTINGS_FILE) as f:
             data = json.load(f)
-        return {**_DEFAULTS, **data}
-    except (FileNotFoundError, json.JSONDecodeError):
+        return _normalise(data)
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError, OSError):
         return dict(_DEFAULTS)
 
 
 def save(d: dict) -> None:
-    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    if not _ensure_config_dir():
+        return
     tmp = _SETTINGS_FILE + ".tmp"
     try:
         with open(tmp, "w") as f:
             json.dump(d, f, indent=2)
         os.replace(tmp, _SETTINGS_FILE)
-    except (PermissionError, OSError):
-        # write-protected config dir — silently skip persistence
-        pass
+    except (PermissionError, OSError) as exc:
+        print(f"Settings: cannot save settings: {exc}", file=sys.stderr)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 # ── Presets ───────────────────────────────────────────────────────────────────
@@ -52,22 +93,50 @@ def load_presets() -> list:
         with open(_PRESETS_FILE) as f:
             data = json.load(f)
         if isinstance(data, dict):
-            return [{"name": k, **v} for k, v in data.items()]
-        return data if isinstance(data, list) else []
-    except (FileNotFoundError, json.JSONDecodeError):
+            data = [
+                {"name": k, **value} for k, value in data.items()
+                if isinstance(k, str) and isinstance(value, dict)
+            ]
+        if not isinstance(data, list):
+            return []
+        valid = []
+        for preset in data:
+            if not isinstance(preset, dict) or not isinstance(preset.get("name"), str):
+                continue
+            mode_idx = preset.get("mode_idx")
+            if not isinstance(mode_idx, int) or isinstance(mode_idx, bool):
+                continue
+            item = dict(preset)
+            item["mode_idx"] = max(0, mode_idx)
+            gain = item.get("intensity", _DEFAULTS["effect_gain"])
+            if isinstance(gain, (int, float)) and not isinstance(gain, bool):
+                item["intensity"] = max(0.0, min(2.0, float(gain)))
+            else:
+                item["intensity"] = _DEFAULTS["effect_gain"]
+            item["bg_on"] = item.get("bg_on", False) if isinstance(item.get("bg_on", False), bool) else False
+            bg_mode = item.get("bg_mode_i", 0)
+            item["bg_mode_i"] = max(0, bg_mode) if isinstance(bg_mode, int) and not isinstance(bg_mode, bool) else 0
+            valid.append(item)
+        return valid
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError, OSError, TypeError):
         return []
 
 
 def _write_presets(presets: list) -> None:
     """Atomically write presets list to disk."""
-    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    if not _ensure_config_dir():
+        return
     tmp = _PRESETS_FILE + ".tmp"
     try:
         with open(tmp, "w") as f:
             json.dump(presets, f, indent=2)
         os.replace(tmp, _PRESETS_FILE)
-    except (PermissionError, OSError):
-        pass
+    except (PermissionError, OSError) as exc:
+        print(f"Settings: cannot save presets: {exc}", file=sys.stderr)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def save_preset(name: str, data: dict) -> None:

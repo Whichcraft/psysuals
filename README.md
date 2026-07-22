@@ -2,8 +2,8 @@
 
 **Welcome to the super-duper greatest music visualizer ever made.** psysuals v3 is a massive leap forward, re-engineered from the ground up to deliver uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, v3 is built to melt your mind with precision and style.
 
-![Version](https://img.shields.io/badge/version-3.10.0-orange)
- ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-3.13.0-orange)
+ ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -12,16 +12,16 @@
 - **✨ Unified ModernGL Engine** — Harness the power of your GPU. v3 merges experimental hardware acceleration into the core app. Run with `--gl` for blistering frame rates and per-pixel shader fluid motion.
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
 - **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. v3 scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
-- **🔊 Battle-Hardened Audio Pipeline** — Bulletproof audio capture that never crashes. v3 features intelligent no-input fallback, silence-aware idle motion, live device switching, and a refined spectral-flux beat detection system tuned for maximum response.
-- **⚖️ Built-in Benchmarking & Regression Gates** — Measure your speed with `benchmarks.py` and sleep easy knowing our automated smoke tests guard all 27 active effects from regressions.
+- **🔊 Resilient Audio Pipeline** — Tolerant audio capture with a no-input fallback, silence-aware idle motion, live device switching, and spectral-flux beat detection.
+- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 27 registered effects.
 
 ---
 
 ## ⚙️ Installation
 
 ### 1. Requirements
-- Python 3.8+
-- Audio input device (microphone or loopback monitor)
+- Python 3.10+
+- Optional audio input device (microphone or loopback monitor); the app can run in silent mode without one
 - (Optional) OpenGL 3.3+ capable GPU for hardware acceleration
 
 ### 2. Setup
@@ -71,7 +71,7 @@ The app restores the last saved display index on startup. Use `--display N` to o
 | Key / Action | Effect |
 |---|---|
 | `←` / `→` or `Space` or click | Cycle to previous / next mode (or adjust pane slider when pane is open) |
-| `↑` / `↓` | Increase / decrease effect intensity (or navigate pane sliders when pane is open) |
+| `↑` / `↓` | Increase / decrease effect intensity (or adjust FlowField particles by 2,000, or navigate pane sliders when pane is open) |
 | `1` – `9` | Jump to modes 1–9 |
 | `Tab` | Toggle real-time settings pane (effect gain, bg alpha, crossfade length) |
 | `P` | Save current state as a preset |
@@ -82,7 +82,7 @@ The app restores the last saved display index on startup. Use `--display N` to o
 | `M` | Tap tempo — tap 2+ times to lock BPM for 8 s |
 | `Shift+M` | Toggle span mode — single monitor: one effect NOFRAME full-screen; multi-monitor: one child process per other display |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) · in span mode: cycle the shared secondary-display effect forward |
-| `F` | Toggle fullscreen (effects re-render at native resolution) |
+| `F` | Toggle fullscreen (effects are rebuilt for the new display dimensions) |
 | `H` | Toggle HUD on / off |
 | `Shift+H` | Cycle HUD detail: full → minimal → off |
 | `Q` / `Esc` | Quit |
@@ -96,6 +96,30 @@ Press `D` while running to open the interactive device picker. Use `↑`/`↓` t
 If no input device is available at startup, psysuals stays open in silent mode instead of crashing. The HUD shows `no input` until a device is selected successfully.
 
 Before and after tracks, psysuals uses RMS/FFT silence detection with hysteresis. During true silence, beat spikes are suppressed and effects fall back to a faint low-motion idle state instead of freezing completely or reacting to noise-floor normalization.
+
+## Testing and benchmarks
+
+Run the headless smoke and registry checks with:
+
+```bash
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy .venv/bin/python smoke_test.py
+```
+
+Run the automated unit tests with:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+Audio and graphics boundary tests use fakes when hardware or optional native dependencies are unavailable; the real Pygame resize test runs when Pygame is installed.
+
+Run the CPU/ModernGL performance comparison with:
+
+```bash
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy .venv/bin/python benchmarks.py
+```
+
+The benchmark requires the optional ModernGL dependencies for GPU results; it still runs the CPU measurements without them.
 
 ## Project structure
 
@@ -111,16 +135,19 @@ psysuals/
 ├── settings.py               # User settings persistence
 ├── gl_renderer.py            # Shared moderngl renderer utilities
 ├── requirements-gl.txt       # Optional moderngl dependency set
-├── smoke_test.py             # Automated instantiation and import check
+├── smoke_test.py             # Headless effect instantiation and registry checks
 ├── benchmarks.py             # Performance measurement tool
 ├── effects/
 │   ├── __init__.py           # MODES list and package re-exports
 │   ├── base.py               # Effect base class and contract
 │   ├── utils.py              # Shared colour helpers
 │   ├── palette.py            # Shared colour palette
-│   └── (27 modes).py         # Visual implementations
+│   └── *.py                   # 27 registered visual implementations and helpers
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects
+├── tests/                    # Automated settings, audio, graphics, and cleanup tests
+├── CHANGELOG.md              # Release and unreleased change history
+├── TODO.md                   # Open review and maintenance items
 ├── requirements.txt
 └── README.md
 ```

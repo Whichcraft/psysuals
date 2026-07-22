@@ -250,7 +250,9 @@ class PlasmaGL(Effect):
 
         # Reuse cached FBO for this resolution
         key = (width, height)
-        if key not in self._fbo_cache:
+        cached = self._fbo_cache.get(key)
+        current = getattr(r, "is_offscreen_current", lambda fbo, w, h: True)
+        if cached is None or not current(cached, width, height):
             self._fbo_cache[key] = r.offscreen(width, height)
         fbo = self._fbo_cache[key]
 

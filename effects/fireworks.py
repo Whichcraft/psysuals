@@ -70,7 +70,7 @@ class Fireworks(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         W, H, RD = self._render_size()
         self._trail   = pygame.Surface((W, H))
         self._trail.fill((0, 0, 0))
@@ -129,10 +129,12 @@ class Fireworks(Effect):
             self._fade.fill((0, 0, 0, self._FADE_ALPHA))
         if self._scaled.get_width() != surf.get_width() or self._scaled.get_height() != surf.get_height():
             self._scaled = pygame.Surface(surf.get_size())
+        fbo_current = getattr(self.renderer, "is_offscreen_current", lambda fbo, w, h: True)
         if self.renderer is not None and (
             self._feedback_fbo is None
             or self._feedback_fbo.width != W
             or self._feedback_fbo.height != H
+            or not fbo_current(self._feedback_fbo, W, H)
         ):
             self._feedback_fbo = self.renderer.offscreen(W, H)
         

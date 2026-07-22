@@ -24,7 +24,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.11.0"
+__version__ = "3.13.0"
 
 import argparse
 import atexit
@@ -51,6 +51,7 @@ _BG_MODES = 9
 
 class VisualizerApp:
     def __init__(self):
+        self._quit_requested = False
         self.args = self._parse_args()
         config.LOW_SPEC = self.args.low_spec
         if config.LOW_SPEC:
@@ -76,6 +77,7 @@ class VisualizerApp:
         self.vis = self.VisCls(renderer=self.display.renderer)
         
         self.using_tap = False
+        self._fade_surf = None
         # Initialize target resolution based on effect
         self._update_target_res()
         
@@ -102,7 +104,7 @@ class VisualizerApp:
         self.is_silent = True
         
         self.hud_level = self.settings.get("hud_level", 2)
-        self.show_hud = self.hud_level > 0
+        self.show_hud = self.settings.get("show_hud", self.hud_level > 0)
         
         self.auto_gain = self.settings.get("auto_gain", False)
         self.target_rms = 0.05
@@ -123,14 +125,13 @@ class VisualizerApp:
         self.dev_name_cache = {}
         
         self.clock = pygame.time.Clock()
-        tw, th = self.display.target.get_size()
-        self._fade_surf = pygame.Surface((tw, th), pygame.SRCALPHA)
-        self._fade_surf.fill((0, 0, 0, self.fade_alpha))
-        self.fade = self._fade_surf
+        self.fade = self._make_fade(self.fade_alpha)
 
     def _setup_signals(self):
         def _sig_handler(sig, frame):
-            self._quit()
+            # Do not tear down pygame from inside a draw callback. Request
+            # shutdown and let the main loop clean up after the frame returns.
+            self._quit_requested = True
         signal.signal(signal.SIGINT, _sig_handler)
         signal.signal(signal.SIGTERM, _sig_handler)
 
@@ -191,11 +192,35 @@ class VisualizerApp:
             self.fade = self._make_fade(self.fade_alpha)
 
     def _make_fade(self, alpha: int):
+        size = self.display.target.get_size()
+        if self._fade_surf is None or self._fade_surf.get_size() != size:
+            self._fade_surf = pygame.Surface(size, pygame.SRCALPHA)
         self._fade_surf.fill((0, 0, 0, alpha))
         return self._fade_surf
 
+    def _set_background_mode(self, mode_i: int) -> None:
+        old_bg = getattr(self, "bg_vis", None)
+        if old_bg is not None and hasattr(old_bg, "release"):
+            old_bg.release()
+        self.bg_mode_i = mode_i % _BG_MODES
+        self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
+        self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+
     def _quit(self):
+        self._quit_requested = True
+
+    def _cleanup(self):
+        if getattr(self, "_cleanup_done", False):
+            return
+        self._cleanup_done = True
         self._save_settings()
+        for effect in (getattr(self, "vis", None), getattr(self, "bg_vis", None)):
+            release = getattr(effect, "release", None)
+            if callable(release):
+                try:
+                    release()
+                except Exception:
+                    pass
         if hasattr(self, "display") and self.display is not None:
             self.display.kill_children()
             if self.display.renderer:
@@ -207,7 +232,6 @@ class VisualizerApp:
         except Exception:
             pass
         pygame.quit()
-        sys.exit(0)
 
     def _save_settings(self):
         if self.args.span_child:
@@ -242,9 +266,9 @@ class VisualizerApp:
         self.effect_gain = config.DEFAULT_EFFECT_GAIN
         self._update_target_res()
 
-    def _rebuild_effects(self):
+    def _rebuild_effects(self, force: bool = False):
         prev_size = (config.WIDTH, config.HEIGHT)
-        if getattr(self, "_last_rebuild_size", None) == prev_size:
+        if not force and getattr(self, "_last_rebuild_size", None) == prev_size:
             return
         self._last_rebuild_size = prev_size
         if hasattr(self.vis, "release") and callable(self.vis.release):
@@ -259,24 +283,31 @@ class VisualizerApp:
         self._update_target_res()
 
     def run(self):
-        while True:
-            self._handle_events()
-            self._update()
+        try:
+            while not self._quit_requested:
+                self._handle_events()
+                if self._quit_requested:
+                    break
+                self._update()
+                if self._quit_requested:
+                    break
             
-            if self.args.gl and self.display.renderer:
-                self.display.renderer.ctx.screen.use()
-                self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
-                self.display.renderer.ctx.disable(self.display.renderer.ctx.BLEND)
+                if self.args.gl and self.display.renderer:
+                    self.display.renderer.ctx.screen.use()
+                    self.display.renderer.ctx.clear(0.0, 0.0, 0.0, 1.0)
+                    self.display.renderer.ctx.disable(self.display.renderer.ctx.BLEND)
 
-            self._render()
-            
-            if self.args.gl and self.display.renderer:
-                self.display.renderer.blit(self.display.target)
-                self.display.target.fill((0, 0, 0, 0))
-                
-            pygame.display.flip()
-            self.clock.tick(config.FPS)
-            self.tick += 1
+                self._render()
+
+                if self.args.gl and self.display.renderer:
+                    self.display.renderer.blit(self.display.target)
+                    self.display.target.fill((0, 0, 0, 0))
+
+                pygame.display.flip()
+                self.clock.tick(config.FPS)
+                self.tick += 1
+        finally:
+            self._cleanup()
 
     def _handle_events(self):
         for event in pygame.event.get():
@@ -301,7 +332,7 @@ class VisualizerApp:
                     self._quit()
                 elif event.key == pygame.K_f:
                     self.display.toggle_fullscreen()
-                    self._rebuild_effects()
+                    self._rebuild_effects(force=True)
                 elif event.key == pygame.K_h:
                     if event.mod & pygame.KMOD_SHIFT:
                         self.hud_level = (self.hud_level + 1) % 3
@@ -341,9 +372,7 @@ class VisualizerApp:
                         self.ui.pick_sel = next((i for i, d in enumerate(devs) if d[0] == self.audio.active_dev), 0)
                 elif event.key == pygame.K_b:
                     if event.mod & pygame.KMOD_SHIFT:
-                        self.bg_mode_i = (self.bg_mode_i + 1) % _BG_MODES
-                        self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
-                        self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+                        self._set_background_mode(self.bg_mode_i + 1)
                     else:
                         self.bg_on = not self.bg_on
                 elif event.key == pygame.K_p:
@@ -354,9 +383,7 @@ class VisualizerApp:
                             self._switch_mode(p["mode_idx"])
                             self.effect_gain = p.get("intensity", 0.7)
                             self.bg_on = p.get("bg_on", False)
-                            self.bg_mode_i = p.get("bg_mode_i", 0)
-                            self.bg_name, self.bg_cls = MODES[self.bg_mode_i]
-                            self.bg_vis = self.bg_cls(renderer=self.display.renderer)
+                            self._set_background_mode(p.get("bg_mode_i", 0))
                             self._update_target_res()
                     else:
                         preset_name = f"Preset {len(self.presets) + 1}"
@@ -378,11 +405,15 @@ class VisualizerApp:
                 elif event.key == pygame.K_UP:
                     if self.ui.pane_open:
                         self.ui.pane_sel = (self.ui.pane_sel - 1) % 3
+                    elif self.name == "FlowField" and hasattr(self.vis, "adjust_particles"):
+                        self.vis.adjust_particles(2000)
                     else:
                         self.effect_gain = min(2.0, round(self.effect_gain + 0.1, 1))
                 elif event.key == pygame.K_DOWN:
                     if self.ui.pane_open:
                         self.ui.pane_sel = (self.ui.pane_sel + 1) % 3
+                    elif self.name == "FlowField" and hasattr(self.vis, "adjust_particles"):
+                        self.vis.adjust_particles(-2000)
                     else:
                         self.effect_gain = max(0.0, round(self.effect_gain - 0.1, 1))
                 elif pygame.K_1 <= event.key <= pygame.K_9:
@@ -497,15 +528,27 @@ class VisualizerApp:
         self.display.reposition_window_fix(self.tick)
 
         if self.span_mode:
-            for child_idx, child in list(self.display.span_children.items()):
-                if child.poll() is not None:
-                    print(f"  Span child {child_idx} died, respawning...")
-                    try:
-                        child.wait(timeout=1)
-                    except Exception:
-                        pass
-                    self.display.requery_xmonitors()
-                    self.display.spawn_child(child_idx, self.span_vis2_idx, os.path.abspath(__file__))
+            geometry_changed = self.tick % 60 == 0 and self.display.requery_xmonitors()
+            if geometry_changed:
+                print("  Monitor geometry changed, rebuilding span children...")
+                self.display.open_display(self.display.display_idx, self.display.fullscreen)
+                self._rebuild_effects(force=True)
+                self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
+            else:
+                for child_idx, child in list(self.display.span_children.items()):
+                    if child.poll() is not None:
+                        print(f"  Span child {child_idx} died, respawning...")
+                        try:
+                            child.wait(timeout=1)
+                        except Exception:
+                            pass
+                        self.display.spawn_child(child_idx, self.span_vis2_idx, os.path.abspath(__file__))
+
+        # sounddevice is imported in a daemon thread so a broken PortAudio
+        # installation cannot block startup. Retry the initial stream once the
+        # backend has finished loading.
+        if self.audio.stream is None and self.audio.initial_stream_pending and self.tick % 30 == 0:
+            self.audio.open_input_stream(self.settings.get("active_dev"), None)
 
     def _render(self):
         target = self.display.target

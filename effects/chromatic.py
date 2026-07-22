@@ -1,6 +1,5 @@
 """Chromatic — prismatic raindrop ripples with RGB-separated outlines."""
 import math
-import random
 
 import numpy as np
 import pygame
@@ -17,6 +16,7 @@ class Chromatic(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         W = config.WIDTH
         H = config.HEIGHT
         self._trail = pygame.Surface((W, H))
@@ -86,12 +86,12 @@ class Chromatic(Effect):
     def _spawn(self, bass, W, H):
         if len(self._rings) >= _MAX_RINGS:
             return
-        cx = W // 2 + random.randint(-W // 6, W // 6)
-        cy = H // 2 + random.randint(-H // 6, H // 6)
+        cx = W // 2 + int(self._rng.integers(-W // 6, W // 6 + 1))
+        cy = H // 2 + int(self._rng.integers(-H // 6, H // 6 + 1))
         max_r = math.hypot(max(cx, W - cx), max(cy, H - cy)) * 1.1
         speed = 3.0 + bass * 5.0
         inten = 0.5 + bass * 0.5
-        self._rings.append([cx, cy, 0.0, max_r, speed, inten, random.random() * math.tau])
+        self._rings.append([cx, cy, 0.0, max_r, speed, inten, float(self._rng.random()) * math.tau])
 
     def _wave_points(self, cx, cy, radius, warp, phase):
         steps = 72

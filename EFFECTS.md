@@ -56,7 +56,7 @@ Standardized audio energy parameters used across all effects:
 | 10 | `←` / `→` | Plasma | Full-screen sine-interference plasma |
 | 11 | `←` / `→` | Branches | Fractal lightning tree with audio-jittered angles |
 | 12 | `←` / `→` | Butterflies | Dancing butterfly pairs with orbit breaks |
-| 13 | `←` / `→` | FlowField | 12 000+ particles surfing a shifting vector field |
+| 13 | `←` / `→` | FlowField | 8 000+ particles surfing a shifting vector field |
 | 14 | `←` / `→` | Fireworks | Feedback zooming tunnel with fireworks |
 | 15 | `←` / `→` | Aurora | Parallel Northern Lights ribbons with additive glow |
 | 16 | `←` / `→` | Lattice | Crystal grid with zoom feedback and peak-normalization |
@@ -162,7 +162,7 @@ Up to three butterfly pairs move through the screen. A solo butterfly appears fi
 
 ## 13. FlowField
 
-Twelve thousand+ particles surf a continuously changing multi-layer vector field (scaling dynamically up to 50,000 on high-res displays) and paint the path they take directly into a persistent trail surface.
+Eight thousand+ particles surf a continuously changing multi-layer vector field (scaling dynamically up to 100,000 on high-resolution displays) and paint the path they take directly into a persistent trail surface.
 
 - Audio: beat (bass) drives particle speeds and field angle scales; MID_ENERGY accelerates field evolution; TREBLE_ENERGY triggers a vectorized center-outward push on particle positions during transients.
 - Visual notes: particles now wrap cleanly across the full viewport, so the flow reaches the screen edges without the dark border the old edge recycling created.
@@ -211,10 +211,10 @@ A Physarum-inspired multi-agent simulation: thousands of agents deposit chemical
 
 ## 20. Clifford
 
-A 3D-shaded, density-accumulated strange attractor. It runs the Clifford equations at high point density, bins them into a 2D grid using fast `np.bincount`, applies logarithmic scaling for a smooth nebulous look, and shades the result as a 3D relief using bump-mapped diffuse reflection from an orbiting light source.
+A high-energy 3D-shaded strange-attractor storm. It runs the Clifford equations through multiple dense passes, bins them into a 2D grid using fast `np.bincount`, applies contrast-compressed density emission with beat bloom, and shades the result as a 3D relief using bump-mapped diffuse reflection from an orbiting light source.
 
 - Audio: beat jumps to a new curated attractor preset; mid accelerates parameter morphing; bass/beat expands brightness; treble/high frequencies drive hue shifting and detail.
-- Visual notes: features dynamic percentile framing to keep the attractor scaled properly. The 3D relief shading makes the fractal ribbons look like sculpted metallic/glassy structures morphing in space.
+- Visual notes: features dynamic percentile framing, dense multi-pass ribbons, hot white cores, and stronger beat-driven emission so the attractor remains forceful rather than fading into a dim cloud.
 
 ## 21. Möbius
 
@@ -232,17 +232,17 @@ Prismatic raindrop ripples expand from beat origins as wavy RGB-separated outlin
 
 ## 23. Persistence
 
-Multiple nested polygons rotate in 3D space on non-coplanar X, Y, and Z axes at different speeds. Projected through a perspective camera with depth-based thickness and brightness shading, their counter-rotating ghost images accumulate under long persistence to form 3D holographic moiré mandalas.
+Multiple nested polygons rotate in 3D space on non-coplanar X, Y, and Z axes at different speeds. The geometric figures target roughly 80% of the render height. Projected through a perspective camera with depth-based thickness and brightness shading, their counter-rotating ghost images accumulate under long persistence to form 3D holographic moiré mandalas.
 
-- Audio: bass drives X/Y/Z rotation speed bursts; mid scales the number of active shapes; treble fires a radial flash ring in background; beat triggers a speed spike and hue jump.
+- Audio: bass drives X/Y/Z rotation speed bursts; mid scales the number of active shapes; treble brightens the foremost shape; beat triggers a speed spike and hue jump.
 - Visual notes: lines closer to the camera are drawn thicker and brighter, creating realistic 3D depth cueing as the polygons spin in perspective.
 
 ## 24. Synapse
 
-~55 nodes wired to their nearest neighbours form a neural graph. Signals travel visibly along edges as glowing pulses; arriving signals fire destination nodes which cascade further. Beat triggers multi-node cascades.
+An evolving neural graph grows and sheds connection points while its nodes wander around loose anchors. Each point is rewired to nearby neighbours as the topology changes. Signals travel visibly along edges as glowing pulses; arriving signals fire destination nodes which cascade further. Beat triggers multi-node cascades.
 
 - Audio: bass drives signal propagation speed and node glow intensity; mid controls the baseline auto-fire rate; treble increases signal color saturation; beat fires bounded multi-node cascades.
-- Visual notes: the live signal pool is now capped and node fan-out is sampled instead of fully expanded, keeping the effect stable on Android and other lower-power targets.
+- Visual notes: the live signal pool is capped, node fan-out is sampled, and topology changes clear only stale in-flight edge references, keeping the effect stable while the graph remains alive.
 
 ## 25. Heartbeat
 
@@ -255,7 +255,7 @@ Rhythmic pressure waves expand from the screen centre. Each beat spawns concentr
 
 Classic analyser bars are spaced logarithmically, with peak markers and a waveform line layered over the centre of the screen.
 
-- Audio: per-bin FFT controls bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
+- Audio: log-spaced FFT bands control bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
 - Visual notes: this is the plainest diagnostic mode and is useful for checking input levels quickly.
 
 ## 27. Waterfall
@@ -274,7 +274,7 @@ A scrolling spectrogram stores recent history as rows, with hue encoding frequen
 | `1` – `9` | Jump directly to modes 1–9 |
 | `←` / `→` | Previous / next mode across all 27 modes |
 | `Space` or mouse click | Next mode |
-| `↑` / `↓` | Adjust intensity for the current mode (`0.0 .. 2.0`) |
+| `↑` / `↓` | Adjust intensity for the current mode (`0.0 .. 2.0`), or adjust FlowField particles by 2,000 |
 | `Tab` | Open the settings pane |
 | `P` / `Shift+P` | Save / load presets |
 | `D` | Open the device picker, or cycle the shared secondary-display mode while span mode is active |

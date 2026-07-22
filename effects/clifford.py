@@ -1,6 +1,5 @@
-"""Clifford — 3D-shaded density-accumulated strange attractor."""
+"""Clifford — high-contrast, 3D-shaded strange-attractor storm."""
 import math
-import random
 
 import numpy as np
 import pygame
@@ -15,7 +14,8 @@ class Clifford(Effect):
     RES_DIV     = 2
     _FADE_ALPHA = 18
 
-    _N = 60_000
+    _N = 80_000
+    _PASSES = 6
     _PRESETS = [
         (-1.40, 1.60, 1.00, 0.70),
         (-1.70, 1.80, -1.90, -0.40),
@@ -26,15 +26,17 @@ class Clifford(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self._trail = pygame.Surface((1, 1))
         self._frame_surf = pygame.Surface((1, 1))
         self._scaled = pygame.Surface((1, 1))
         self._fade = pygame.Surface((1, 1), pygame.SRCALPHA)
-        self._hue = random.random()
+        self._hue = float(self._rng.random())
         self._a, self._b = np.float32(-1.4), np.float32(1.6)
         self._c, self._d = np.float32(1.0),  np.float32(0.7)
         self._ta = self._a; self._tb = self._b
         self._tc = self._c; self._td = self._d
+        self._boost = 0.0
         self._xmin = -2.0
         self._xmax = 2.0
         self._ymin = -2.0
@@ -57,8 +59,8 @@ class Clifford(Effect):
         if getattr(config, "LOW_SPEC", False):
             self._n //= 2
             
-        self._xs = np.random.uniform(-1.6, 1.6, self._n).astype(np.float32)
-        self._ys = np.random.uniform(-1.6, 1.6, self._n).astype(np.float32)
+        self._xs = self._rng.uniform(-1.6, 1.6, self._n).astype(np.float32)
+        self._ys = self._rng.uniform(-1.6, 1.6, self._n).astype(np.float32)
         self._xmin, self._xmax = -2.0, 2.0
         self._ymin, self._ymax = -2.0, 2.0
 
@@ -67,18 +69,20 @@ class Clifford(Effect):
         self._y_g = np.linspace(-1.0, 1.0, H, dtype=np.float32)
         self._xx, self._yy = np.meshgrid(self._x_g, self._y_g, indexing='ij')
         # Pre-allocated multi-pass point buffer (O2)
-        self._all_x = np.empty((4, self._n), dtype=np.float32)
-        self._all_y = np.empty((4, self._n), dtype=np.float32)
+        passes = 4 if getattr(config, "LOW_SPEC", False) else self._PASSES
+        self._all_x = np.empty((passes, self._n), dtype=np.float32)
+        self._all_y = np.empty((passes, self._n), dtype=np.float32)
 
         self._new_params(force=True)
 
     def _new_params(self, force=False):
-        base = random.choice(self._PRESETS)
+        base = self._PRESETS[int(self._rng.integers(0, len(self._PRESETS)))]
         jitter = 0.0 if force else 0.18
-        self._ta = np.float32(base[0] + random.uniform(-jitter, jitter))
-        self._tb = np.float32(base[1] + random.uniform(-jitter, jitter))
-        self._tc = np.float32(base[2] + random.uniform(-jitter, jitter))
-        self._td = np.float32(base[3] + random.uniform(-jitter, jitter))
+        offsets = self._rng.uniform(-jitter, jitter, 4)
+        self._ta = np.float32(base[0] + offsets[0])
+        self._tb = np.float32(base[1] + offsets[1])
+        self._tc = np.float32(base[2] + offsets[2])
+        self._td = np.float32(base[3] + offsets[3])
 
     def draw(self, surf, waveform, fft, beat, tick):
         W, H, RD = self._render_size()
@@ -93,14 +97,14 @@ class Clifford(Effect):
         if self._scaled.get_width() != sw or self._scaled.get_height() != sh:
             self._scaled = pygame.Surface((sw, sh))
 
-        self._hue = (self._hue + 0.0025 + high * 0.003) % 1.0
+        self._hue = (self._hue + 0.004 + mid * 0.002 + high * 0.006) % 1.0
 
         if bass > 0.8 and self._beat_prev <= 0.8:
             self._new_params()
         self._beat_prev = bass
 
         # Smooth parameter interpolation
-        spd  = 0.008 + mid * 0.012 + bass * 0.006
+        spd  = 0.022 + mid * 0.025 + bass * 0.020 + self._boost * 0.008
         self._a = np.float32(self._a + (self._ta - self._a) * spd)
         self._b = np.float32(self._b + (self._tb - self._b) * spd)
         self._c = np.float32(self._c + (self._tc - self._c) * spd)
@@ -110,7 +114,7 @@ class Clifford(Effect):
         all_x = self._all_x
         all_y = self._all_y
         # Multi-pass iteration to generate high point density
-        for i in range(4):
+        for i in range(self._all_x.shape[0]):
             nx = np.sin(self._a * ys) - np.cos(self._b * xs)
             ny = np.sin(self._c * xs) - np.cos(self._d * ys)
             xs = nx.astype(np.float32)
@@ -150,10 +154,11 @@ class Clifford(Effect):
         counts = np.bincount(indices, minlength=W * H)
         density = counts.reshape((W, H)).astype(np.float32)
 
-        # Logarithmic normalization for a gorgeous smooth nebulous look
+        # Compress the density range so the attractor reads as a solid,
+        # energetic structure instead of a few dim isolated pixels.
         if density.max() > 0:
             log_density = np.log1p(density)
-            norm_density = log_density / log_density.max()
+            norm_density = np.power(log_density / log_density.max(), 0.62)
         else:
             norm_density = np.zeros_like(density)
 
@@ -176,8 +181,12 @@ class Clifford(Effect):
             diffuse = ((-dx) * lx + (-dy) * ly + nz * lz) / n_len
             diffuse = np.clip(diffuse, 0.0, 1.0)
             
-            # Brightness scaled by density, audio transients, and 3D shading
-            bright = norm_density * (0.24 + bass * 0.40 + high * 0.30) * (0.35 + 0.65 * diffuse)
+            # Strong base emission plus audio-reactive bloom. The hot core is
+            # lifted separately so beats produce a visible power surge.
+            hot = np.clip((norm_density - 0.42) / 0.58, 0.0, 1.0)
+            emission = 0.58 + bass * 0.55 + high * 0.35 + self._boost * 0.16
+            bright = norm_density * emission * (0.52 + 0.48 * diffuse)
+            bright += hot * (0.18 + bass * 0.35)
         else:
             bright = np.zeros_like(norm_density)
 
@@ -187,9 +196,13 @@ class Clifford(Effect):
         ang = np.arctan2(yy, xx) / math.tau + 0.5
         h_arr = (self._hue + ang * 0.45 + r * 0.20) % 1.0
 
-        r_arr = np.clip((np.sin(h_arr * math.tau) * 127 + 128) * bright * 2, 0, 255).astype(np.uint32)
-        g_arr = np.clip((np.sin((h_arr + 0.333) * math.tau) * 127 + 128) * bright * 2, 0, 255).astype(np.uint32)
-        b_arr = np.clip((np.sin((h_arr + 0.667) * math.tau) * 127 + 128) * bright * 2, 0, 255).astype(np.uint32)
+        r_arr = np.clip((np.sin(h_arr * math.tau) * 127 + 128) * bright * 2.4, 0, 255).astype(np.uint32)
+        g_arr = np.clip((np.sin((h_arr + 0.333) * math.tau) * 127 + 128) * bright * 2.4, 0, 255).astype(np.uint32)
+        b_arr = np.clip((np.sin((h_arr + 0.667) * math.tau) * 127 + 128) * bright * 2.4, 0, 255).astype(np.uint32)
+        hot = np.clip(bright - 0.72, 0.0, 1.0) * 255
+        r_arr = np.clip(r_arr + hot, 0, 255).astype(np.uint32)
+        g_arr = np.clip(g_arr + hot, 0, 255).astype(np.uint32)
+        b_arr = np.clip(b_arr + hot, 0, 255).astype(np.uint32)
         colors = (r_arr << 16) | (g_arr << 8) | b_arr
 
         # Write frame buffer

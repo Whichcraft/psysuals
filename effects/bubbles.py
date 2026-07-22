@@ -16,7 +16,7 @@ class Bubbles(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._rng = np.random.default_rng(config.RNG_SEED or None)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self.hue        = 0.0
         self.pulse      = 0.0
         self.pvel       = 0.0

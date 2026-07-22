@@ -60,7 +60,11 @@ class GLRenderer:
         The vertex shader must declare:  in vec2 in_vert;
         """
         prog = self.ctx.program(vertex_shader=vert, fragment_shader=frag)
-        vao  = self.ctx.vertex_array(prog, [(self._vbo, "2f", "in_vert")])
+        try:
+            vao = self.ctx.vertex_array(prog, [(self._vbo, "2f", "in_vert")])
+        except Exception:
+            prog.release()
+            raise
         return prog, vao
 
     def shader_asset(self, name: str) -> str:
@@ -234,8 +238,9 @@ class GLRenderer:
         if self._feedback_tex:
             self._feedback_tex.release()
             self._feedback_tex = None
-        self._vbo.release()
-        self._vbo = None
+        if self._vbo is not None:
+            self._vbo.release()
+            self._vbo = None
         for prog, vao in list(self._program_cache.values()):
             vao.release()
             prog.release()
@@ -260,7 +265,12 @@ class GLRenderer:
     # ── Offscreen / Android ───────────────────────────────────────────────────
 
     def offscreen(self, width: int = 0, height: int = 0) -> "moderngl.Framebuffer":
-        """Return a cached RGBA framebuffer for the requested size (max 8)."""
+        """Return a renderer-owned cached RGBA framebuffer for the requested size.
+
+        Callers must not release the returned framebuffer directly. The cache
+        may evict it, and :meth:`release` releases all remaining entries.
+        Call ``is_offscreen_current`` before reusing a retained reference.
+        """
         w = width  or self.width
         h = height or self.height
         key = (w, h)
@@ -274,6 +284,13 @@ class GLRenderer:
             fbo = self.ctx.framebuffer(color_attachments=[tex])
             self._offscreen_cache[key] = (tex, fbo)
         return self._offscreen_cache[key][1]
+
+    def is_offscreen_current(self, fbo, width: int = 0, height: int = 0) -> bool:
+        """Return whether *fbo* is the live cached framebuffer for its size."""
+        w = width or self.width
+        h = height or self.height
+        entry = self._offscreen_cache.get((w, h))
+        return entry is not None and entry[1] is fbo
 
     def read_pixels(self, fbo: "moderngl.Framebuffer") -> np.ndarray:
         """

@@ -22,6 +22,7 @@ class GlowSquares(Effect):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._rng = np.random.default_rng(config.RNG_SEED)
         self.hue   = 0.0
         n_bins     = config.BLOCK_SIZE // 2
         self._rows, self._cols = self._grid_dims()
@@ -55,7 +56,7 @@ class GlowSquares(Effect):
             row_boost = flash * max(0.0, 1.0 - age * 6) + mid * 0.12 * max(0.0, 1.0 - age * 2)
             
             # High frequency treble transients add a heat-shimmer jitter/offset on newer rows
-            jitter = np.random.uniform(-0.5, 0.5) if age < 0.4 else 0.0
+            jitter = self._rng.uniform(-0.5, 0.5) if age < 0.4 else 0.0
             x_offset = int(high * 6.0 * (1.0 - age) * jitter)
             y_offset = int(high * 4.0 * (1.0 - age) * jitter)
 

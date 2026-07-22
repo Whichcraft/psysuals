@@ -45,7 +45,7 @@ class Aurora(Effect):
         k_unit = math.tau / config.WIDTH
         self._phases: list[list[float]] = []
         self._ks:     list[list[float]] = []
-        self._wave: np.ndarray | None = None
+        self._wave = np.zeros(len(self._xs), dtype=np.float32)
         for _, _, harms in self._DEFS:
             self._phases.append([0.0] * len(harms))
             self._ks.append([k_unit * km for km, *_ in harms])

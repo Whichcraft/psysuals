@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import numpy as np
 import pygame
 import os
 
@@ -18,22 +19,29 @@ def test_imports():
 def test_effects(MODES):
     print(f"Checking {len(MODES)} effects...")
     import config
-    config.WIDTH = 800
-    config.HEIGHT = 600
-    
     pygame.init()
-    pygame.display.set_mode((320, 240))
+    screen = pygame.display.set_mode((320, 240))
+    config.WIDTH, config.HEIGHT = screen.get_size()
+    config._INITIALIZED = True
+    waveform = np.zeros(config.BLOCK_SIZE, dtype=np.float32)
+    fft = np.zeros(config.BLOCK_SIZE // 2, dtype=np.float32)
     
     passed = 0
     failed = 0
     for name, VisCls in MODES:
+        vis = None
         try:
             vis = VisCls()
-            print(f"  ✅ {name:12} instantiated")
+            screen.fill((0, 0, 0))
+            vis.draw(screen, waveform, fft, 0.0, 0)
+            print(f"  ✅ {name:12} instantiated and rendered")
             passed += 1
         except Exception as e:
             print(f"  ❌ {name:12} FAILED: {e}")
             failed += 1
+        finally:
+            if vis is not None and hasattr(vis, "release"):
+                vis.release()
             
     print(f"\nResults: {passed} passed, {failed} failed")
     if failed > 0:
