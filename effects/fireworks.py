@@ -79,6 +79,9 @@ class Fireworks(Effect):
         self._scaled = pygame.Surface((config.WIDTH, config.HEIGHT))
         self._fade = pygame.Surface((W, H), pygame.SRCALPHA)
         self._fade.fill((0, 0, 0, self._FADE_ALPHA))
+        self._flow_x = self._flow_y = None
+        self._flow_src = self._flow_dst = None
+        self._reset_flow(W, H)
         self._feedback_fbo = None
         self._hue     = self._rng.random()
         self._beat_t  = 0
@@ -88,6 +91,40 @@ class Fireworks(Effect):
         self._beat_prev = 0.0
 
     # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _reset_flow(self, width, height):
+        self._flow_x, self._flow_y = np.meshgrid(
+            np.arange(width, dtype=np.float32),
+            np.arange(height, dtype=np.float32),
+            indexing="ij",
+        )
+        self._flow_src = np.empty((width, height, 3), dtype=np.uint8)
+        self._flow_dst = np.empty_like(self._flow_src)
+        self._flow_vx = np.empty((width, height), dtype=np.float32)
+        self._flow_vy = np.empty_like(self._flow_vx)
+        self._flow_src_x = np.empty((width, height), dtype=np.int32)
+        self._flow_src_y = np.empty_like(self._flow_src_x)
+
+    def _advect_trail(self, strength, tick):
+        """Apply one bounded semi-Lagrangian step to the feedback trail."""
+        width, height = self._trail.get_size()
+        if self._flow_x is None or self._flow_x.shape != (width, height):
+            self._reset_flow(width, height)
+        np.sin(self._flow_y * 0.055 + tick * 0.018, out=self._flow_vx)
+        np.cos(self._flow_x * 0.047 - tick * 0.014, out=self._flow_vy)
+        self._flow_vx *= strength
+        self._flow_vy *= strength
+        np.clip(self._flow_x - self._flow_vx, 0, width - 1, out=self._flow_vx)
+        np.clip(self._flow_y - self._flow_vy, 0, height - 1, out=self._flow_vy)
+        self._flow_src_x[:] = self._flow_vx
+        self._flow_src_y[:] = self._flow_vy
+        self._flow_src[:] = surfarray.array3d(self._trail)
+        self._flow_dst[:] = self._flow_src[self._flow_src_x, self._flow_src_y]
+        pixels = surfarray.pixels3d(self._trail)
+        try:
+            pixels[:] = self._flow_dst
+        finally:
+            del pixels
 
     def _launch(self, res_div: int):
         if len(self._rockets) >= self._MAX_ROCKETS:
@@ -135,6 +172,7 @@ class Fireworks(Effect):
             self._trail.fill((0, 0, 0))
             self._fade = pygame.Surface((W, H), pygame.SRCALPHA)
             self._fade.fill((0, 0, 0, self._FADE_ALPHA))
+            self._reset_flow(W, H)
         if self._scaled.get_width() != surf.get_width() or self._scaled.get_height() != surf.get_height():
             self._scaled = pygame.Surface(surf.get_size())
         fbo_current = getattr(self.renderer, "is_offscreen_current", lambda fbo, w, h: True)
@@ -182,6 +220,7 @@ class Fireworks(Effect):
 
         # Fade with alpha overlay to preserve chroma better than RGB multiply.
         self._trail.blit(self._fade, (0, 0))
+        self._advect_trail(0.35 + bass * 0.35 + mid * 0.18, tick)
 
         # ── rockets ───────────────────────────────────────────────────────────
         live = []

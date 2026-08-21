@@ -13,7 +13,7 @@
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
 - **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. v3 scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
 - **🔊 Resilient Audio Pipeline** — Tolerant audio capture with a no-input fallback, silence-aware idle motion, live device switching, and spectral-flux beat detection.
-- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 27 registered effects, with focused tests for audio timing, display lifecycle, and effect safety bounds.
+- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 34 registered effects, with focused tests for audio timing, display lifecycle, and effect safety bounds.
 
 ---
 
@@ -31,19 +31,39 @@ git clone https://github.com/Whichcraft/psysuals.git
 cd psysuals
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt
 ```
+
+### Ubuntu/Debian: `externally-managed-environment`
+
+Recent Ubuntu and Debian releases protect the system Python (PEP 668), so a
+direct `pip install -r requirements-gl.txt` may fail with
+`error: externally-managed-environment`. Install the venv support package and
+install project dependencies into the repository's virtual environment instead:
+
+```bash
+sudo apt update
+sudo apt install python3-full
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements-gl.txt
+```
+
+Use the same `.venv/bin/python` for the run and test commands below. The
+`--break-system-packages` pip override is intentionally not recommended: it
+modifies the OS-managed Python and can break distribution packages.
 
 ### 3. Advanced Beat Tracking (Optional)
 To enable high-accuracy Librosa-based beat tracking and BPM estimation:
 ```bash
-pip install librosa
+.venv/bin/python -m pip install librosa
 ```
 
 ### 4. Hardware Acceleration (Optional)
 To enable the high-performance ModernGL path:
 ```bash
-pip install -r requirements-gl.txt
+.venv/bin/python -m pip install -r requirements-gl.txt
 ```
 
 ---
@@ -151,7 +171,7 @@ psysuals/
 │   ├── base.py               # Effect base class and contract
 │   ├── utils.py              # Shared colour helpers
 │   ├── palette.py            # Shared colour palette
-│   └── *.py                   # 27 registered visual implementations and helpers
+│   └── *.py                   # 34 registered visual implementations and helpers
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects
 ├── tests/                    # Automated settings, audio, graphics, and cleanup tests
