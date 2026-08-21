@@ -1,17 +1,17 @@
-# psysuals v3 — The Ultimate Psychedelic Experience
+# psysuals — The Ultimate Psychedelic Experience
 
-**Welcome to the super-duper greatest music visualizer ever made.** psysuals v3 is a massive leap forward, re-engineered from the ground up to deliver uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, v3 is built to melt your mind with precision and style.
+**Welcome to the super-duper greatest music visualizer ever made.** psysuals delivers uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, it is built to melt your mind with precision and style.
 
-![Version](https://img.shields.io/badge/version-3.14.0-orange)
+![Version](https://img.shields.io/badge/version-3.15.0-orange)
  ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
-## 🚀 Biggest Changes in v3
+## 🚀 Highlights
 
-- **✨ Unified ModernGL Engine** — Harness the power of your GPU. v3 merges experimental hardware acceleration into the core app. Run with `--gl` for blistering frame rates and per-pixel shader fluid motion.
+- **✨ Unified ModernGL Engine** — Harness the power of your GPU with experimental hardware acceleration. Run with `--gl` for blistering frame rates and per-pixel shader fluid motion.
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
-- **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. v3 scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
+- **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. The app scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
 - **🔊 Resilient Audio Pipeline** — Tolerant audio capture with a no-input fallback, silence-aware idle motion, live device switching, and spectral-flux beat detection.
 - **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 34 registered effects, with focused tests for audio timing, display lifecycle, and effect safety bounds.
 
@@ -95,10 +95,11 @@ The app restores the last saved display index on startup. Use `--display N` to o
 | `1` – `9` | Jump to modes 1–9 |
 | `Tab` | Toggle real-time settings pane (effect gain, bg alpha, crossfade length) |
 | `P` | Save current state as a preset |
-| `Shift+P` | Cycle through saved presets |
+| `Shift+P` | Morph to the next saved preset over eight beats (or a short time fallback) |
 | `A` | Toggle auto-gain (auto-scales beat to current volume) · in span mode: cycle the shared secondary-display effect backward |
 | `B` | Toggle background layer (renders a second effect at configurable opacity behind the active one) |
 | `Shift+B` | Cycle background effect (modes 1–9) |
+| `Shift+R` | Cycle curated foreground/background recipes |
 | `M` | Tap tempo — tap 2+ times to lock BPM for 8 s |
 | `Shift+M` | Toggle span mode — single monitor: one effect NOFRAME full-screen; multi-monitor: one child process per other display |
 | `D` | Open device picker (↑↓ navigate, Enter confirm, Esc cancel) · in span mode: cycle the shared secondary-display effect forward |
@@ -115,7 +116,11 @@ Press `D` while running to open the interactive device picker. Use `↑`/`↓` t
 
 If no input device is available at startup, psysuals stays open in silent mode instead of crashing. The HUD shows `no input` until a device is selected successfully.
 
-Before and after tracks, psysuals uses RMS/FFT silence detection with hysteresis. During true silence, beat spikes are suppressed and effects fall back to a faint low-motion idle state instead of freezing completely or reacting to noise-floor normalization.
+Before and after tracks, psysuals uses RMS/FFT silence detection with hysteresis. It enters silence after about 140 ms of quiet audio and exits after two fresh loud audio blocks (about 46 ms at the default 44.1 kHz / 1024-sample callback). Repeated video frames do not accelerate these timings, and invalid audio is ignored. During true silence, beat spikes are suppressed and effects fall back to a faint low-motion idle state instead of freezing completely or reacting to noise-floor normalization.
+
+Effects can also read `config.BEAT_PHASE`, a normalized position from `0.0` at
+the predicted beat boundary to `1.0` just before the next one. It falls back to
+a slow idle phase when BPM timing is unavailable.
 
 ## Testing and benchmarks
 
@@ -130,6 +135,16 @@ Run the automated unit tests with:
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
+
+The suite includes compact deterministic visual fixtures for every registered
+effect. They compare quantized coverage and color-energy metrics rather than
+large screenshots, so black frames and major visual regressions are detected
+without committing binary artifacts.
+
+At runtime, a rolling frame-time governor can move effects among high,
+balanced, and low internal-resolution tiers. It uses a 90th-percentile window,
+hysteresis, and a cooldown; benchmark commands are unaffected because they do
+not run the visualizer loop.
 
 Audio and graphics boundary tests use fakes when hardware or optional native dependencies are unavailable; the real Pygame resize test runs when Pygame is installed.
 
@@ -146,6 +161,20 @@ To attempt the CPU/ModernGL comparison, use a real display/context (do not set t
 ```
 
 The benchmark reports when ModernGL is unavailable or the context cannot be created; CPU measurements still complete.
+
+`Shift+R` cycles curated pairings such as Hyperbolic + LiquidLight,
+Tesseract + Persistence, Cymatica + Ferrofluid, Morphogenesis + Plasma, and
+Fireworks + Aurora. Choosing a recipe explicitly enables its background; the
+individual foreground/background controls remain available afterward.
+
+`Shift+X` cycles optional post-processing: off, chromatic separation,
+kaleidoscope mirroring, feedback rotation, and diffraction-style bloom. The
+default is off; each pass reuses its working surfaces and remains bounded on
+the CPU path.
+
+Compatible visual modes also interpolate their declared projection or warp
+parameters during a transition, so related geometries can flow into one
+another instead of only crossfading their surfaces.
 GL results include the display-present step (and context synchronization when available), so compare them on the same display and VSync settings.
 
 Use `--display N` for monitor selection. When `xrandr` geometry is unavailable, the app falls back to SDL's detected display count and asks SDL to target the selected display.
@@ -158,7 +187,10 @@ psysuals/
 ├── core/
 │   ├── audio_engine.py       # Capture, FFT, beat & genre detection
 │   ├── display_manager.py    # Monitors, X11, windowing, span mode
-│   └── ui_manager.py         # HUD, pane, picker rendering
+│   ├── ui_manager.py         # HUD, pane, picker rendering
+│   ├── postprocess.py         # Optional bounded psychedelic post-processing
+│   ├── quality.py             # Adaptive frame-time quality governor
+│   └── regression_tester.py   # Headless effect contract checks
 ├── beat_tracking.py          # Optional librosa-based BPM/beat refinement
 ├── config.py                 # Shared mutable state
 ├── settings.py               # User settings persistence

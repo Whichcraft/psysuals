@@ -32,6 +32,7 @@ class Mycelium(Effect):
         self._halo = None
         self._halo_surface = None
         self._halo_scaled = None
+        self._motion_field = None
         self.max_segs = _MAX_SEGS
         self.max_tips = _MAX_TIPS
         if getattr(config, "LOW_SPEC", False):
@@ -183,6 +184,12 @@ class Mycelium(Effect):
                     math.sin(tx * 0.013 + self._phase + core_idx * 0.7) * 0.55
                     + math.cos(ty * 0.011 - self._phase * 1.2 + depth * 0.25) * 0.35
                 )
+                if self._motion_field is not None:
+                    vx, vy = self._motion_field
+                    if vx.ndim == 2 and vy.shape == vx.shape and vx.size:
+                        fy = min(vx.shape[0] - 1, max(0, int(ty / max(1, H) * vx.shape[0])))
+                        fx = min(vx.shape[1] - 1, max(0, int(tx / max(1, W) * vx.shape[1])))
+                        field += float(np.clip(vx[fy, fx] - vy[fy, fx], -2.0, 2.0)) * 0.04
                 ta2 = ta + (swirl + field - ta) * 0.22 + float(gauss[idx])
                 length = max(2.5, speed * (1.0 - depth * 0.030) * float(len_mul[idx]))
                 ex = (tx + math.cos(ta2) * length) % W
@@ -313,3 +320,13 @@ class Mycelium(Effect):
             val = min(0.95, 0.3 + high * 0.5) * fade
             r = max(1.0, ssize * fade * (1.0 + high * 0.8))
             pygame.draw.circle(surf, hsl(hue, l=val), (int(sx), int(sy)), int(r))
+
+    def set_motion_field(self, field) -> None:
+        if not field or len(field) != 2:
+            self._motion_field = None
+            return
+        vx, vy = field
+        if isinstance(vx, np.ndarray) and isinstance(vy, np.ndarray) and vx.shape == vy.shape and vx.ndim == 2:
+            self._motion_field = (vx, vy)
+        else:
+            self._motion_field = None

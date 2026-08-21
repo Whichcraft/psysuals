@@ -10,6 +10,7 @@ from .utils import hsl
 
 
 class Hyperbolic(Effect):
+    MORPH_SCHEMA = {"_morph_warp": (0.0, 1.0)}
     TRAIL_ALPHA = 18
     MAX_GENERATIONS = 5
     MAX_TILES = 160
@@ -22,6 +23,7 @@ class Hyperbolic(Effect):
         self._tiles = []
         self._hue = float(self._rng.random())
         self._shock = 0.0
+        self._morph_warp = 0.5
         self._beat_prev = 0.0
         self._reset_geometry(max(1, config.WIDTH), max(1, config.HEIGHT))
 
@@ -68,7 +70,7 @@ class Hyperbolic(Effect):
         self._shock *= 0.93
         self._hue = (self._hue + 0.001 + mid * 0.0008 + bpm * 0.000002) % 1.0
 
-        offset_radius = min(0.28, 0.035 + mid * 0.025 + self._shock * 0.07)
+        offset_radius = min(0.28, 0.035 + mid * 0.025 + self._shock * 0.07 + self._morph_warp * 0.02)
         offset_angle = tick * (0.004 + bpm * 0.00001)
         offset = complex(math.cos(offset_angle), math.sin(offset_angle)) * offset_radius
 

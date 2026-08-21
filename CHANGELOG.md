@@ -5,6 +5,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.15.0] — 2026-08-21
+
+### Changed
+- **Butterflies courtship simulation** — Replaced the fixed three-pair chase
+  with bounded cocoon emergence, nearest-neighbour pairing, mirrored orbiting
+  dance, beat-synchronised wings, sparkle-ready audio response, and deliberate
+  pair breakup/re-pairing. The effect remains deterministic, resize-safe, and
+  compatible with the CPU/Pygame rendering contract.
+
+### Documentation and verification
+- Updated the Butterflies effect reference, architecture resource-safety notes,
+  Ubuntu virtual-environment setup, and effect controls description.
+
 ## [3.14.0] — 2026-08-21
 
 ### Fixed

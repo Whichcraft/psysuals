@@ -18,6 +18,7 @@ _IDLE = 0.08
 _FFT_START_BIN = 3  # skip DC component and sub-bass rumble
 
 class Lattice(Effect):
+    MORPH_SCHEMA = {"_morph_warp": (0.0, 1.0)}
     TRAIL_ALPHA = 0 # Managed by internal surface
 
     @property
@@ -59,6 +60,7 @@ class Lattice(Effect):
         self._cy = 0.0
         self._max_r = 1.0
         self._hyperbolic_strength = 0.0
+        self._morph_warp = 0.35
         self._nodes = []
         self._col_peaks = np.ones(self._grid_cols, dtype=np.float32) * 0.2
 
@@ -160,7 +162,7 @@ class Lattice(Effect):
         self._surf.fill((230, 230, 230), special_flags=pygame.BLEND_RGB_MULT)
 
         sc = self._scale
-        self._hyperbolic_strength = min(0.35, mid * 0.06 + bass * 0.04 + high * 0.02)
+        self._hyperbolic_strength = min(0.35, mid * 0.06 + bass * 0.04 + high * 0.02 + self._morph_warp * 0.03)
         hyper = self._hyperbolic_strength
         sx_arr = np.empty(len(self._nodes), dtype=np.float32)
         sy_arr = np.empty(len(self._nodes), dtype=np.float32)

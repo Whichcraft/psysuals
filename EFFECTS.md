@@ -6,6 +6,11 @@ All effects consume the same shared audio signals. They differ only in how they 
 
 ## Global audio signals
 
+In addition to the raw normalized bands below, effects may read
+`config.BASS_ENVELOPE`, `config.MID_ENVELOPE`, and `config.TREBLE_ENVELOPE`.
+These values stay within `0.0 .. 6.0` and use separate attack/release time
+constants for responsive transients and smooth sustained decay.
+
 | Signal | Meaning | Source |
 |--------|---------|--------|
 | `waveform` | Latest raw mono PCM block (`1024` samples) | `sounddevice` callback |
@@ -55,7 +60,7 @@ Standardized audio energy parameters used across all effects:
 | 9 | `9` | Bubbles | Rising translucent bubbles with global pulse swells |
 | 10 | `←` / `→` | Plasma | Full-screen sine-interference plasma |
 | 11 | `←` / `→` | Branches | Fractal lightning tree with audio-jittered angles |
-| 12 | `←` / `→` | Butterflies | Dancing butterfly pairs with orbit breaks |
+| 12 | `←` / `→` | Butterflies | Emergent butterflies that form audio-reactive dancing pairs |
 | 13 | `←` / `→` | FlowField | 8 000+ particles surfing a shifting vector field |
 | 14 | `←` / `→` | Fireworks | Feedback zooming tunnel with fireworks |
 | 15 | `←` / `→` | Aurora | Parallel Northern Lights ribbons with additive glow |
@@ -162,10 +167,14 @@ A recursive lightning tree radiates from the screen centre with multiple branchi
 
 ## 12. Butterflies
 
-Up to three butterfly pairs move through the screen. A solo butterfly appears first, then a partner joins and the two chase each other in a tightening mutual orbit before occasionally breaking away to wander freely.
+Butterflies emerge from drifting cocoon motes at the screen edges. The bounded
+flock forms nearby, compatible pairs; partners orbit and mirror one another's
+wing beats, exchange a brief sparkle trail, then dissolve the pairing so new
+relationships can form. The simulation supports up to 12 butterflies and six
+pairs, with seeded randomness for repeatable runs.
 
-- Audio: beat and bass drive wing flapping speed and flight velocities; beat triggers particle sparkles when partners are in close proximity.
-- Visual notes: trails are managed on a persistent half-resolution internal surface and scaled into the destination each frame, so the effect survives backends that do not preserve the display backbuffer without falling back to full-resolution CPU drawing. Wing-phase sync is dynamically enabled when partners are near each other.
+- Audio: bass accelerates emergence and flight, mids steer flock drift and orbit motion, treble controls wing shimmer and breakup probability, and beat pulses synchronise paired wings.
+- Visual notes: trails are managed on a persistent half-resolution internal surface and scaled into the destination each frame. Pair matching uses a bounded nearest-neighbour search; resize-safe surfaces and idempotent cleanup preserve the normal CPU/Pygame effect contract.
 
 ## 13. FlowField
 

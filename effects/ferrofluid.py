@@ -22,6 +22,7 @@ class Ferrofluid(Effect):
         self._W = self._H = 1
         self._x = self._y = None
         self._field = None
+        self._field_dx = self._field_dy = None
         self._poles = None
         self._strength = None
         self._surface = pygame.Surface((1, 1))
@@ -38,6 +39,8 @@ class Ferrofluid(Effect):
         yy = np.linspace(-1.0, 1.0, H, dtype=np.float32)
         self._x, self._y = np.meshgrid(xx, yy)
         self._field = np.zeros((H, W), dtype=np.float32)
+        self._field_dx = np.zeros_like(self._field)
+        self._field_dy = np.zeros_like(self._field)
         self._poles = self._rng.uniform(-0.65, 0.65, (self.MAX_POLES, 2)).astype(np.float32)
         self._strength = self._rng.uniform(0.6, 1.2, self.MAX_POLES).astype(np.float32)
         self._surface = pygame.Surface((W, H))
@@ -91,10 +94,20 @@ class Ferrofluid(Effect):
             sign = -1.0 if self._invert_timer and index == 0 else 1.0
             field += sign * self._strength[index] / distance
         self._field[:] = np.clip(field, -self.MAX_FIELD, self.MAX_FIELD)
+        self._field_dx[:, 1:-1] = (self._field[:, 2:] - self._field[:, :-2]) * 0.5
+        self._field_dy[1:-1, :] = (self._field[2:, :] - self._field[:-2, :]) * 0.5
+        self._field_dx[:, 0] = self._field[:, 1] - self._field[:, 0]
+        self._field_dx[:, -1] = self._field[:, -1] - self._field[:, -2]
+        self._field_dy[0, :] = self._field[1, :] - self._field[0, :]
+        self._field_dy[-1, :] = self._field[-1, :] - self._field[-2, :]
         self._hue = (self._hue + 0.001 + high * 0.0008) % 1.0
         self._render(surf, high)
+
+    def get_motion_field(self):
+        return self._field_dx, self._field_dy
 
     def release(self):
         self._surface = None
         self._scaled = None
-        self._x = self._y = self._field = self._poles = self._strength = None
+        self._x = self._y = self._field = self._field_dx = self._field_dy = None
+        self._poles = self._strength = None

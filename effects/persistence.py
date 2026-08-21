@@ -22,6 +22,7 @@ _MAX_SHAPES = 8
 
 
 class Persistence(Effect):
+    MORPH_SCHEMA = {"_morph_projection": (0.0, 1.0)}
     TRAIL_ALPHA = 5   # very long persistence for 3D moiré build-up
     RES_DIV     = 2
 
@@ -56,6 +57,7 @@ class Persistence(Effect):
         self._speeds_z = [0.015 * (1 + i * 0.15) for i in range(_MAX_SHAPES)]
         
         self._boost = 0.0
+        self._morph_projection = 0.5
         self._beat_prev = 0.0
         self._scaled = None
 
@@ -144,7 +146,7 @@ class Persistence(Effect):
         # scale leaves the projected solids visually undersized because of
         # perspective depth. Use a substantially wider focal scale so the
         # outer figures occupy most of the viewport height.
-        base_r = H * 0.95
+        base_r = H * (0.90 + self._morph_projection * 0.10)
         fov = base_r
         spd_mul = 1.0 + bass * 2.5 + self._boost
 

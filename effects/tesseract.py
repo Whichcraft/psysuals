@@ -11,6 +11,7 @@ from .utils import hsl
 
 
 class Tesseract(Effect):
+    MORPH_SCHEMA = {"_morph_projection": (0.0, 1.0)}
     TRAIL_ALPHA = 20
     MAX_EDGES = 220
     MAX_VERTICES = 140
@@ -26,6 +27,7 @@ class Tesseract(Effect):
         self._projected = np.empty((1, 3), dtype=np.float32)
         self._build_preset(0)
         self._beat_prev = 0.0
+        self._morph_projection = 0.5
         self._hue = float(self._rng.random())
 
     @staticmethod
@@ -97,7 +99,7 @@ class Tesseract(Effect):
         self._hue = (self._hue + 0.001 + high * 0.001) % 1.0
         self._rotate(tick * (0.006 + mid * 0.001), tick * (0.009 + high * 0.001))
         w = self._rotated[:, 3]
-        denom4 = np.maximum(0.45, self.PROJECTION_DISTANCE - w)
+        denom4 = np.maximum(0.45, self.PROJECTION_DISTANCE - w * (0.8 + self._morph_projection * 0.4))
         self._projected[:, 0] = self._rotated[:, 0] / denom4
         self._projected[:, 1] = self._rotated[:, 1] / denom4
         self._projected[:, 2] = self._rotated[:, 2] / denom4

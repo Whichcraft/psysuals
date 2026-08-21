@@ -24,6 +24,7 @@ class LiquidLight(Effect):
         self._x = self._y = None
         self._back_x = self._back_y = None
         self._vx = self._vy = None
+        self._published_vx = self._published_vy = None
         self._vx_next = self._vy_next = None
         self._dye = self._dye_next = None
         self._surface = pygame.Surface((1, 1))
@@ -41,6 +42,8 @@ class LiquidLight(Effect):
         self._back_y = np.empty((H, W), dtype=np.int32)
         self._vx = np.zeros((H, W), dtype=np.float32)
         self._vy = np.zeros((H, W), dtype=np.float32)
+        self._published_vx = np.zeros_like(self._vx)
+        self._published_vy = np.zeros_like(self._vy)
         self._vx_next = np.empty_like(self._vx)
         self._vy_next = np.empty_like(self._vy)
         self._dye = np.zeros((H, W, 3), dtype=np.float32)
@@ -74,6 +77,8 @@ class LiquidLight(Effect):
         self._dye, self._dye_next = self._dye_next, self._dye
         np.clip(self._vx, -self.MAX_VELOCITY, self.MAX_VELOCITY, out=self._vx)
         np.clip(self._vy, -self.MAX_VELOCITY, self.MAX_VELOCITY, out=self._vy)
+        self._published_vx[:] = self._vx
+        self._published_vy[:] = self._vy
         np.clip(self._dye, 0.0, self.MAX_DENSITY, out=self._dye)
 
     def _render(self, surf):
@@ -118,10 +123,14 @@ class LiquidLight(Effect):
             self._advect()
         self._render(surf)
 
+    def get_motion_field(self):
+        return self._published_vx, self._published_vy
+
     def release(self):
         self._surface = None
         self._scaled = None
         self._x = self._y = None
         self._back_x = self._back_y = None
         self._vx = self._vy = self._vx_next = self._vy_next = None
+        self._published_vx = self._published_vy = None
         self._dye = self._dye_next = None

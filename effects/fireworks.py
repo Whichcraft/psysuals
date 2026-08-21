@@ -104,6 +104,10 @@ class Fireworks(Effect):
         self._flow_vy = np.empty_like(self._flow_vx)
         self._flow_src_x = np.empty((width, height), dtype=np.int32)
         self._flow_src_y = np.empty_like(self._flow_src_x)
+        self._external_vx = self._external_vy = None
+        self._external_sample_x = self._external_sample_y = None
+        self._external_cache_vx = self._external_cache_vy = None
+        self._external_key = None
 
     def _advect_trail(self, strength, tick):
         """Apply one bounded semi-Lagrangian step to the feedback trail."""
@@ -116,6 +120,14 @@ class Fireworks(Effect):
         self._flow_vy *= strength
         np.clip(self._flow_x - self._flow_vx, 0, width - 1, out=self._flow_vx)
         np.clip(self._flow_y - self._flow_vy, 0, height - 1, out=self._flow_vy)
+        if self._external_vx is not None:
+            self._external_cache_vx[:] = self._external_vx[
+                self._external_sample_y[:, None], self._external_sample_x[None, :]
+            ].T * 0.18
+            self._flow_vx += self._external_cache_vx
+            self._flow_vy += self._external_cache_vy
+            np.clip(self._flow_vx, 0, width - 1, out=self._flow_vx)
+            np.clip(self._flow_vy, 0, height - 1, out=self._flow_vy)
         self._flow_src_x[:] = self._flow_vx
         self._flow_src_y[:] = self._flow_vy
         self._flow_src[:] = surfarray.array3d(self._trail)
@@ -125,6 +137,35 @@ class Fireworks(Effect):
             pixels[:] = self._flow_dst
         finally:
             del pixels
+
+    def set_motion_field(self, field) -> None:
+        if not field or len(field) != 2:
+            self._external_vx = self._external_vy = None
+            self._external_key = None
+            return
+        vx, vy = field
+        if not isinstance(vx, np.ndarray) or not isinstance(vy, np.ndarray):
+            self._external_vx = self._external_vy = None
+            self._external_key = None
+            return
+        if vx.shape != vy.shape or vx.ndim != 2 or not np.isfinite(vx).all() or not np.isfinite(vy).all():
+            self._external_vx = self._external_vy = None
+            self._external_key = None
+            return
+        key = (id(vx), id(vy), vx.shape, self._trail_size())
+        if key == self._external_key:
+            return
+        width, height = self._trail_size()
+        source_h, source_w = vx.shape
+        self._external_vx, self._external_vy = vx, vy
+        self._external_sample_x = np.linspace(0, source_w - 1, width).astype(np.int32)
+        self._external_sample_y = np.linspace(0, source_h - 1, height).astype(np.int32)
+        self._external_cache_vx = np.empty((width, height), dtype=np.float32)
+        self._external_cache_vy = np.empty_like(self._external_cache_vx)
+        self._external_key = key
+
+    def _trail_size(self):
+        return self._trail.get_size()
 
     def _launch(self, res_div: int):
         if len(self._rockets) >= self._MAX_ROCKETS:

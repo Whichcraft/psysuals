@@ -191,6 +191,32 @@ class EffectRenderRegressionTests(unittest.TestCase):
         self.assertIs(effect._vx, velocity)
         self.assertNotEqual(self.surface.get_bounding_rect().width, 0)
 
+    def test_motion_field_consumers_stay_finite_and_bounded(self):
+        producer = LiquidLight()
+        fireworks = Fireworks()
+        mycelium = Mycelium()
+        for tick, beat in enumerate((0.0, 3.0, 6.0) * 6):
+            producer.draw(self.surface, self.waveform, self.fft, beat, tick)
+            field = producer.get_motion_field()
+            fireworks.set_motion_field(field)
+            mycelium.set_motion_field(field)
+            fireworks.draw(self.surface, self.waveform, self.fft, beat, tick)
+            mycelium.draw(self.surface, self.waveform, self.fft, beat, tick)
+            self.assertTrue(np.isfinite(field[0]).all())
+            self.assertTrue(np.isfinite(field[1]).all())
+            self.assertLessEqual(len(fireworks._embers), fireworks._MAX_EMBERS)
+            self.assertLessEqual(len(mycelium._tips), mycelium.max_tips)
+
+    def test_compatible_effect_schemas_clamp_and_expose_values(self):
+        for effect in (Lattice(), Hyperbolic(), Tesseract(), Persistence()):
+            self.assertTrue(effect.MORPH_SCHEMA)
+            values = effect.get_morph_values()
+            self.assertEqual(set(values), set(effect.MORPH_SCHEMA))
+            effect.set_morph_values({name: 99.0 for name in values})
+            for name, bounds in effect.MORPH_SCHEMA.items():
+                self.assertGreaterEqual(getattr(effect, name), bounds[0])
+                self.assertLessEqual(getattr(effect, name), bounds[1])
+
     def test_cymatica_handles_fft_edges_and_bounded_sand(self):
         effect = Cymatica()
         for tick, beat in enumerate((0.0, 3.0, 6.0) * 10):
