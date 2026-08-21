@@ -5,6 +5,8 @@ import pygame
 
 import config
 from effects.aurora import Aurora
+from effects.bubbles import Bubbles
+from effects.plasma_gl import PlasmaGL
 from effects.clifford import Clifford
 from effects.mycelium import Mycelium
 from effects.slimemold import SlimeMold
@@ -67,6 +69,22 @@ class EffectRenderRegressionTests(unittest.TestCase):
         self.assertTrue(any(a != b for a, b in zip(before, effect._nodes[:initial])))
         effect._mutate_topology(320, 240, add=False)
         self.assertEqual(effect.n_nodes, initial)
+
+    def test_bubbles_accepts_high_gain_beat_values(self):
+        effect = Bubbles()
+        for beat in (0.0, 3.0, 6.0):
+            effect.draw(self.surface, self.waveform, self.fft, beat, 0)
+
+    def test_plasma_cpu_fallback_reduces_large_internal_grid(self):
+        old_size = (config.WIDTH, config.HEIGHT)
+        try:
+            config.WIDTH, config.HEIGHT = 1920, 1080
+            effect = PlasmaGL()
+            effect._ensure_fallback(1920, 1080)
+            self.assertLess(effect._X.shape[1], 1080)
+            self.assertLess(effect._X.shape[0], 1920)
+        finally:
+            config.WIDTH, config.HEIGHT = old_size
 
 
 if __name__ == "__main__":

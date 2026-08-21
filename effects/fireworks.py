@@ -67,6 +67,8 @@ class Fireworks(Effect):
     _EMBER_LIGHT_BASE = 0.4
     _EMBER_LIGHT_LIFE_GAIN = 0.5
     _EMBER_LIGHT_TREBLE_GAIN = 0.15
+    _MAX_ROCKETS = 120
+    _MAX_EMBERS = 3000
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -83,10 +85,13 @@ class Fireworks(Effect):
         self._rockets = []   # [x, y, vx, vy, hue, trail_pts]
         self._embers  = []   # [x, y, vx, vy, hue, radius, life, max_life]
         self._auto_t  = int(self._rng.integers(*self._AUTO_START_STAGGER))
+        self._beat_prev = 0.0
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _launch(self, res_div: int):
+        if len(self._rockets) >= self._MAX_ROCKETS:
+            return
         W, H = max(1, config.WIDTH // res_div), max(1, config.HEIGHT // res_div)
         x  = float(self._rng.uniform(W * self._LAUNCH_X_RANGE[0], W * self._LAUNCH_X_RANGE[1]))
         vy = float(self._rng.uniform(self._LAUNCH_VY_RANGE[0] / res_div, self._LAUNCH_VY_RANGE[1] / res_div))
@@ -98,6 +103,9 @@ class Fireworks(Effect):
         n = int(self._rng.integers(*self._EXPLODE_EMBERS) * (1.0 + treble * self._EXPLODE_TREBLE_COUNT_GAIN))
         if getattr(config, "LOW_SPEC", False):
             n = max(5, n // 2)
+        n = min(n, max(0, self._MAX_EMBERS - len(self._embers)))
+        if n <= 0:
+            return
         angs = self._rng.uniform(0.0, math.tau, n)
         spds = self._rng.normal(self._EXPLODE_SPEED_MEAN / res_div,
                                 self._EXPLODE_SPEED_STD / res_div, n)
@@ -141,10 +149,11 @@ class Fireworks(Effect):
         self._hue = (self._hue + self._HUE_BASE_STEP + bass * self._HUE_BASS_GAIN + high * self._HUE_HIGH_GAIN) % 1.0
 
         # Beat: launch rockets + boost
-        if beat > 0.7:
+        if beat > 0.7 and self._beat_prev <= 0.7:
             self._beat_t = self._BEAT_FRAMES
             for _ in range(1 + int(beat)):
                 self._launch(RD)
+        self._beat_prev = float(beat)
 
         # Auto-launch between beats
         gain     = max(0.1, getattr(config, 'EFFECT_GAIN', 1.0))

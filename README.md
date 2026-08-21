@@ -2,7 +2,7 @@
 
 **Welcome to the super-duper greatest music visualizer ever made.** psysuals v3 is a massive leap forward, re-engineered from the ground up to deliver uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, v3 is built to melt your mind with precision and style.
 
-![Version](https://img.shields.io/badge/version-3.13.0-orange)
+![Version](https://img.shields.io/badge/version-3.14.0-orange)
  ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -13,7 +13,7 @@
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
 - **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. v3 scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
 - **🔊 Resilient Audio Pipeline** — Tolerant audio capture with a no-input fallback, silence-aware idle motion, live device switching, and spectral-flux beat detection.
-- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 27 registered effects.
+- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 27 registered effects, with focused tests for audio timing, display lifecycle, and effect safety bounds.
 
 ---
 
@@ -113,13 +113,22 @@ Run the automated unit tests with:
 
 Audio and graphics boundary tests use fakes when hardware or optional native dependencies are unavailable; the real Pygame resize test runs when Pygame is installed.
 
-Run the CPU/ModernGL performance comparison with:
+Run a quick headless CPU performance comparison with:
 
 ```bash
-SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy .venv/bin/python benchmarks.py
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy .venv/bin/python benchmarks.py --cpu-only --duration 2
 ```
 
-The benchmark requires the optional ModernGL dependencies for GPU results; it still runs the CPU measurements without them.
+To attempt the CPU/ModernGL comparison, use a real display/context (do not set the dummy video driver):
+
+```bash
+.venv/bin/python benchmarks.py --gl --duration 2
+```
+
+The benchmark reports when ModernGL is unavailable or the context cannot be created; CPU measurements still complete.
+GL results include the display-present step (and context synchronization when available), so compare them on the same display and VSync settings.
+
+Use `--display N` for monitor selection. When `xrandr` geometry is unavailable, the app falls back to SDL's detected display count and asks SDL to target the selected display.
 
 ## Project structure
 
@@ -147,7 +156,7 @@ psysuals/
 ├── EFFECTS.md                # Full parameter reference for all effects
 ├── tests/                    # Automated settings, audio, graphics, and cleanup tests
 ├── CHANGELOG.md              # Release and unreleased change history
-├── TODO.md                   # Open review and maintenance items
+├── TODO.md                   # Audit status and outstanding maintenance items
 ├── requirements.txt
 └── README.md
 ```

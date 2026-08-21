@@ -3,8 +3,9 @@
 ## Overview
 
 ```
-psysualizer.py   ← main entry point: sounddevice callback + pygame loop
+psysualizer.py   ← main entry point: audio orchestration + pygame loop
                  (Supports --gl for hardware-accelerated ModernGL rendering)
+core/audio_engine.py ← sounddevice callback, FFT, fallback beat/BPM analysis
 beat_tracking.py ← optional librosa beat/BPM refinement, off the render thread
 config.py        ← shared mutable runtime state
 effects/         ← effect modules and shared helpers, registered in MODES
@@ -19,10 +20,10 @@ requirements-gl.txt ← optional dependency set for the GL path
 
 ```
 sounddevice InputStream callback
-    │  1024-sample mono blocks at 44 100 Hz
+    │  variable-size mono callback blocks at 44 100 Hz
     ▼
 _audio_cb()
-    │  push block to LibrosaBeatTracker history
+    │  push captured samples to LibrosaBeatTracker history (short blocks stay short; long blocks keep the newest BLOCK_SIZE samples)
     │  Blackman-windowed rfft → log1p scale → /10
     │  exponential smoothing (α = 0.50) → _smooth_fft
     │  weighted spectral flux across available FFT bins → raw beat energy
@@ -84,13 +85,14 @@ The render loop in `psysualizer.py` uses a dual-target strategy to support both 
 
 Mode switches recreate the effect instance and reset foreground intensity to `config.DEFAULT_EFFECT_GAIN`.
 
-Fullscreen/display changes also recreate the background effect so display-bound caches stay aligned with the new geometry.
+Fullscreen/display changes release foreground effects, background effects, and the shared GL renderer before SDL recreates the context; replacement effects are then constructed against the new renderer. Same-size forced rebuilds are still supported.
 
 ---
 
 ## Display and Span Mode
 
 - Startup display selection comes from saved settings unless `--display N` overrides it.
+- If `xrandr` geometry is unavailable, SDL's display count and the `display=` target are used for selection; coordinate-based X11 spanning is only enabled when monitor geometry is known.
 - On multi-monitor setups, the primary process can enter span mode and spawn one child process for every *other* monitor.
 - Child windows are launched with `--span-child`, so they never recursively create more span children.
 - `A` / `D` in span mode change the shared secondary-display mode across all spawned child windows.
@@ -117,6 +119,10 @@ Fullscreen/display changes also recreate the background effect so display-bound 
 | `DEFAULT_EFFECT_GAIN` | `0.7` | Reset value used on startup and mode changes |
 | `EFFECT_GAIN` | `0.7` | Current foreground intensity |
 | `SILENCE_*` | various | Silence gate thresholds and idle motion floors |
+
+### Resource safety
+
+Effects keep bounded runtime state even when normalized beat values are unusually high. Bubbles cap visual geometry and cached surface dimensions; Fireworks cap rockets and embers and only trigger beat bursts on rising edges. Reduced-resolution effects retain their internal render targets and scale into the display surface instead of silently reallocating to full resolution.
 
 ---
 

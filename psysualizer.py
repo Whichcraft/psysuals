@@ -24,7 +24,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.13.0"
+__version__ = "3.14.0"
 
 import argparse
 import atexit
@@ -78,6 +78,8 @@ class VisualizerApp:
         
         self.using_tap = False
         self._fade_surf = None
+        self._ui_surface = None
+        self._present_surface = None
         # Initialize target resolution based on effect
         self._update_target_res()
         
@@ -282,6 +284,17 @@ class VisualizerApp:
         self.prev_surf_scaled = None
         self._update_target_res()
 
+    def _release_for_display_change(self):
+        for name in ("vis", "bg_vis"):
+            obj = getattr(self, name, None)
+            if hasattr(obj, "release") and callable(obj.release):
+                obj.release()
+            setattr(self, name, None)
+        renderer = getattr(self.display, "renderer", None)
+        if renderer is not None and hasattr(renderer, "release"):
+            renderer.release()
+        self.display.renderer = None
+
     def run(self):
         try:
             while not self._quit_requested:
@@ -300,7 +313,8 @@ class VisualizerApp:
                 self._render()
 
                 if self.args.gl and self.display.renderer:
-                    self.display.renderer.blit(self.display.target)
+                    present = self._present_surface if self._present_surface is not None else self.display.target
+                    self.display.renderer.blit(present)
                     self.display.target.fill((0, 0, 0, 0))
 
                 pygame.display.flip()
@@ -331,8 +345,11 @@ class VisualizerApp:
                 if event.key in (pygame.K_ESCAPE, pygame.K_q):
                     self._quit()
                 elif event.key == pygame.K_f:
+                    self._release_for_display_change()
                     self.display.toggle_fullscreen()
                     self._rebuild_effects(force=True)
+                elif event.key == pygame.K_SPACE:
+                    self._switch_mode(self.mode_idx + 1)
                 elif event.key == pygame.K_h:
                     if event.mod & pygame.KMOD_SHIFT:
                         self.hud_level = (self.hud_level + 1) % 3
@@ -430,16 +447,28 @@ class VisualizerApp:
         elif self.ui.pane_sel == 2:
             self.cf_frames = min(90, max(0, self.cf_frames + delta * 5))
 
+    def _update_genre(self) -> None:
+        """Poll genre detection at a cadence appropriate to silence state."""
+        self._genre_check_cd -= 1
+        if self._genre_check_cd > 0:
+            return
+        detected = self.audio.detect_genre()
+        if detected:
+            self.current_genre = detected
+            self.audio.apply_genre_weights(detected)
+            palette.set_genre(detected)
+        self._genre_check_cd = 60 if self.is_silent else 1
+
+    def _compute_draw_beat(self) -> float:
+        """Apply optional RMS normalization and the user-selected gain."""
+        if self.auto_gain and self.rms_buf:
+            cur_rms = float(np.mean(self.rms_buf)) + 1e-9
+            auto_scale = max(0.5, min(self.target_rms / cur_rms, 2.0))
+            return self.beat * auto_scale * self.effect_gain
+        return self.beat * self.effect_gain
+
     def _update(self):
-        if self.is_silent:
-            self._genre_check_cd -= 1
-        if self._genre_check_cd <= 0:
-            detected = self.audio.detect_genre()
-            if detected:
-                self.current_genre = detected
-                self.audio.apply_genre_weights(detected)
-                palette.set_genre(detected)
-            self._genre_check_cd = 60 if self.is_silent else 1
+        self._update_genre()
             
         self.waveform, self.fft, raw_beat, mid_e, treble_e, bpm, audio_time = self.audio.get_audio()
         if self.audio.beat_tracker.enabled:
@@ -516,12 +545,7 @@ class VisualizerApp:
         self.beat = max(self.beat_decay, silence_beat_floor if self.is_silent else 0.0)
         
         self.rms_buf.append(rms)
-        if self.auto_gain and self.rms_buf:
-            cur_rms = float(np.mean(self.rms_buf)) + 1e-9
-            auto_scale = max(0.5, min(self.target_rms / cur_rms, 2.0))
-            self.draw_beat = self.beat * auto_scale
-        else:
-            self.draw_beat = self.beat * self.effect_gain
+        self.draw_beat = self._compute_draw_beat()
             
         palette.update(self.beat, mid_e, treble_e, self.tick)
         
@@ -531,6 +555,7 @@ class VisualizerApp:
             geometry_changed = self.tick % 60 == 0 and self.display.requery_xmonitors()
             if geometry_changed:
                 print("  Monitor geometry changed, rebuilding span children...")
+                self._release_for_display_change()
                 self.display.open_display(self.display.display_idx, self.display.fullscreen)
                 self._rebuild_effects(force=True)
                 self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
@@ -549,6 +574,16 @@ class VisualizerApp:
         # backend has finished loading.
         if self.audio.stream is None and self.audio.initial_stream_pending and self.tick % 30 == 0:
             self.audio.open_input_stream(self.settings.get("active_dev"), None)
+
+    def _prepare_present_surface(self, target):
+        """Upscale reduced GL effect targets before drawing display-resolution UI."""
+        if self.args.gl and target.get_size() != self.display.screen.get_size():
+            if self._ui_surface is None or self._ui_surface.get_size() != self.display.screen.get_size():
+                self._ui_surface = pygame.Surface(self.display.screen.get_size(), pygame.SRCALPHA)
+            self._ui_surface.fill((0, 0, 0, 0))
+            pygame.transform.smoothscale(target, self.display.screen.get_size(), self._ui_surface)
+            return self._ui_surface
+        return target
 
     def _render(self):
         target = self.display.target
@@ -591,19 +626,22 @@ class VisualizerApp:
                 scaled_prev.set_alpha(0)
                 self.prev_surf = None
                 self.prev_surf_scaled = None
-                
+
+        ui_target = self._prepare_present_surface(target)
+        self._present_surface = ui_target
+
         now = _time.monotonic()
         if self.tap_bpm > 0 and now < self.tap_flash_end:
-            self.ui.draw_tap_flash(target, self.tap_bpm, int(180 * min(self.tap_flash_end - now, 1.0)))
+            self.ui.draw_tap_flash(ui_target, self.tap_bpm, int(180 * min(self.tap_flash_end - now, 1.0)))
             
         if self.show_hud:
-            self._render_hud(target)
+            self._render_hud(ui_target)
             
         if self.ui.pane_open:
-            self.ui.draw_pane(target, self.effect_gain, self.bg_alpha, self.cf_frames)
+            self.ui.draw_pane(ui_target, self.effect_gain, self.bg_alpha, self.cf_frames)
             
         if self.ui.picking:
-            self.ui.draw_device_picker(target, self.audio.input_devices(), self.audio.active_dev)
+            self.ui.draw_device_picker(ui_target, self.audio.input_devices(), self.audio.active_dev)
 
     def _render_hud(self, target):
         self.ui.draw_multiband_bars(target, self.beat, config.MID_ENERGY, config.TREBLE_ENERGY)

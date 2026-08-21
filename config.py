@@ -5,6 +5,7 @@ the display is opened."""
 
 import os
 import random
+import sys
 
 import numpy as np
 
@@ -48,7 +49,17 @@ SILENCE_TREBLE_FLOOR = 0.018
 
 _seed_str = os.environ.get("PSYSUALS_SEED")
 if _seed_str is not None:
-    RNG_SEED = int(_seed_str) if _seed_str else 0
+    if not _seed_str:
+        RNG_SEED = 0
+    else:
+        try:
+            RNG_SEED = int(_seed_str) % (2 ** 32)
+        except ValueError:
+            print(
+                f"config: invalid PSYSUALS_SEED={_seed_str!r}; using 0",
+                file=sys.stderr,
+            )
+            RNG_SEED = 0
     random.seed(RNG_SEED)
     np.random.seed(RNG_SEED)
 else:

@@ -128,7 +128,7 @@ class _Butterfly:
         self.x += math.cos(self.heading) * spd
         self.y += math.sin(self.heading) * spd
 
-        cl = int(28 * self.scale)
+        cl = min(int(28 * self.scale), max(1, W // 2), max(1, H // 2))
         self.x = max(float(cl), min(float(W - cl), self.x))
         self.y = max(float(cl), min(float(H - cl), self.y))
 
@@ -162,12 +162,14 @@ class _Butterfly:
 
 def _edge_spawn(W, H, rng):
     """Return a position just inside one screen edge."""
-    m = 60
+    m = min(60, max(1, min(W, H) // 3))
     edge = int(rng.integers(0, 4))
-    if edge == 0:  return float(m), float(rng.uniform(m, H - m))
-    if edge == 1:  return float(W - m), float(rng.uniform(m, H - m))
-    if edge == 2:  return float(rng.uniform(m, W - m)), float(m)
-    return float(rng.uniform(m, W - m)), float(H - m)
+    y0, y1 = m, max(m + 1, H - m)
+    x0, x1 = m, max(m + 1, W - m)
+    if edge == 0:  return float(m), float(rng.uniform(y0, y1))
+    if edge == 1:  return float(W - m), float(rng.uniform(y0, y1))
+    if edge == 2:  return float(rng.uniform(x0, x1)), float(m)
+    return float(rng.uniform(x0, x1)), float(H - m)
 
 
 # Scale is 70 % of the original 7.2 / 6.84
@@ -351,7 +353,14 @@ class Butterflies(Effect):
             self._pairs.append(_Pair(hue, self._rng, spawn_delay=off))
 
     def draw(self, surf, waveform, fft, beat, tick):
-        W, H = surf.get_size()
+        dest_w, dest_h = surf.get_size()
+        W, H = self._render_size()[:2]
+        if self._trail.get_size() != (W, H):
+            self._trail = pygame.Surface((W, H))
+            self._trail.fill((0, 0, 0))
+            self._scaled = pygame.Surface((dest_w, dest_h))
+        elif self._scaled.get_size() != (dest_w, dest_h):
+            self._scaled = pygame.Surface((dest_w, dest_h))
         self._tick       += 1
         self._global_hue  = (self._global_hue + 0.0014) % 1.0
         bass = float(np.mean(fft[:min(6, len(fft))]))
@@ -370,8 +379,7 @@ class Butterflies(Effect):
             pair.draw(self._trail, beat, gh)
 
         if surf.get_size() != self._trail.get_size():
-            self._trail = pygame.Surface(surf.get_size())
-            self._trail.fill((0, 0, 0))
-            surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
+            pygame.transform.scale(self._trail, surf.get_size(), self._scaled)
+            surf.blit(self._scaled, (0, 0), special_flags=pygame.BLEND_RGB_MAX)
         else:
             surf.blit(self._trail, (0, 0), special_flags=pygame.BLEND_RGB_MAX)

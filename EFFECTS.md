@@ -10,7 +10,7 @@ All effects consume the same shared audio signals. They differ only in how they 
 |--------|---------|--------|
 | `waveform` | Latest raw mono PCM block (`1024` samples) | `sounddevice` callback |
 | `fft` | Smoothed, log-scaled spectrum (`512` bins) | Blackman-windowed FFT + EMA |
-| `beat` | Normalised beat impulse (`0.0 .. 3.0`) | Spectral flux, optional tracker refinement, main-loop decay |
+| `beat` | Normalised raw beat impulse (`0.0 .. 3.0`); foreground effects receive this multiplied by the selected gain (up to `6.0`) | Spectral flux, optional tracker refinement, main-loop decay |
 | `config.MID_ENERGY` | Normalised mid-band energy | Smoothed relative mid-band slice |
 | `config.TREBLE_ENERGY` | Normalised treble energy | Smoothed relative treble-band slice |
 | `config.BPM` | Live BPM estimate or tap-tempo override | Callback onset timing + optional `librosa` refinement |
@@ -158,7 +158,7 @@ A recursive lightning tree radiates from the screen centre with multiple branchi
 Up to three butterfly pairs move through the screen. A solo butterfly appears first, then a partner joins and the two chase each other in a tightening mutual orbit before occasionally breaking away to wander freely.
 
 - Audio: beat and bass drive wing flapping speed and flight velocities; beat triggers particle sparkles when partners are in close proximity.
-- Visual notes: trails are managed on an internal surface so the effect survives backends that do not preserve the display backbuffer between frames. Wing-phase sync is dynamically enabled when partners are near each other.
+- Visual notes: trails are managed on a persistent half-resolution internal surface and scaled into the destination each frame, so the effect survives backends that do not preserve the display backbuffer without falling back to full-resolution CPU drawing. Wing-phase sync is dynamically enabled when partners are near each other.
 
 ## 13. FlowField
 
@@ -172,7 +172,7 @@ Eight thousand+ particles surf a continuously changing multi-layer vector field 
 The previous frame is zoomed and darkened into a tunnel while fireworks launch upward and explode into glowing embers.
 
 - Audio: beat (bass) launches rockets and drives zoom scaling; TREBLE_ENERGY dramatically increases rocket explosion ember counts, launch trail widths, and velocities.
-- Visual notes: auto-launch timing is also tied to `config.EFFECT_GAIN`, so quieter gain settings create more background rockets between beats.
+- Visual notes: auto-launch timing is also tied to `config.EFFECT_GAIN`, so quieter gain settings create more background rockets between beats. Beat bursts trigger on rising edges, while rocket and ember populations remain explicitly capped.
 
 ## 15. Aurora
 

@@ -33,7 +33,12 @@ class DisplayManager:
         self.target = None
         self.fullscreen = True
         self.xmonitors = self._xrandr_monitors() or []
-        self.num_displays = max(len(self.xmonitors), 1)
+        detected = 0
+        try:
+            detected = int(pygame.display.get_num_displays())
+        except Exception:
+            pass
+        self.num_displays = max(len(self.xmonitors), detected, 1)
         self.display_idx = 0
         self.span_children: dict[int, subprocess.Popen] = {}
         self._install_x11_error_handler()
@@ -105,7 +110,22 @@ class DisplayManager:
         self.display_idx = idx
         self.fullscreen = fullscreen
         self._xmove_target = None
+        # The old context is still current here; release renderer resources
+        # before SDL recreates the window/context below.
+        if self.renderer is not None:
+            try:
+                self.renderer.release()
+            finally:
+                self.renderer = None
         flags = 0
+        def set_mode(size, mode_flags):
+            if self.num_displays <= 1:
+                return pygame.display.set_mode(size, mode_flags)
+            try:
+                return pygame.display.set_mode(size, mode_flags, display=idx)
+            except TypeError:
+                # Older Pygame builds and simple test doubles lack display=.
+                return pygame.display.set_mode(size, mode_flags)
         if self.args.gl:
             flags |= pygame.OPENGL | pygame.DOUBLEBUF
             if self._gl_renderer_cls is None:
@@ -148,13 +168,13 @@ class DisplayManager:
                 config.WIDTH = mw
                 config.HEIGHT = mh
             elif fullscreen:
-                self.screen = pygame.display.set_mode((0, 0), flags | pygame.FULLSCREEN)
+                self.screen = set_mode((0, 0), flags | pygame.FULLSCREEN)
                 config.WIDTH, config.HEIGHT = self.screen.get_size()
             else:
                 # Default window size if config was 0
                 w = config.WIDTH or 1280
                 h = config.HEIGHT or 720
-                self.screen = pygame.display.set_mode((w, h), flags)
+                self.screen = set_mode((w, h), flags)
                 config.WIDTH, config.HEIGHT = self.screen.get_size()
         except Exception as _dm_exc:
             print(f"  ⚠️ Display init failed: {_dm_exc}", file=sys.stderr)
@@ -168,8 +188,6 @@ class DisplayManager:
         
         if self.args.gl and self._has_moderngl and self._gl_renderer_cls is not None:
             try:
-                if self.renderer:
-                    self.renderer.release()
                 self.renderer = self._gl_renderer_cls(config.WIDTH, config.HEIGHT)
             except Exception as e:
                 print(f"  ⚠️ ModernGL renderer initialization failed: {e}")

@@ -99,7 +99,15 @@ class AudioEngine:
             weights[:n//4] = 0.6
             weights[n//4:] = 1.4
         with self._lock:
+            if np.array_equal(self._genre_weights, weights):
+                return
             self._genre_weights[:] = weights
+            # The weighted spectrum changed discontinuously.  Start a fresh
+            # flux baseline on the next callback instead of treating the
+            # genre transition as an audio onset.
+            self._first_frame = True
+            self._raw_beat_energy = 0.0
+            self._prev_beat_energy = 0.0
 
     def detect_genre(self) -> str | None:
         """Return detected genre string once enough frames are collected."""
@@ -128,13 +136,20 @@ class AudioEngine:
         if status:
             print(f"AudioEngine: status={status}", file=sys.stderr)
         try:
-            mono = np.asarray(indata[:, 0], dtype=np.float32)
-            if mono.size != config.BLOCK_SIZE:
-                if mono.size < config.BLOCK_SIZE:
-                    mono = np.pad(mono, (0, config.BLOCK_SIZE - mono.size))
-                else:
-                    mono = mono[:config.BLOCK_SIZE]
-            self.beat_tracker.push_audio(mono, time_info.currentTime)
+            captured = np.asarray(indata[:, 0], dtype=np.float32).reshape(-1)
+            captured_frames = min(max(int(frames), 0), captured.size)
+            captured = captured[:captured_frames]
+            adc_start = getattr(time_info, "inputBufferAdcTime", None)
+            if adc_start is None:
+                block_end_time = float(time_info.currentTime)
+            else:
+                block_end_time = float(adc_start) + float(captured_frames) / config.SAMPLE_RATE
+            tracker_block = captured[-config.BLOCK_SIZE:] if captured.size > config.BLOCK_SIZE else captured
+            self.beat_tracker.push_audio(tracker_block, block_end_time)
+
+            mono = np.zeros(config.BLOCK_SIZE, dtype=np.float32)
+            analysis = captured[-config.BLOCK_SIZE:]
+            mono[:analysis.size] = analysis
 
             windowed = mono * self._blackman_window
             spectrum = np.abs(np.fft.rfft(windowed))[: config.BLOCK_SIZE // 2]
@@ -144,7 +159,7 @@ class AudioEngine:
             spectrum /= 10.0
 
             with self._lock:
-                self._audio_time = float(time_info.currentTime)
+                self._audio_time = block_end_time
                 self._waveform[:] = mono
 
                 if self._smooth_fft is None:
@@ -170,7 +185,7 @@ class AudioEngine:
                     self._flux_avg = self._flux_avg * 0.95 + flux * 0.05
                     self._raw_beat_energy = flux / (self._flux_avg + 1e-6)
 
-                    t_now = float(time_info.currentTime)
+                    t_now = block_end_time
                     if (
                         self._raw_beat_energy > 2.2
                         and self._prev_beat_energy <= 2.2
@@ -185,6 +200,9 @@ class AudioEngine:
                                 self._bpm = 60.0 / median_interval
 
                     self._prev_beat_energy = self._raw_beat_energy
+
+                # Flux is frame-to-frame, not against the first frame.
+                self._prev_spectrum[:beat_end] = weighted
 
                 mid = self._band_mean(self._smooth_fft, 0.04, 0.20)
                 self._mid_avg = self._mid_avg * 0.98 + mid * 0.02
@@ -259,15 +277,14 @@ class AudioEngine:
         return candidates
 
     def start_input_stream(self, device_idx: int | None):
-        if self.stream is not None:
-            self.stop_input_stream()
-
         sounddevice = _get_sounddevice()
         if sounddevice is None:
             self.last_error = _sd_error or RuntimeError("sounddevice is still loading or unavailable")
             return None
 
         self._initial_stream_pending = False
+        old_stream = self.stream
+        old_dev = self.active_dev
         stream = None
         try:
             stream = sounddevice.InputStream(
@@ -278,13 +295,22 @@ class AudioEngine:
                 callback=self._audio_cb,
             )
             stream.start()
+            if old_stream is not None:
+                try:
+                    old_stream.stop()
+                except Exception as exc:
+                    self.last_error = exc
+                try:
+                    old_stream.close()
+                except Exception as exc:
+                    self.last_error = exc
             self.stream = stream
             self.active_dev = device_idx
             self.last_error = None
             return self.stream
         except Exception as exc:
-            self.stream = None
-            self.active_dev = None
+            self.stream = old_stream
+            self.active_dev = old_dev
             self.last_error = exc
             if stream is not None:
                 try:

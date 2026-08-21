@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import time
 import numpy as np
@@ -7,7 +8,7 @@ import config
 from effects import MODES
 from gl_renderer import GLRenderer, HAS_MODERNGL
 
-def run_benchmark(duration_s=2.0):
+def run_benchmark(duration_s=2.0, *, enable_gl=False, headless=True):
     print(f"Running benchmarks (duration: {duration_s}s per mode)...")
     
     # Mock audio data
@@ -16,7 +17,8 @@ def run_benchmark(duration_s=2.0):
     beat = 1.0
     tick = 0
     
-    os.environ['SDL_VIDEODRIVER'] = 'dummy'
+    if headless:
+        os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
     pygame.init()
     W, h = 1920, 1080 # Benchmark at Full HD
     _old_w, _old_h = config.WIDTH, config.HEIGHT
@@ -24,7 +26,9 @@ def run_benchmark(duration_s=2.0):
     config.WIDTH, config.HEIGHT = W, h
     config._INITIALIZED = True
     renderer = None
-    gl_available = HAS_MODERNGL
+    gl_available = bool(enable_gl and HAS_MODERNGL)
+    if enable_gl and not HAS_MODERNGL:
+        print("  ModernGL unavailable; skipping GL measurements.")
     
     try:
         # CPU Target
@@ -72,8 +76,13 @@ def run_benchmark(duration_s=2.0):
                 end_time = start + duration_s
                 while time.perf_counter() < end_time:
                     vis_gl.draw(gl_target, waveform, fft, beat, tick)
-                    renderer.blit(gl_target)
-                    gl_target.fill((0, 0, 0, 0))
+                    if not getattr(vis_gl, "IS_GL", False):
+                        renderer.blit(gl_target)
+                        gl_target.fill((0, 0, 0, 0))
+                    pygame.display.flip()
+                    finish = getattr(getattr(renderer, "ctx", None), "finish", None)
+                    if callable(finish):
+                        finish()
                     frames += 1
                     tick += 1
                 gl_fps = frames / (time.perf_counter() - start)
@@ -99,5 +108,25 @@ def run_benchmark(duration_s=2.0):
         pygame.quit()
 
 
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Benchmark CPU effects and optional ModernGL rendering")
+    parser.add_argument("--duration", type=float, default=2.0,
+                        help="seconds per effect (default: 2.0)")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--cpu-only", action="store_true",
+                       help="run headless CPU measurements only (default)")
+    group.add_argument("--gl", action="store_true",
+                       help="run CPU measurements and attempt a real ModernGL window")
+    args = parser.parse_args(argv)
+    if args.duration <= 0:
+        parser.error("--duration must be greater than zero")
+    return args
+
+
 if __name__ == "__main__":
-    run_benchmark()
+    args = parse_args()
+    run_benchmark(
+        args.duration,
+        enable_gl=args.gl,
+        headless=not args.gl,
+    )

@@ -5,6 +5,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.14.0] — 2026-08-21
+
+### Fixed
+- **Bounded effect resources** — Capped Bubbles' visual geometry/cache sizes and Fireworks' sustained-beat rocket/ember populations; Fireworks beat bursts now trigger on threshold crossings.
+- **Sample-accurate audio callbacks** — Preserved captured callback lengths for beat tracking, retained the newest fixed-size analysis window for long callbacks, and used ADC-domain end times for fallback onset timing.
+- **Safe display-context recreation** — Released foreground/background effects and the shared GL renderer before fullscreen or monitor-geometry context changes, then rebuilt them against the replacement context.
+- **Reduced-resolution Butterflies trail** — Kept the internal trail at `RES_DIV` resolution, scaled it into the destination, and guarded tiny viewport edge spawning.
+- **Space-key mode cycling** — Implemented the documented Space shortcut while preserving device-picker keyboard precedence.
+- **Completed GL benchmark frames** — Present and synchronize measured frames, and avoid redundant Pygame-surface blits for direct-GL effects.
+- **Non-XRandR display selection** — Use SDL's detected display count and display target when monitor geometry is unavailable.
+
+### Documentation and verification
+- Updated README, architecture, effect behavior, and release notes for the completed audit remediation.
+- Verified 52 unit tests, the 27-effect headless smoke test, byte compilation, and whitespace checks.
+
+
 ## [3.13.0] — 2026-07-22
 
 ### Fixed
@@ -55,13 +71,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Historical implementation notes use review identifiers only; they do not refer to a required review-artifact file.
 
 ### Tests
-- Added automated tests for audio callback padding/truncation, genre warm-up, device fallback, UTF-8 settings/preset corruption, signed monitor geometry, transient `xrandr` failure, shader allocation cleanup, resize behavior, child-process races, benchmark execution, and idempotent GL release (37 tests total).
+- Added automated tests for audio callback padding/truncation, genre warm-up, device fallback, UTF-8 settings/preset corruption, signed monitor geometry, transient `xrandr` failure, shader allocation cleanup, resize behavior, child-process races, benchmark CLI parsing, and idempotent GL release. The test count is intentionally maintained by the test suite rather than hardcoded here.
 - Added coverage for FlowField's 2,000-particle interactive adjustment steps.
 - Added coverage for failed stream teardown, monitor geometry changes, display fallback flags, FBO cache ownership, seeded effect initialization, and beat-tracker shutdown races.
 - Added regression coverage for Aurora, Clifford, Mycelium, Slimemold, and Synapse first-frame/render paths.
 - Added coverage for display-aware Slimemold resolution and laptop motion scaling inputs.
 - Added a GitHub Actions matrix for Python 3.10 and 3.12 with native Pygame dependencies, unit tests, and the headless smoke test.
 - Hardened partially initialized display cleanup so `__del__` cannot fail when child-process state was never created.
+
+> Audit note: historical review entries below use review-era wording. In the current implementation, `pygame.surfarray.pixels2d()` is indexed as `(x, y)`; FlowField and Magnetar therefore intentionally use `pix[ix, iy]`. SlimeMold's NumPy trail remains row-major `(y, x)` and transposes only when copying to the Pygame surface.
 
 ## [3.11.0] — 2026-06-24
 
@@ -213,7 +231,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - **UIManager use target.get_size()** — Replaced `config.WIDTH/HEIGHT` with `target.get_size()` / `target.get_width()` / `target.get_height()` in all cached surface checks and positioning, removing stale-config risk. (I22)
 - **GL renderer pre-allocated upload buffer** — Replaced `pygame.image.tostring` (8 MB per-frame bytes allocation) with a pre-allocated numpy buffer filled via `pixels3d`/`pixels_alpha` views, eliminating per-frame 8 MB allocation in the GL blit path. (O15)
 
-## [3.11.0] — 2026-06-24
+<!-- Duplicate 3.11.0 entries merged into the release section above. -->
 
 ### Fixed
 - **Screen cleared on effect change** — `_switch_mode()` now calls `self.display.target.fill((0, 0, 0))` unconditionally after capturing the previous frame, so the new effect always starts on a clean black surface regardless of GL/non-GL mode.

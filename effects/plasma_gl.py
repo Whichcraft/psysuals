@@ -199,7 +199,9 @@ class PlasmaGL(Effect):
         if self._fallback_surf is not None and self._fb_w == w and self._fb_h == h:
             return
         self._fb_w, self._fb_h = w, h
-        div = self._render_div()
+        # Keep the direct GL path at the requested framebuffer size, but make
+        # the NumPy fallback affordable on large CPU-only displays.
+        div = max(1, self._auto_res_div())
         rw = max(1, w // div)
         rh = max(1, h // div)
         self._fallback_surf = pygame.Surface((rw, rh))

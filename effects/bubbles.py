@@ -13,6 +13,7 @@ class Bubbles(Effect):
     """Translucent rising bubbles — fills the full screen; size and spawn rate driven by bass."""
 
     MAX = 700
+    MAX_RENDER_DIAMETER = 512
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -48,7 +49,7 @@ class Bubbles(Effect):
 
     def _get_bsurf(self, size):
         # Quantize size to nearest multiple of 8 to avoid infinite cache growth
-        size = max(8, ((size + 7) // 8) * 8)
+        size = min(self.MAX_RENDER_DIAMETER, max(8, ((size + 7) // 8) * 8))
         s = self._surf_cache.get(size)
         if s is None:
             if len(self._surf_cache) >= 128:
@@ -96,7 +97,7 @@ class Bubbles(Effect):
 
     def draw(self, surf, waveform, fft, beat, tick):
         self.hue += 0.005
-        bass = beat
+        bass = min(max(float(beat), 0.0), 1.5)
         mid  = config.MID_ENERGY
         high = config.TREBLE_ENERGY
         W, H = surf.get_size()
@@ -127,6 +128,7 @@ class Bubbles(Effect):
 
             life  = max(0.0, min(1.0, b["y"] / H))
             r     = max(2, int(b["r"] * (1 + self.pulse * 0.90 + mid * 0.35 + high * 0.20 + self._bass_flash * 0.45)))
+            r     = min(r, max(8, self.MAX_RENDER_DIAMETER // 2 - 14))
             pad   = r + 14
             alpha = int(life * 160)
             size = max(8, ((pad * 2 + 7) // 8) * 8)
@@ -149,15 +151,17 @@ class Bubbles(Effect):
             hr = max(1, r // 3)
             pygame.draw.circle(bsurf, (255, 255, 255, int(alpha * 0.55)),
                                (cc - r // 3, cc - r // 3), hr)
-            if beat > 1.0:
-                excess = beat - 1.0
+            if bass > 1.0:
+                excess = bass - 1.0
                 er1 = max(1, int(r * (1.7 + excess * 0.4)))
                 ec1 = hsl((b["hue"] + 0.33) % 1.0, l=0.90)
-                pygame.draw.circle(bsurf, (*ec1, int(alpha * excess * 0.55)), (cc, cc), er1, 2)
+                er1_alpha = max(0, min(255, int(alpha * excess * 0.55)))
+                pygame.draw.circle(bsurf, (*ec1, er1_alpha), (cc, cc), er1, 2)
                 if excess > 0.5:
                     er2 = max(1, int(r * (2.0 + excess * 0.3)))
                     ec2 = hsl((b["hue"] + 0.66) % 1.0, l=0.85)
-                    pygame.draw.circle(bsurf, (*ec2, int(alpha * (excess - 0.5) * 0.45)), (cc, cc), er2, 2)
+                    er2_alpha = max(0, min(255, int(alpha * (excess - 0.5) * 0.45)))
+                    pygame.draw.circle(bsurf, (*ec2, er2_alpha), (cc, cc), er2, 2)
 
             surf.blit(bsurf, (int(b["x"]) - cc, int(b["y"]) - cc))
             alive.append(b)

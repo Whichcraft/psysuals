@@ -50,6 +50,8 @@ class GLRenderer:
         self._feedback_vao: moderngl.VertexArray | None = None
         self._offscreen_cache: dict[tuple[int, int], tuple[moderngl.Texture, moderngl.Framebuffer]] = {}
         self._upload_buf: np.ndarray | None = None
+        self._blit_upload_buf: np.ndarray | None = None
+        self._feedback_upload_buf: np.ndarray | None = None
 
     # ── Shader helpers ────────────────────────────────────────────────────────
 
@@ -164,17 +166,25 @@ class GLRenderer:
         # self.ctx.clear(0.0, 0.0, 0.0, 1.0) # Removed clear to allow layering
         vao.render(moderngl.TRIANGLE_STRIP)
 
-    def _upload_surface(self, surface: "pygame.Surface", tex: "moderngl.Texture | None") -> "moderngl.Texture":
+    def _upload_surface(
+        self,
+        surface: "pygame.Surface",
+        tex: "moderngl.Texture | None",
+        buffer_attr: str = "_upload_buf",
+    ) -> "moderngl.Texture":
         size = surface.get_size()
-        if tex is None or tex.size != size:
+        upload_buf = getattr(self, buffer_attr, None)
+        required = size[0] * size[1] * 4
+        if tex is None or tex.size != size or upload_buf is None or upload_buf.size != required:
             if tex:
                 tex.release()
             tex = self.ctx.texture(size, 4)
-            self._upload_buf = np.empty(size[0] * size[1] * 4, dtype=np.uint8)
+            upload_buf = np.empty(required, dtype=np.uint8)
+            setattr(self, buffer_attr, upload_buf)
 
         w, h = size
         has_alpha = bool(surface.get_flags() & pygame.SRCALPHA)
-        buf = self._upload_buf.reshape(h, w, 4)
+        buf = upload_buf.reshape(h, w, 4)
 
         rgb = pygame.surfarray.pixels3d(surface)
         try:
@@ -190,7 +200,7 @@ class GLRenderer:
         finally:
             del rgb
 
-        tex.write(self._upload_buf)
+        tex.write(upload_buf)
         tex.use(0)
         return tex
 
@@ -199,7 +209,8 @@ class GLRenderer:
         if self._blit_prog is None:
             self._blit_prog, self._blit_vao = self.blit_program()
 
-        self._blit_tex = self._upload_surface(surface, self._blit_tex)
+        self._blit_tex = self._upload_surface(
+            surface, self._blit_tex, "_blit_upload_buf")
         self._blit_prog["u_tex"] = 0
 
         self.ctx.enable(moderngl.BLEND)
@@ -208,7 +219,8 @@ class GLRenderer:
 
     def surface_texture(self, surface: "pygame.Surface") -> "moderngl.Texture":
         """Upload a pygame surface to a reusable texture."""
-        self._feedback_tex = self._upload_surface(surface, self._feedback_tex)
+        self._feedback_tex = self._upload_surface(
+            surface, self._feedback_tex, "_feedback_upload_buf")
         self._feedback_tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
         self._feedback_tex.repeat_x = False
         self._feedback_tex.repeat_y = False
@@ -238,6 +250,9 @@ class GLRenderer:
         if self._feedback_tex:
             self._feedback_tex.release()
             self._feedback_tex = None
+        self._upload_buf = None
+        self._blit_upload_buf = None
+        self._feedback_upload_buf = None
         if self._vbo is not None:
             self._vbo.release()
             self._vbo = None

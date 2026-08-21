@@ -136,6 +136,22 @@ class GraphicsLifecycleTests(unittest.TestCase):
         self.assertEqual(second.get_size(), (48, 36))
         self.assertIsNot(first, second)
 
+    def test_reduced_gl_target_gets_full_resolution_ui_surface(self):
+        if not REAL_PYGAME:
+            self.skipTest("real Pygame is required for UI compositing coverage")
+        app = VisualizerApp.__new__(VisualizerApp)
+        app.args = types.SimpleNamespace(gl=True)
+        app.display = types.SimpleNamespace(
+            target=pygame.Surface((640, 360), pygame.SRCALPHA),
+            screen=pygame.Surface((1920, 1080)),
+        )
+        app._ui_surface = None
+
+        app._present_surface = app._prepare_present_surface(app.display.target)
+
+        self.assertEqual(app._present_surface.get_size(), (1920, 1080))
+        self.assertEqual(app.display.target.get_size(), (640, 360))
+
     def test_forced_effect_rebuild_ignores_same_size_guard(self):
         if not REAL_PYGAME:
             self.skipTest("real Pygame is required for effect rebuild coverage")
@@ -222,6 +238,41 @@ class GraphicsLifecycleTests(unittest.TestCase):
             renderer.release()
         finally:
             gl_renderer.HAS_MODERNGL = old_has
+
+    def test_surface_upload_buffers_support_alternating_sizes(self):
+        class Texture:
+            def __init__(self, size):
+                self.size = size
+                self.writes = []
+
+            def release(self):
+                pass
+
+            def use(self, unit):
+                pass
+
+            def write(self, data):
+                self.writes.append(data.copy())
+
+        class Context:
+            def texture(self, size, components):
+                return Texture(size)
+
+        renderer = gl_renderer.GLRenderer.__new__(gl_renderer.GLRenderer)
+        renderer.ctx = Context()
+        renderer._blit_upload_buf = None
+        renderer._feedback_upload_buf = None
+        renderer._upload_buf = None
+        large = pygame.Surface((64, 48), pygame.SRCALPHA)
+        small = pygame.Surface((16, 12), pygame.SRCALPHA)
+
+        blit_tex = renderer._upload_surface(large, None, "_blit_upload_buf")
+        feedback_tex = renderer._upload_surface(small, None, "_feedback_upload_buf")
+        renderer._upload_surface(large, blit_tex, "_blit_upload_buf")
+        renderer._upload_surface(small, feedback_tex, "_feedback_upload_buf")
+
+        self.assertEqual(len(blit_tex.writes[-1]), 64 * 48 * 4)
+        self.assertEqual(len(feedback_tex.writes[-1]), 16 * 12 * 4)
 
     def test_offscreen_cache_ownership_is_queryable(self):
         renderer = gl_renderer.GLRenderer.__new__(gl_renderer.GLRenderer)
