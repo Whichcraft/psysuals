@@ -143,7 +143,10 @@ class VisualizerApp:
         self._phase_was_silent = True
         
         self.span_vis2_idx = (self.mode_idx + 1) % len(MODES)
-        self.span_mode = len(self.display.xmonitors) >= 2 and not self.args.span_child
+        # Multi-monitor span mode is opt-in. Start the primary app on one
+        # screen so an extra monitor is never claimed unexpectedly; Shift+M
+        # can still enable synchronized child windows explicitly.
+        self.span_mode = False
         if self.span_mode:
             self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
             
