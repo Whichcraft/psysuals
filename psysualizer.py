@@ -24,7 +24,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.16.0"
+__version__ = "3.17.0"
 
 import argparse
 import atexit

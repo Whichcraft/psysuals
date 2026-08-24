@@ -116,7 +116,10 @@ class Tesseract(Effect):
         self._projected[:, 1] = (self._rotated[:, 1] * self._scale + self._bounce_y) / denom4
         self._projected[:, 2] = self._rotated[:, 2] / denom4
         denom3 = np.maximum(0.25, 3.2 - self._projected[:, 2])
-        scale = min(surf.get_width(), surf.get_height()) * 1.15
+        # Use a TV-friendly focal scale.  The 4-D projection occupies a small
+        # fraction of the viewport at 16:9 sizes, so the old value read as a
+        # tiny coloured speck instead of a legible geometric object.
+        scale = min(surf.get_width(), surf.get_height()) * 2.05
         points = np.column_stack((
             surf.get_width() * 0.5 + self._projected[:, 0] / denom3 * scale,
             surf.get_height() * 0.5 + self._projected[:, 1] / denom3 * scale,
