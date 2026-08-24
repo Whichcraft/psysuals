@@ -33,6 +33,7 @@ import os
 import sys
 import time as _time
 import signal
+import threading
 from collections import deque
 
 import numpy as np
@@ -156,10 +157,27 @@ class VisualizerApp:
         self.fade = self._make_fade(self.fade_alpha)
 
     def _setup_signals(self):
+        self._interrupt_count = 0
+        self._interrupt_watchdog = None
+
         def _sig_handler(sig, frame):
-            # Do not tear down pygame from inside a draw callback. Request
-            # shutdown and let the main loop clean up after the frame returns.
+            # The first interrupt is graceful and never tears down pygame from
+            # inside a draw callback. If another Ctrl-C arrives while cleanup
+            # or audio shutdown is stuck, restore the OS default so the
+            # process exits immediately instead of accumulating ``^C`` text.
+            self._interrupt_count += 1
+            if self._interrupt_count >= 2:
+                # Do not depend on Python returning from a blocked PortAudio
+                # or SDL call; hard-exit on the second interrupt.
+                os._exit(128 + int(sig))
+                return
             self._quit_requested = True
+            # A first Ctrl-C should normally reach the loop's finally block,
+            # but a backend call can hold the main thread. Guarantee escape
+            # after a short grace period even if that call never returns.
+            self._interrupt_watchdog = threading.Timer(1.5, lambda: os._exit(128 + int(sig)))
+            self._interrupt_watchdog.daemon = True
+            self._interrupt_watchdog.start()
         signal.signal(signal.SIGINT, _sig_handler)
         signal.signal(signal.SIGTERM, _sig_handler)
 
