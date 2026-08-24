@@ -159,7 +159,7 @@ class Lattice(Effect):
         rotated = pygame.transform.scale(self._surf, (rw, rh))
         self._surf.fill((0, 0, 0))
         self._surf.blit(rotated, (-((rw - W) // 2), -((rh - H) // 2)))
-        self._surf.fill((230, 230, 230), special_flags=pygame.BLEND_RGB_MULT)
+        self._surf.fill((210, 210, 210), special_flags=pygame.BLEND_RGB_MULT)
 
         sc = self._scale
         self._hyperbolic_strength = min(0.35, mid * 0.06 + bass * 0.04 + high * 0.02 + self._morph_warp * 0.03)
