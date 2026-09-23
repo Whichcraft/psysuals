@@ -9,7 +9,7 @@ Controls:
   Up/Down         Adjust intensity (or navigate pane sliders when pane is open)
   Tab             Toggle real-time settings pane
   P               Save current state as a preset
-  Shift+P         Cycle through saved presets
+  Shift+P         Morph to the next saved preset
   A               Toggle auto-gain (or cycle child mode backward in span mode)
   B               Toggle background layer
   Shift+B         Cycle background effect
@@ -24,13 +24,12 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.17.0"
+__version__ = "3.18.0"
 
 import argparse
 import atexit
 import math
 import os
-import sys
 import time as _time
 import signal
 import threading
@@ -140,15 +139,12 @@ class VisualizerApp:
         self._phase_anchor_tick = 0
         self._phase_last_onset = 0.0
         self._phase_anchor_time = 0.0
-        self._phase_was_silent = True
         
         self.span_vis2_idx = (self.mode_idx + 1) % len(MODES)
         # Multi-monitor span mode is opt-in. Start the primary app on one
         # screen so an extra monitor is never claimed unexpectedly; Shift+M
         # can still enable synchronized child windows explicitly.
         self.span_mode = False
-        if self.span_mode:
-            self.display.spawn_span_children(self.span_vis2_idx, os.path.abspath(__file__))
             
         self.presets = sett.load_presets()
         self.active_preset = -1
@@ -204,7 +200,7 @@ class VisualizerApp:
             formatter_class=argparse.RawDescriptionHelpFormatter
         )
         parser.add_argument("-d", "--display", type=int, default=None, help="Target display index (e.g. 0, 1)")
-        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index (0-26)")
+        parser.add_argument("-m", "--mode", type=int, default=None, help="Starting mode index (0-based)")
         parser.add_argument("-g", "--gl", action="store_true", help="Enable ModernGL hardware acceleration")
         parser.add_argument("--low-spec", action="store_true", help="Optimize performance for low-end systems (lowers FPS and particle counts)")
         parser.add_argument("--span-child", action="store_true", help=argparse.SUPPRESS)
