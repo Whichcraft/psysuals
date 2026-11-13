@@ -1086,6 +1086,10 @@ its two correction rounds.
   with eight tests over the new behaviour (bounds, packet travel and
   handover, spore germination, small display, resize, reproducibility,
   motion field, colony spread).
+- [x] Fixed the branching packet's sibling selection. The candidate list was
+  indexed with a negative offset, which Python wrapped around, so a packet
+  could branch back onto the filament it had just arrived on. Covered by a
+  focused test over a three-way junction.
 - [x] Updated EFFECTS.md section 17, added the implemented brief to
   NEWEFFECTS.md and recorded the rebuild in README.md.
 - [x] The compact visual fixture still passes with the unchanged Mycelium
@@ -1109,3 +1113,29 @@ Open follow-ups:
 - [ ] check-changelog still fails on the historical CHANGELOG format. The
   new Unreleased section follows the canonical rules; migrating the released
   sections to the same format is a separate, larger change.
+
+## Lattice balance and Magnetar backdrop — 2026-11-13
+
+- [x] Assign Lattice's FFT bins centre-out, so the bass drives the middle of
+  the grid and the leftmost column is no longer the liveliest line.
+- [x] Slow the Magnetar contour drift and halve its bass response, so the
+  background field only shimmers slightly.
+- [x] Cover both with focused tests: symmetric centre-out bins, bass lighting
+  the centre rather than the left edge, and a bounded background drift.
+- [x] Update EFFECTS.md sections 16 and 18.
+- [x] Give Persistence a music-driven size pulse and a faster, wider colour
+  response; apply the pulse after the viewport fit so it stays visible.
+- [x] Push the AndroSaver effect rework upstream: Tunnel music reactivity,
+  Phason movement, Ferrofluid bounce and rainbow, Chromatic spread, SlimeMold
+  full-frame seeding and faster colours, Tesseract geometry trail.
+- [x] Keep the upstream contracts intact: the Tunnel camera path stays
+  audio-independent, the Tunnel ride speed stays inside its limit, the Phason
+  field keeps changing slowly and the SlimeMold palette reference follows the
+  new intensity coupling.
+- [x] Cover the new behaviour with focused tests: Tunnel ride speed, Chromatic
+  drop spread, SlimeMold coverage, Tesseract trail bound and the Ferrofluid
+  bounce bound.
+
+Verification: 233 unit tests, the visual regression fixture and the headless
+smoke test for all 33 effects pass. The desktop window itself was not
+inspected for these effects.

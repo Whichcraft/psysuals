@@ -5,6 +5,77 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+---
+
+## [3.22.0] — 2026-11-13
+
+### Changed
+
+- 2026-11-13: Corridor is rebuilt from scratch as a ride down a solid neon
+  corridor: perspective wall, floor and ceiling panels, neon ribs and gates,
+  wall light bars that follow the spectrum, a ceiling light strip, floor lane
+  lines, fog and a glowing doorway. Each beat sends a pulse of light down the
+  corridor. The rounded frames, sparks and trails are gone.
+- 2026-11-13: Mobius is a solid, shaded ribbon instead of a wireframe, so its
+  lines no longer cross into noise. It stands upright in the plane of the
+  screen, spins in that plane and never turns edge-on.
+- 2026-11-13: Chromatic draws each ripple as one spectral band of parallel
+  strokes instead of three independently warped RGB outlines. Drops stay
+  local and land away from each other.
+- 2026-11-13: Lattice assigns its FFT bins centre-out, so the low bands drive
+  the middle of the grid and neither edge owns the bass.
+- 2026-11-13: Magnetar's background contour layer drifts slowly and answers
+  bass only slightly, so it shimmers as a backdrop instead of pulsing.
+- 2026-11-13: Persistence pulses its solids with the music: the five shapes
+  breathe out of step with the bass and mids, and their colours cycle faster
+  and spread further apart with the mids. The pulse is applied after the
+  viewport fit, so it stays visible instead of being cancelled by it.
+- 2026-11-13: Tunnel follows the music again: the ride speeds up with bass
+  and mids, the tube widens, the rings brighten and the interior stars spin
+  faster. A beat kicks the ride so it surges and settles. The camera path
+  stays independent of the audio, and the ride speed stays inside the existing
+  limit.
+- 2026-11-13: Phason evolves faster with the music. Its wave directions and
+  swell stay independent of fast audio changes, so the field never jumps.
+- 2026-11-13: Ferrofluid's peaks bounce on a spring kicked by the beats and
+  its skin carries a full spectrum instead of a single hue.
+- 2026-11-13: Chromatic spreads its drops over the frame and answers treble
+  less strongly, so the prismatic outlines interfere less.
+- 2026-11-13: SlimeMold seeds its agents across the whole frame instead of a
+  central blob, and its colour cycle follows the music faster.
+- 2026-11-13: Tesseract keeps a bounded geometry trail, like Cube, so the
+  wireframe leaves a fading echo behind it.
+
+### Fixed
+
+- 2026-11-13: Lattice's column activity is balanced across the grid. The
+  leftmost column is no longer the liveliest line on the laptop grid.
+- 2026-11-13: Chromatic's trail fades fully to black. The multiplicative fade
+  stopped a few levels above black and left faint ghost rings behind.
+- 2026-11-13: Mobius no longer collapses into a thin sliver: the
+  fourth-coordinate rotation rocks instead of turning fully, and its
+  perspective scales the whole strip rather than one axis.
+- 2026-11-13: Mycelium's branching packet now takes a sibling filament. The
+  candidate list was indexed with a negative offset, which Python wrapped
+  around, so a packet could branch back onto the filament it had just
+  arrived on instead of a neighbour.
+
+---
+
 ## [3.21.0] — 2026-11-12
 
 ### Changed

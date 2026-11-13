@@ -1,5 +1,5 @@
 <!-- Frame/options inputs replace ambient config; effect formulas are unchanged. -->
-# psysuals — Effects Reference (3.21.0)
+# psysuals — Effects Reference (3.22.0)
 
 There are 33 registered modes. Mandelbox and Morphogenesis are removed in 3.20.0.
 
@@ -78,7 +78,7 @@ for Waterfall); the number keys directly select only modes 1–9.
 | 3 | `3` | TriFlux | Triangle mosaic wall with popping foreground tiles |
 | 4 | `4` | Lissajous | 3-D knot with neon trail and BPM-sensitive motion |
 | 5 | `5` | Tunnel | Curving polygon tube rushing toward the camera |
-| 6 | `6` | Corridor | Neon rounded-rectangle corridor with sparks |
+| 6 | `6` | Corridor | Solid neon corridor ride with ribs, light bars and beat pulses |
 | 7 | `7` | Nova | Waveform kaleidoscope with layered symmetry |
 | 8 | `8` | Spiral | Multi-arm helix vortex with cross-ring links |
 | 9 | `9` | Bubbles | Rising translucent bubbles with global pulse swells |
@@ -92,8 +92,8 @@ for Waterfall); the number keys directly select only modes 1–9.
 | 17 | `←` / `→` | Mycelium | Violet hyphal web with travelling light packets and drifting spores |
 | 18 | `←` / `→` | Magnetar | Magnetic-dipole particle field with equatorial shockwaves |
 | 19 | `←` / `→` | SlimeMold | Physarum trail simulation with self-organising veins |
-| 20 | `←` / `→` | Mobius | Rotating wireframe strip without interior cross-lines |
-| 21 | `←` / `→` | Chromatic | RGB raindrop ripples with wavy prismatic outlines |
+| 20 | `←` / `→` | Mobius | Solid shaded Möbius ribbon standing upright, spinning in the screen plane |
+| 21 | `←` / `→` | Chromatic | Raindrop ripples with clean spectral rims |
 | 22 | `←` / `→` | Persistence | Long-trail polygon moiré mandala |
 | 23 | `←` / `→` | Synapse | Neural graph with bounded travelling light pulses |
 | 24 | `←` / `→` | Heartbeat | Centre-out shockwave rings morphing circle to polygon |
@@ -148,10 +148,10 @@ A first-person ride through a curving polygon tube, with incoming triangles flyi
 
 ## 6. Corridor
 
-Rounded neon frames form a corridor that breathes toward the camera while sparks streak on a separate persistent layer above the geometry.
+A first-person ride down a solid neon corridor. Wall, floor and ceiling panels are drawn in true perspective and painted far to near, so the walls close the view. Neon ribs are set into the walls, with wider gates at regular intervals; between them run light bars on both walls, a broken light strip along the ceiling and two lane lines along the floor. The passage bends gently, fades into fog and ends in a glowing doorway.
 
-- Audio: beat drives frame speed and brightness; MID_ENERGY scales camera path sways and frame border inflates; TREBLE_ENERGY drives spark spawn rates, spark sizes, and brightness levels.
-- Visual notes: the dedicated spark layer keeps the foreground trails readable instead of smearing them into the walls.
+- Audio: bass and mid raise the ride speed and the overall glow; the spectrum lights the wall bars by depth, bass near the camera and treble far away; each beat rising edge sends a pulse of light down the corridor that flares every rib it passes (at most three at once).
+- Visual notes: every frame is fully repainted, so there are no trails. The camera always looks along the corridor, bends appear ahead, and the view rolls slightly.
 
 ## 7. Nova
 
@@ -224,7 +224,9 @@ Five translucent ribbon curtains sweep across the screen as thick parallel bands
 ## 16. Lattice
 
 A crystal grid of nodes and beams maps columns across FFT bins and normalizes
-column peaks for balanced activity. Laptop uses 22×14 nodes and TV uses 14×9,
+column peaks for balanced activity. Columns are assigned centre-out, so the low
+bands drive the middle of the grid and neither edge owns the bass. Laptop uses
+22×14 nodes and TV uses 14×9,
 independently of GL render scale. Auto chooses the profile by output width;
 explicit profiles override it at any resolution. Slow zoom feedback and a
 bounded shockwave reveal the grid without changing its Euclidean spacing.
@@ -244,7 +246,7 @@ A bioluminescent hyphal colony. Three glowing fruiting bodies sit on a deep indi
 Thousands of particles ride the field lines of an analytically computed rotating magnetic dipole. Particles accumulate near the poles and trace luminous flux lines. Beat fires a shockwave that scatters particles outward from the magnetic equator.
 
 - Audio: bass drives field rotation speed and particle velocity; mid shifts the dipole tilt angle; treble shifts particle colour saturation; beat triggers the equatorial shockwave.
-- Visual notes: rendered at reduced resolution for performance, with a bounded glossy magnetic-potential contour layer behind the particles. Particle density still scales higher on large displays so the field does not thin out on TVs.
+- Visual notes: rendered at reduced resolution for performance, with a bounded glossy magnetic-potential contour layer behind the particles. That contour layer drifts slowly and answers bass only slightly, so it stays a shimmering backdrop rather than a pulsing foreground. Particle density still scales higher on large displays so the field does not thin out on TVs.
 
 ## 19. SlimeMold
 
@@ -257,17 +259,17 @@ A Physarum-inspired multi-agent simulation: thousands of agents deposit chemical
 
 ## 20. Mobius
 
-A 3-D Möbius strip rendered as a wireframe with perspective projection. The visible structure is carried by the latitude loops alone, leaving the band clean instead of cutting it up with interior cross-lines.
+A solid, shaded Möbius ribbon with perspective projection. The surface is drawn as depth-sorted filled bands with a bright rim along its single edge, so the near side hides the far side and no lines cross.
 
-- Audio: bass controls rotation speed; mid controls roll/tilt and fourth-coordinate rotation; treble adds further rotation speed; beat triggers the shiver.
-- Visual notes: hue varies continuously along the strip width, highlighting the non-orientable topology without the straight interior wires.
+- Audio: bass, mid and treble raise the spin speed; bass also speeds the wobble and widens the twist; mid drives the hue drift and the rocking fourth-coordinate rotation; beat triggers the shiver, a flare of the ribbon and rim.
+- Visual notes: the strip stands upright in the plane of the screen and spins in that plane with a small wobble, so it never turns edge-on. The colour field is continuous across the seam of the strip, and the whole strip is fitted inside the frame margin.
 
 ## 21. Chromatic
 
-Prismatic raindrop ripples expand from beat origins as wavy RGB-separated outlines rather than plain circles, producing chromatic interference that remains readable at large output sizes.
+Raindrop ripples whose rims split into a clean spectral band. Every ripple is one gently wobbling outline drawn as six contiguous strokes from red to violet that share the same shape, followed by a fainter ripple inside it.
 
-- Audio: bass controls expansion speed and ring intensity; mid adds speed/intensity to automatic idle droplets and slightly advances their wave phase; treble increases the RGB split and wave deformation; beat rising edges spawn new droplets.
-- Visual notes: the rings are intentionally irregular and fluid, so the effect reads as chromatic rainfall instead of concentric circles. At most five ripple objects coexist, each drawn as three separated RGB outlines.
+- Audio: bass controls expansion speed and drop strength; mid drifts the hue and feeds the automatic idle drops; treble widens the spectral band; beat rising edges spawn new drops.
+- Visual notes: at most five drops coexist. Each stays local and lands where the frame is emptiest, so separate drops rarely cross. The wake behind a rim is short and fades fully to black.
 
 ## 22. Persistence
 
