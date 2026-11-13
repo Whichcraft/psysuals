@@ -43,6 +43,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - 2026-11-13: Lattice's column activity is balanced across the grid. The
   leftmost column is no longer the liveliest line on the laptop grid.
+- 2026-11-13: Mycelium's branching packet now takes a sibling filament. The
+  candidate list was indexed with a negative offset, which Python wrapped
+  around, so a packet could branch back onto the filament it had just
+  arrived on instead of a neighbour.
 
 ### Security
 

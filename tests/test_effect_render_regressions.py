@@ -125,6 +125,36 @@ class EffectRenderRegressionTests(unittest.TestCase):
         # A packet either continues on another filament or dies at a dead end.
         self.assertTrue(handed_over or vanished)
 
+    def test_mycelium_branch_pulse_takes_a_sibling_filament(self):
+        effect = self.host.create(Mycelium)
+        # A junction with three sibling filaments. The packet arrives on the
+        # first one and branches onto a sibling, never back onto its own.
+        effect._nodes = [(0.0, 0.0), (10.0, 0.0), (20.0, 0.0), (30.0, 0.0), (40.0, 0.0)]
+        effect._node_edges = [[], [], [], [], []]
+        effect._edges = []
+        for a, b in ((0, 3), (1, 3), (2, 3), (3, 4)):
+            effect._edges.append([a, b, 0.0, 100.0, 0.0, 0, 0])
+            effect._node_edges[a].append(len(effect._edges) - 1)
+            effect._node_edges[b].append(len(effect._edges) - 1)
+        effect._pulses = [[0, 1.0, 0.1, 1.0, 0, 0.0]]
+
+        class _LastCandidate:
+            """Always take the last sibling, the case a negative index hid."""
+
+            @staticmethod
+            def integers(low, high):
+                return high - 1
+
+            @staticmethod
+            def random():
+                return 0.0
+
+        effect.rng = _LastCandidate()
+        effect._update_pulses(1.0, 1.0)
+        self.assertEqual(2, len(effect._pulses))
+        handover, branch = effect._pulses
+        self.assertNotEqual(handover[0], branch[0])
+
     def test_mycelium_spore_germinates_into_a_new_tip(self):
         effect = self.host.create(Mycelium)
         node_index = next(index for index, node in enumerate(effect._nodes)

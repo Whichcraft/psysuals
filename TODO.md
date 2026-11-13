@@ -1086,6 +1086,10 @@ its two correction rounds.
   with eight tests over the new behaviour (bounds, packet travel and
   handover, spore germination, small display, resize, reproducibility,
   motion field, colony spread).
+- [x] Fixed the branching packet's sibling selection. The candidate list was
+  indexed with a negative offset, which Python wrapped around, so a packet
+  could branch back onto the filament it had just arrived on. Covered by a
+  focused test over a three-way junction.
 - [x] Updated EFFECTS.md section 17, added the implemented brief to
   NEWEFFECTS.md and recorded the rebuild in README.md.
 - [x] The compact visual fixture still passes with the unchanged Mycelium
