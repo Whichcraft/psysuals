@@ -1109,3 +1109,16 @@ Open follow-ups:
 - [ ] check-changelog still fails on the historical CHANGELOG format. The
   new Unreleased section follows the canonical rules; migrating the released
   sections to the same format is a separate, larger change.
+
+## Lattice balance and Magnetar backdrop — 2026-11-13
+
+- [x] Assign Lattice's FFT bins centre-out, so the bass drives the middle of
+  the grid and the leftmost column is no longer the liveliest line.
+- [x] Slow the Magnetar contour drift and halve its bass response, so the
+  background field only shimmers slightly.
+- [x] Cover both with focused tests: symmetric centre-out bins, bass lighting
+  the centre rather than the left edge, and a bounded background drift.
+- [x] Update EFFECTS.md sections 16 and 18.
+
+Verification: 228 unit tests and the headless smoke test for all 33 effects
+pass. The desktop window itself was not inspected for these two effects.

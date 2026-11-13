@@ -21,7 +21,7 @@ from effects.mobius import Mobius
 from effects.chromatic import Chromatic
 from effects.persistence import Persistence
 from effects.lattice import Lattice
-from effects.magnetar import Magnetar
+from effects.magnetar import Magnetar, _BAND_DRIFT
 from effects.fireworks import Fireworks
 
 
@@ -329,6 +329,47 @@ class EffectRenderRegressionTests(unittest.TestCase):
             self.assertTrue(np.isfinite(effect._contour).all())
             self.assertLessEqual(float(effect._contour.max()), 1.0)
         self.assertNotEqual(self.surface.get_bounding_rect().width, 0)
+
+    def test_lattice_column_bins_are_centre_out_and_symmetric(self):
+        effect = self.host.create(Lattice)
+        fft_len = len(self.fft)
+        bins = [effect._bin(col, fft_len) for col in range(effect._cols)]
+        self.assertGreaterEqual(effect._cols, 14)
+        # Mirrored columns share a band, so no edge owns the low frequencies.
+        for col in range(effect._cols // 2):
+            self.assertEqual(bins[col], bins[effect._cols - 1 - col])
+        # The lowest band sits in the middle of the grid.
+        middle = (effect._cols - 1) // 2
+        self.assertEqual(bins[middle], min(bins))
+        self.assertLess(bins[middle], bins[0])
+
+    def test_lattice_bass_lights_the_centre_not_the_left_edge(self):
+        effect = self.host.create(Lattice)
+        fft = np.zeros(len(self.fft), dtype=np.float32)
+        middle = (effect._cols - 1) // 2
+        fft[effect._bin(middle, len(fft))] = 1.0
+        for tick in range(6):
+            effect.draw(self.surface, self.waveform, fft, 0.0, tick)
+        columns = pygame.surfarray.array3d(self.surface).sum(axis=0)
+        width = columns.shape[0]
+        left = int(columns[: width // 6].sum())
+        middle_band = int(columns[width // 3 : 2 * width // 3].sum())
+        self.assertGreater(middle_band, left)
+
+    def test_magnetar_background_field_only_shimmers_slightly(self):
+        effect = self.host.create(Magnetar)
+        self.assertLessEqual(_BAND_DRIFT, 0.05)
+        # A full radian of field rotation may shift the background bands only a
+        # little; the contour layer is a backdrop, not a pulsing foreground.
+        first = pygame.Surface((320, 240))
+        second = pygame.Surface((320, 240))
+        effect._rot = 0.0
+        effect._draw_contours(first, 1.0, 0.0, 0.0, 0.0)
+        effect._rot = 1.0
+        effect._draw_contours(second, 1.0, 0.0, 0.0, 0.0)
+        delta = pygame.surfarray.array3d(second).astype(np.int16) - \
+            pygame.surfarray.array3d(first).astype(np.int16)
+        self.assertLess(float(np.abs(delta).mean()), 1.5)
 
     def test_hyperbolic_tiles_are_bounded_on_small_and_wide_targets(self):
         effect = self.host.create(Hyperbolic)

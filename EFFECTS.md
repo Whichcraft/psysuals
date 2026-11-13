@@ -224,7 +224,9 @@ Five translucent ribbon curtains sweep across the screen as thick parallel bands
 ## 16. Lattice
 
 A crystal grid of nodes and beams maps columns across FFT bins and normalizes
-column peaks for balanced activity. Laptop uses 22×14 nodes and TV uses 14×9,
+column peaks for balanced activity. Columns are assigned centre-out, so the low
+bands drive the middle of the grid and neither edge owns the bass. Laptop uses
+22×14 nodes and TV uses 14×9,
 independently of GL render scale. Auto chooses the profile by output width;
 explicit profiles override it at any resolution. Slow zoom feedback and a
 bounded shockwave reveal the grid without changing its Euclidean spacing.
@@ -244,7 +246,7 @@ A bioluminescent hyphal colony. Three glowing fruiting bodies sit on a deep indi
 Thousands of particles ride the field lines of an analytically computed rotating magnetic dipole. Particles accumulate near the poles and trace luminous flux lines. Beat fires a shockwave that scatters particles outward from the magnetic equator.
 
 - Audio: bass drives field rotation speed and particle velocity; mid shifts the dipole tilt angle; treble shifts particle colour saturation; beat triggers the equatorial shockwave.
-- Visual notes: rendered at reduced resolution for performance, with a bounded glossy magnetic-potential contour layer behind the particles. Particle density still scales higher on large displays so the field does not thin out on TVs.
+- Visual notes: rendered at reduced resolution for performance, with a bounded glossy magnetic-potential contour layer behind the particles. That contour layer drifts slowly and answers bass only slightly, so it stays a shimmering backdrop rather than a pulsing foreground. Particle density still scales higher on large displays so the field does not thin out on TVs.
 
 ## 19. SlimeMold
 

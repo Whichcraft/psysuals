@@ -5,6 +5,30 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+- 2026-11-13: Lattice assigns its FFT bins centre-out, so the low bands drive
+  the middle of the grid and neither edge owns the bass.
+- 2026-11-13: Magnetar's background contour layer drifts slowly and answers
+  bass only slightly, so it shimmers as a backdrop instead of pulsing.
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+- 2026-11-13: Lattice's column activity is balanced across the grid. The
+  leftmost column is no longer the liveliest line on the laptop grid.
+
+### Security
+
+---
+
 ## [3.21.0] — 2026-11-12
 
 ### Changed

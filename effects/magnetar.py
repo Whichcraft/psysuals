@@ -18,6 +18,9 @@ import pygame.surfarray as surfarray
 from .base import Effect
 from .utils import _hsl_batch
 
+# Phase drift of the background contour bands per radian of field rotation.
+_BAND_DRIFT = 0.05
+
 
 class Magnetar(Effect):
     TRAIL_ALPHA = 0
@@ -65,9 +68,11 @@ class Magnetar(Effect):
         by = (3.0 * dot * ry / r2 - my) / r3
         magnitude = np.sqrt(bx * bx + by * by)
         self._contour[:] = np.tanh(magnitude * 0.20)
-        bands = np.abs(np.sin(self._contour * 6.0 + self._rot * 0.2))
+        # The contour layer is a background: drift the bands only slightly and
+        # let bass lift it a little, so it shimmers instead of pulsing.
+        bands = np.abs(np.sin(self._contour * 6.0 + self._rot * _BAND_DRIFT))
         hue = (self._hue + self._contour * 0.18 + high * 0.03) % 1.0
-        glow = np.clip(bands * (0.20 + bass * 0.10), 0.0, 1.0)
+        glow = np.clip(bands * (0.20 + bass * 0.05), 0.0, 1.0)
         red = np.clip((np.sin(hue * math.tau) * 127 + 128) * glow, 0, 255)
         green = np.clip((np.sin((hue + 0.333) * math.tau) * 127 + 128) * glow, 0, 255)
         blue = np.clip((np.sin((hue + 0.667) * math.tau) * 127 + 128) * glow, 0, 255)
