@@ -21,6 +21,84 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.23.0] — 2026-11-14
+
+### Added
+
+- 2026-11-13: Horizon, a new mode: a landscape built from the music. Rows of
+  solid mountain ridges shaped by the spectrum scroll toward the camera
+  through a valley with lane lines, toward a sun under a sky of stars. It sits
+  after ChromaWeave; Spectrum and Waterfall move to zero-based indices 32/33.
+
+### Changed
+
+- 2026-11-13: Spiral fades its trails faster, so the arms stay crisp instead
+  of smearing into each other, and draws its periodic cross-rings as larger
+  bubbles. This matches the AndroSaver port.
+- 2026-11-13: Corridor and Horizon share one spectrum-level helper in
+  `effects/utils.py`, which treats infinite FFT values as silence.
+
+### Fixed
+
+- 2026-11-13: With `--gl`, the rotation post-effect no longer shows the
+  picture upside down; its shader now samples uploaded frames like the blit
+  shader.
+- 2026-11-13: Mid and treble levels no longer jump to about forty times their
+  normal value when music returns after a pause. Their running averages hold
+  while the band falls below a tenth of them, catch up quickly after a silent
+  start, and are seeded from the first measured block instead of a fixed 0.1,
+  so treble also reacts during the first minute. Published levels are clipped
+  to 0..6 like the envelopes. Tuned on a laptop microphone with music playing
+  and paused.
+- 2026-11-13: One NaN or infinite input sample no longer turns the whole
+  audio analysis into NaN for the rest of the session; such samples read as
+  silence.
+- 2026-11-13: The mid and treble averages tell a pause from a quieter
+  passage by the room's noise floor (the 20th percentile of the last second,
+  remembered for minutes) and judge pauses on the median of the last second.
+  A pause holds the average for as long as it lasts, even with quiet music
+  where room noise reaches 30 % of the music level; a quieter passage above
+  the noise is followed within seconds instead of about three minutes.
+- 2026-11-13: Switching the input device resets the level averages, the DC
+  offset, the tempo history and the beat tracker's buffered audio, so a
+  quieter new device is no longer muted by the old one's levels.
+- 2026-11-13: An input stream that stops delivering audio (an unplugged
+  device, an aborted stream) is closed after two seconds, the published audio
+  is cleared to silence, and the saved device is reopened by the regular
+  retry. The last block no longer stays on screen forever.
+- 2026-11-13: Magnetar and FlowField re-seed a small share of their particles
+  every frame (Magnetar also those reaching the dipole core). Their particles
+  used to merge onto a handful of pixels within seconds to a minute.
+- 2026-11-13: ChromaWeave accumulates its weave phase instead of multiplying
+  total running time by the live mid level, which made the pattern flicker
+  after a few minutes of music. The GL and CPU paths share the change.
+- 2026-11-13: Butterflies keep their size over resize round trips between
+  different aspect ratios; each round trip shrank them by a quarter.
+- 2026-11-13: FlowField's trail fades fully to black instead of leaving a
+  dark-grey residue.
+- 2026-11-13: GL fields skip uniforms the shader compiler optimised away
+  instead of raising.
+- 2026-11-13: The audio engine removes a constant DC offset from the input
+  before analysis. A laptop microphone delivered +0.20, which kept the RMS
+  silence gate from ever engaging, made auto-gain turn effects down and
+  shifted drawn waveforms off centre.
+- 2026-11-13: Bubbles caps its swell and bubble radius, so loud beats at high
+  effect gain no longer stall frames for hundreds of milliseconds.
+- 2026-11-13: In CPU mode the trail fade follows a resized screen, so trails
+  outside the old area fade again.
+- 2026-11-13: A preset morph stores the crossfade length as whole frames, so
+  it survives the next start instead of resetting to 45.
+- 2026-11-13: Settings and presets store the effect name next to its index.
+  Files saved without names are moved past Horizon's slot on load, so a
+  saved Spectrum or Waterfall no longer opens as Horizon or Spectrum.
+- 2026-11-13: Horizon's star twinkle and ridge glitter follow elapsed time
+  instead of the frame count.
+- 2026-11-13: Spectrum, Waterfall, Spiral and Bubbles render short or empty
+  spectra from external hosts instead of raising, and Aurora renders on
+  surfaces five pixels wide or less.
+
+---
+
 ## [3.22.0] — 2026-11-13
 
 ### Changed

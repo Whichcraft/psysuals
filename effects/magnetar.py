@@ -24,6 +24,8 @@ _BAND_DRIFT = 0.05
 
 class Magnetar(Effect):
     TRAIL_ALPHA = 0
+    _CORE = 0.16    # respawn radius around the dipole core, in half-heights
+    _RESEED = 0.002 # share of particles re-seeded per frame
     RES_DIV     = 2
     _FADE_ALPHA = 48
 
@@ -141,6 +143,16 @@ class Magnetar(Effect):
 
         self._px = (self._px + vx) % W
         self._py = (self._py + vy) % H
+
+        # The field lines converge on the dipole core, so particles used to
+        # collapse onto a few pixels there within seconds. Particles that
+        # reach the core, plus a small random share, start again anywhere.
+        near = ((self._px - cx) ** 2 + (self._py - cy) ** 2) < (half * self._CORE) ** 2
+        near |= self._rng.random(self._n) < self._RESEED
+        count = int(near.sum())
+        if count:
+            self._px[near] = self._rng.uniform(0, W, count)
+            self._py[near] = self._rng.uniform(0, H, count)
 
         # Fade with alpha overlay instead of multiplicative darkening, which
         # preserves hue better over long trail runs.

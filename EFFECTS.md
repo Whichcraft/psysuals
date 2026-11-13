@@ -1,7 +1,7 @@
 <!-- Frame/options inputs replace ambient config; effect formulas are unchanged. -->
-# psysuals — Effects Reference (3.22.0)
+# psysuals — Effects Reference (3.23.0)
 
-There are 33 registered modes. Mandelbox and Morphogenesis are removed in 3.20.0.
+There are 34 registered modes. Mandelbox and Morphogenesis are removed in 3.20.0.
 
 All effects consume the same shared audio signals. They differ only in how they interpret those signals visually.
 
@@ -68,7 +68,7 @@ framebuffer size, including HiDPI outputs.
 ## Mode list
 
 The `#` column is the human-readable ordinal. The `--mode` command-line
-option uses the zero-based registry index instead (`0` for Yantra through `32`
+option uses the zero-based registry index instead (`0` for Yantra through `33`
 for Waterfall); the number keys directly select only modes 1–9.
 
 | # | Key | Mode | Summary |
@@ -104,8 +104,9 @@ for Waterfall); the number keys directly select only modes 1–9.
 | 29 | `←` / `→` | Tesseract | Rotating 4-D crystal projections |
 | 30 | `←` / `→` | Ferrofluid | Metallic magnetic droplets |
 | 31 | `←` / `→` | ChromaWeave | Iridescent eightfold ribbons and breathing neon petals |
-| 32 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
-| 33 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
+| 32 | `←` / `→` | Horizon | Spectrum landscape of solid ridges rolling toward a sun |
+| 33 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
+| 34 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
 
 `Spectrum` and `Waterfall` are intentionally the final two registry entries.
 
@@ -165,7 +166,7 @@ Waveform data is mirrored into a sevenfold kaleidoscope across four independentl
 Six luminous arms sweep toward the viewer as a helix, with cross-ring links tying the structure together into a rotating neon vortex.
 
 - Audio: low FFT energy and beat impulses drive helix travel speed; FFT bins sampled along the depth of each arm shape its radius; beat impulses drive spring expansion and the nearest-point flare. Spiral does not apply separate MID_ENERGY or TREBLE_ENERGY geometry layers.
-- Visual notes: colour drift is more aggressive than most modes, which keeps long sessions from feeling static.
+- Visual notes: colour drift is more aggressive than most modes, which keeps long sessions from feeling static. Trails fade faster than the default so the arms stay crisp, and the periodic cross-ring points are drawn as larger bubbles.
 
 ## 9. Bubbles
 
@@ -354,14 +355,34 @@ bodies meet cyan, green and gold seams; small sparkles accent crossings.
   in place, and moves Spectrum/Waterfall to zero-based indices 31/32. Reselect
   and re-save numeric presets targeting those two diagnostic modes.
 
-## 32. Spectrum
+## 32. Horizon
+
+A landscape built from the music. Rows of solid mountain ridges scroll toward
+the camera, painted far to near so each ridge hides the ones behind it. A flat
+valley with lane lines runs down the middle toward a sun on the horizon, under
+a sky of stars.
+
+- Audio: every new ridge takes its shape from the spectrum at the moment it
+  appears, bass beside the valley and treble outside, and keeps that shape
+  while it travels. Bass and mid raise the ride speed; bass swells the near
+  ridges and brightens the sun and sky; treble makes the stars twinkle and the
+  far ridge lines glitter; a beat flares the sun and flashes every ridge line.
+- Silence: resting hills keep rolling by at the base speed.
+- Rendering: CPU effect; every frame is fully repainted, so there are no
+  trails. 27 ridge rows are drawn from a fixed buffer of 28 rows with 46
+  points each.
+- Selection: `--mode 31`, or `←` / `→`. This insertion leaves prior visual modes
+  in place, and moves Spectrum/Waterfall to zero-based indices 32/33. Saved
+  settings and presets follow them automatically.
+
+## 33. Spectrum
 
 Classic analyser bars are spaced logarithmically, with peak markers and a waveform line layered over the centre of the screen.
 
 - Audio: log-spaced FFT bands control bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
 - Visual notes: this is the plainest diagnostic mode and is useful for checking input levels quickly.
 
-## 33. Waterfall
+## 34. Waterfall
 
 A scrolling spectrogram stores recent history as rows, with hue encoding frequency and brightness encoding energy.
 
@@ -375,7 +396,7 @@ A scrolling spectrogram stores recent history as rows, with hue encoding frequen
 | Key | Action |
 |-----|--------|
 | `1` – `9` | Jump directly to modes 1–9 |
-| `←` / `→` | Previous / next mode across all 33 modes |
+| `←` / `→` | Previous / next mode across all 34 modes |
 | `Space` or mouse click | Next mode |
 | `↑` / `↓` | Adjust intensity for the current mode (`0.0 .. 2.0`), or adjust FlowField particles by 2,000 |
 | `Tab` | Open the settings pane |

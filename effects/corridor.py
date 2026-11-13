@@ -18,7 +18,7 @@ import numpy as np
 import pygame
 
 from .base import Effect
-from .utils import _hsl_batch, hsl
+from .utils import _hsl_batch, hsl, track_levels
 
 
 class Corridor(Effect):
@@ -78,14 +78,7 @@ class Corridor(Effect):
                          (x * s + y * c) * scale + H / 2.0], axis=-1)
 
     def _update_spectrum(self, fft):
-        n = len(fft)
-        bands = np.zeros(self.N_SEGMENTS + 1)
-        if n >= 8:
-            edges = np.unique((np.linspace(0.0, 1.0, self.N_SEGMENTS + 2) ** 2 * n * 0.6).astype(int))
-            means = np.add.reduceat(np.nan_to_num(np.abs(fft[:edges[-1]])), edges[:-1]) / np.diff(edges)
-            bands[:] = np.interp(np.linspace(0, len(means) - 1, len(bands)), np.arange(len(means)), means)
-        self._peak = max(1e-3, self._smooth(self._peak, float(bands.max()), 0.01), float(bands.max()))
-        self._spectrum = self._smooth(self._spectrum, np.sqrt(bands / self._peak), 0.3)
+        self._spectrum, self._peak = track_levels(self._spectrum, self._peak, fft, self._smooth)
 
     # ------------------------------------------------------------------
 
