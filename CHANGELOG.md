@@ -15,6 +15,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
   the middle of the grid and neither edge owns the bass.
 - 2026-11-13: Magnetar's background contour layer drifts slowly and answers
   bass only slightly, so it shimmers as a backdrop instead of pulsing.
+- 2026-11-13: Persistence pulses its solids with the music: the five shapes
+  breathe out of step with the bass and mids, and their colours cycle faster
+  and spread further apart with the mids. The pulse is applied after the
+  viewport fit, so it stays visible instead of being cancelled by it.
 
 ### Deprecated
 

@@ -1119,6 +1119,9 @@ Open follow-ups:
 - [x] Cover both with focused tests: symmetric centre-out bins, bass lighting
   the centre rather than the left edge, and a bounded background drift.
 - [x] Update EFFECTS.md sections 16 and 18.
+- [x] Give Persistence a music-driven size pulse and a faster, wider colour
+  response; apply the pulse after the viewport fit so it stays visible.
 
-Verification: 228 unit tests and the headless smoke test for all 33 effects
-pass. The desktop window itself was not inspected for these two effects.
+Verification: 228 unit tests, the visual regression fixture and the headless
+smoke test for all 33 effects pass. The desktop window itself was not
+inspected for these effects.
