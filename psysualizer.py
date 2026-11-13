@@ -25,7 +25,7 @@ Controls:
 
 from __future__ import annotations
 
-__version__ = "3.21.0"
+__version__ = "3.22.0"
 
 import atexit
 import os

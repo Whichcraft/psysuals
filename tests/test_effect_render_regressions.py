@@ -19,6 +19,7 @@ from effects.ferrofluid import Ferrofluid
 from effects.heartbeat import Heartbeat
 from effects.mobius import Mobius
 from effects.chromatic import Chromatic
+from effects.corridor import Corridor
 from effects.persistence import Persistence
 from effects.lattice import Lattice
 from effects.magnetar import Magnetar, _BAND_DRIFT
@@ -418,6 +419,50 @@ class EffectRenderRegressionTests(unittest.TestCase):
         centres = [(ring[0], ring[1]) for ring in effect._rings]
         self.assertGreater(max(abs(cx - 160) for cx, _ in centres), 40)
         self.assertGreater(max(abs(cy - 120) for _, cy in centres), 30)
+
+    def test_chromatic_trail_fades_to_black_without_ghost_rings(self):
+        effect = self.host.create(Chromatic)
+        effect._spawn(1.0, 320, 240)
+        effect.draw(self.surface, self.waveform, self.fft, 0.0, 0)
+        self.assertGreater(pygame.surfarray.array3d(effect._trail).max(), 0)
+        effect._rings.clear()
+        effect._auto_cd = 1e9
+        for tick in range(1, 40):
+            effect.draw(self.surface, self.waveform, self.fft, 0.0, tick)
+        self.assertEqual(int(pygame.surfarray.array3d(effect._trail).max()), 0)
+
+    def test_mobius_never_turns_edge_on(self):
+        effect = self.host.create(Mobius)
+        for tick in range(900):
+            effect.draw(self.surface, self.waveform, self.fft, 0.5, tick)
+            span = np.ptp(effect._projected.reshape(-1, 2), axis=0)
+            self.assertGreater(span[0], 320 * 0.35)
+            self.assertGreater(span[1], 240 * 0.25)
+
+    def test_corridor_beat_pulse_runs_away_and_fills_the_frame(self):
+        effect = self.host.create(Corridor)
+        effect.draw(self.surface, self.waveform, self.fft, 0.0, 0)
+        effect.draw(self.surface, self.waveform, self.fft, 1.2, 1)
+        self.assertEqual(len(effect._pulses), 1)
+        for tick in range(2, 8):
+            effect.draw(self.surface, self.waveform, self.fft, 1.2, tick)
+        self.assertEqual(len(effect._pulses), 1)  # Only rising edges launch.
+        self.assertGreater(effect._pulses[0][0], 1.0)
+        pixels = pygame.surfarray.array3d(self.surface).max(axis=2)
+        self.assertGreater((pixels > 3).mean(), 0.8)
+        for tick in range(8, 60):
+            effect.draw(self.surface, self.waveform, self.fft, 0.0, tick)
+        self.assertEqual(effect._pulses, [])
+
+    def test_corridor_ride_follows_bass_and_survives_odd_input(self):
+        quiet, loud = self.host.create(Corridor), self.host.create(Corridor)
+        for tick in range(30):
+            quiet.draw(self.surface, self.waveform, self.fft, 0.0, tick)
+            loud.draw(self.surface, self.waveform, self.fft, 1.5, tick)
+        self.assertGreater(loud.time, quiet.time)
+        for size in ((400, 1200), (1200, 400)):
+            loud.draw(pygame.Surface(size), self.waveform, np.zeros(0, dtype=np.float32), 6.0, 31)
+        self.assertTrue(np.isfinite(loud._spectrum).all())
 
     def test_slimemold_agents_cover_the_whole_frame(self):
         effect = self.host.create(SlimeMold)

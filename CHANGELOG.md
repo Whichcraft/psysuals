@@ -11,6 +11,31 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+---
+
+## [3.22.0] — 2026-11-13
+
+### Changed
+
+- 2026-11-13: Corridor is rebuilt from scratch as a ride down a solid neon
+  corridor: perspective wall, floor and ceiling panels, neon ribs and gates,
+  wall light bars that follow the spectrum, a ceiling light strip, floor lane
+  lines, fog and a glowing doorway. Each beat sends a pulse of light down the
+  corridor. The rounded frames, sparks and trails are gone.
+- 2026-11-13: Mobius is a solid, shaded ribbon instead of a wireframe, so its
+  lines no longer cross into noise. It stands upright in the plane of the
+  screen, spins in that plane and never turns edge-on.
+- 2026-11-13: Chromatic draws each ripple as one spectral band of parallel
+  strokes instead of three independently warped RGB outlines. Drops stay
+  local and land away from each other.
 - 2026-11-13: Lattice assigns its FFT bins centre-out, so the low bands drive
   the middle of the grid and neither edge owns the bass.
 - 2026-11-13: Magnetar's background contour layer drifts slowly and answers
@@ -35,20 +60,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - 2026-11-13: Tesseract keeps a bounded geometry trail, like Cube, so the
   wireframe leaves a fading echo behind it.
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - 2026-11-13: Lattice's column activity is balanced across the grid. The
   leftmost column is no longer the liveliest line on the laptop grid.
+- 2026-11-13: Chromatic's trail fades fully to black. The multiplicative fade
+  stopped a few levels above black and left faint ghost rings behind.
+- 2026-11-13: Mobius no longer collapses into a thin sliver: the
+  fourth-coordinate rotation rocks instead of turning fully, and its
+  perspective scales the whole strip rather than one axis.
 - 2026-11-13: Mycelium's branching packet now takes a sibling filament. The
   candidate list was indexed with a negative offset, which Python wrapped
   around, so a packet could branch back onto the filament it had just
   arrived on instead of a neighbour.
-
-### Security
 
 ---
 

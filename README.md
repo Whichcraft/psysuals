@@ -2,10 +2,22 @@
 
 **Welcome to the super-duper greatest music visualizer ever made.** psysuals delivers uncompromising visual intensity and rock-solid performance. Whether you're blasting psytrance in a dark room or driving a multi-monitor stage setup, it is built to melt your mind with precision and style.
 
-![Version](https://img.shields.io/badge/version-3.21.0-orange)
+![Version](https://img.shields.io/badge/version-3.22.0-orange)
  ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
+
+## Version 3.22.0
+
+This release reworks three effects and retunes several more. Corridor is
+rebuilt from scratch as a ride down a solid neon corridor with ribs, wall
+light bars that follow the spectrum, and a pulse of light on every beat.
+Mobius is a solid, shaded ribbon that stands upright in the plane of the
+screen, and Chromatic draws each ripple as one clean spectral band; neither
+shows crossing lines any more. Tunnel, Phason, Ferrofluid, Persistence,
+SlimeMold, Tesseract, Lattice and Magnetar follow the music more clearly.
+All modes keep their place in the registry, so mode indices and saved presets
+stay valid; no dependency or file-format migration is required.
 
 ## Version 3.21.0
 
@@ -100,8 +112,8 @@ selection is saved on exit. Auto uses output width as a fallback (TV from 2560
 pixels), so choose a profile explicitly for a 4K laptop or 1080p TV.
 
 Laptop keeps camera motion gentle and uses a 22×14 Lattice grid. TV uses a 14×9
-grid and stronger light accents. Both retain slow geometry transitions. The fourteen
-retuned effects (Cube, TriFlux, Lissajous, Tunnel, Plasma, Lattice, Mobius,
+grid and stronger light accents. Both retain slow geometry transitions. The fifteen
+retuned effects (Cube, TriFlux, Lissajous, Tunnel, Corridor, Plasma, Lattice, Mobius,
 Chromatic, Persistence, Synapse, Hyperbolic, Cymatica, Phason and Ferrofluid)
 use elapsed time for motion rather than render-frame counts. External hosts supply FrameContext.dt in seconds per frame; its default is
 1/60 and consumed motion steps remain capped at 0.1 seconds.
