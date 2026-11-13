@@ -28,6 +28,7 @@ BASELINE = {
     "Phason": (17096, 449507), "Tesseract": (921, 43391),
     "Ferrofluid": (19200, 110168),
     "ChromaWeave": (19200, 428073),
+    "Horizon": (19200, 269235),
     "Spectrum": (3299, 210051), "Waterfall": (2592, 57384),
 }
 

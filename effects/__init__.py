@@ -29,6 +29,7 @@ from .phason import Phason
 from .tesseract import Tesseract
 from .ferrofluid import Ferrofluid
 from .chromaweave import ChromaWeave
+from .horizon import Horizon
 from .spectrum           import Bars
 from .waterfall   import GlowSquares
 
@@ -64,7 +65,28 @@ MODES = [
     ("Tesseract",    Tesseract),      # ←/→ only
     ("Ferrofluid",   Ferrofluid),     # ←/→ only
     ("ChromaWeave",  ChromaWeave),    # ←/→ only
+    ("Horizon",      Horizon),        # ←/→ only
     # ── Spectrum and Waterfall must always be the final two entries ──
     ("Spectrum",    Bars),        # ←/→ only — always second-to-last
     ("Waterfall",   GlowSquares), # ←/→ only — always last
 ]
+
+
+MODE_NAMES = [name for name, _ in MODES]
+# Horizon was inserted here; files saved before modes were stored by name
+# hold indices that pointed one slot earlier from this position on.
+_NAMELESS_SHIFT_FROM = MODE_NAMES.index("Horizon")
+
+
+def resolve_mode(index, name=None):
+    """Registry index for a saved mode, preferring its saved name.
+
+    Settings and presets now store the mode name next to its index, so a
+    registry insertion no longer moves the user to a different effect. Data
+    saved without a name predates Horizon and is shifted past its slot.
+    """
+    if isinstance(name, str):
+        if name in MODE_NAMES:
+            return MODE_NAMES.index(name)
+        return index
+    return index + 1 if index >= _NAMELESS_SHIFT_FROM else index

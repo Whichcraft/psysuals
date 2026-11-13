@@ -5,6 +5,75 @@ Every implementation task should include focused tests, documentation updates
 where behavior is user-visible, the full unit suite, the headless smoke test,
 and `git diff --check`.
 
+## Open findings from the 2026-11-13 bug sweep
+
+Confirmed by review; not fixed because they need GL, real input devices or
+audio hardware to verify.
+
+- [ ] GL mode: post-effects for IS_GL effects run after the HUD, pane and
+  picker are blitted (`core/frame_composer.py` present_gl), so the UI gets
+  mirrored or rotated. Post-process before blitting the UI layer.
+- [ ] GL mode: an IS_GL effect used as background (recipes, presets) draws to
+  the backbuffer and is hidden by the opaque foreground, which bg_surf then
+  darkens (`core/frame_composer.py` compose). Create backgrounds without a
+  renderer or draw them before the foreground.
+- [ ] Windowed mode reuses the last fullscreen size (`core/display_manager.py`
+  toggle_fullscreen); keep the window size separately.
+- [ ] Recalling a preset never applies its saved `postfx_mode`
+  (`PresetTransition` has no field for it).
+- [ ] Tap tempo keeps old taps after the lock expires; a new session averages
+  in the gap and locks e.g. 4 BPM (`core/input_controller.py`). Reset taps
+  after a long gap and ignore tempos outside 30–300 BPM.
+- [ ] Fallback BPM accepts 50–240 while the beat phase only locks 60–200
+  (`core/audio_engine.py`, `core/audio_response.py`); share one range.
+- [ ] Through the PulseAudio host API, `inputBufferAdcTime` advances in 80 ms
+  steps (measured: three or four 23 ms blocks share one value), so onset times
+  jitter by up to 80 ms. ALSA devices, including the saved `pipewire` input,
+  advance cleanly. Derive block times from a sample-count clock anchored to
+  the ADC time (`core/audio_engine.py` `_audio_cb`).
+- [ ] Tempo invented in silence: with the input paused, the fallback detector
+  reported 70-215 BPM from room noise and the librosa tracker about 199 BPM.
+  Check whether the HUD/phase still use it now that the silence gate engages
+  (the DC offset fix), and suppress tempo updates while silent.
+- [ ] The fallback BPM is quantised to whole 23 ms blocks (a 140 BPM track read
+  136.0/143.6). It shows only until librosa has enough audio (~5 s); averaging
+  the intervals near the median would resolve it.
+- [ ] Butterflies can pair one butterfly twice in a rare three-way case
+  (`effects/butterflies.py` pairing loop); skip already-partnered entries.
+- [ ] Genre presets override an effect's own TRAIL_ALPHA, and fully repainted
+  effects still pay for the fade blit (`core/frame_composer.py`).
+
+## Open findings from the 2026-11-13 deep pass
+
+Confirmed by soak tests and review; logged rather than fixed.
+
+- [ ] Bubbles costs about 30 ms per frame at 720p with music and about 120 ms
+  under sustained loud input (700 alpha surfaces per frame). Pre-render
+  sprites per radius bucket or scale the pool to the frame budget.
+- [ ] Lissajous settles at about 24 ms per frame once its 1400-point trail is
+  full (one draw call per segment); batch polylines.
+- [ ] Long uptime: FlowField's `_t` (float32 coordinates, coarse after 8-38 h),
+  Phason's float32 phases (jerky after about a week) and Magnetar's `_rot`
+  (colour banding after days) need wrapping modulo tau. ChromaWeave's
+  `u_time` is a float32 uniform with the same limit.
+- [ ] CPU bloom ignores its intensity (`set_alpha` has no effect on a
+  BLEND_RGB_ADD blit, `core/postprocess.py`).
+- [ ] Span mode respawns a deliberately closed child every frame, without a
+  retry limit (`psysualizer.py` span watchdog).
+- [ ] Quitting before a stream opened saves `active_dev: null`, losing the
+  saved device (`psysualizer.py` `_save_settings`).
+- [ ] `DisplayManager` reads `get_num_displays()` before `pygame.init()`, so
+  multi-monitor detection depends on xrandr alone.
+- [ ] Tests that cannot fail: the CPU post-process tests (each mode can be a
+  no-op), the silence reset of the energy history, and the quality governor
+  stepping back up.
+- [ ] Music reactivity, measured on synthetic audio: Phason barely reacts and
+  ignores bass; Ferrofluid ignores bass; Cymatica and Lattice show no beat
+  pulse; Horizon ignores treble; TriFlux, Bubbles and ChromaWeave ignore
+  treble; Fireworks ignores mids.
+- [ ] moderngl with an EGL context works on this machine, so the two GL
+  composition findings above can be reproduced with offscreen tests.
+
 ## Maintenance pass (PLAN.md)
 
 - [x] M01 — Validate saved post-process settings. Focused: 9 tests; full suite: 128 tests; all 32 smoke effects and whitespace checks passed.
