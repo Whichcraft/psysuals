@@ -23,6 +23,9 @@ from effects.persistence import Persistence
 from effects.lattice import Lattice
 from effects.magnetar import Magnetar, _BAND_DRIFT
 from effects.fireworks import Fireworks
+from effects.tunnel import Tunnel
+from effects.tesseract import Tesseract
+from effects.slimemold import SlimeMold
 
 
 class EffectRenderRegressionTests(unittest.TestCase):
@@ -370,6 +373,39 @@ class EffectRenderRegressionTests(unittest.TestCase):
         delta = pygame.surfarray.array3d(second).astype(np.int16) - \
             pygame.surfarray.array3d(first).astype(np.int16)
         self.assertLess(float(np.abs(delta).mean()), 1.5)
+
+    def test_tunnel_ride_speeds_up_with_the_music(self):
+        quiet = self.host.create(Tunnel)
+        quiet.draw(self.surface, self.waveform, self.fft, 0.0, 0)
+        loud = self.host.create(Tunnel)
+        loud.draw(self.surface, self.waveform, self.fft, 3.0, 0)
+        self.assertGreater(loud.time, quiet.time)
+
+    def test_chromatic_drops_are_spread_over_the_frame(self):
+        effect = self.host.create(Chromatic)
+        for _ in range(20):
+            effect._spawn(0.5, 320, 240)
+        centres = [(ring[0], ring[1]) for ring in effect._rings]
+        self.assertGreater(max(abs(cx - 160) for cx, _ in centres), 40)
+        self.assertGreater(max(abs(cy - 120) for _, cy in centres), 30)
+
+    def test_slimemold_agents_cover_the_whole_frame(self):
+        effect = self.host.create(SlimeMold)
+        self.assertGreater(float(effect._px.max()) - float(effect._px.min()), effect._W * 0.5)
+        self.assertGreater(float(effect._py.max()) - float(effect._py.min()), effect._H * 0.5)
+
+    def test_tesseract_keeps_a_bounded_geometry_trail(self):
+        effect = self.host.create(Tesseract)
+        for tick in range(30):
+            effect.draw(self.surface, self.waveform, self.fft, 0.5, tick)
+        self.assertLessEqual(len(effect._trail_frames), effect.TRAIL_FRAMES + 1)
+
+    def test_ferrofluid_bounce_stays_bounded(self):
+        effect = self.host.create(Ferrofluid)
+        for tick, beat in enumerate((0.0, 3.0, 3.0, 0.0) * 4):
+            effect.draw(self.surface, self.waveform, self.fft, beat, tick)
+        self.assertGreaterEqual(effect._bounce, -0.5)
+        self.assertLessEqual(effect._bounce, 1.5)
 
     def test_hyperbolic_tiles_are_bounded_on_small_and_wide_targets(self):
         effect = self.host.create(Hyperbolic)

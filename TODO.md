@@ -1121,7 +1121,17 @@ Open follow-ups:
 - [x] Update EFFECTS.md sections 16 and 18.
 - [x] Give Persistence a music-driven size pulse and a faster, wider colour
   response; apply the pulse after the viewport fit so it stays visible.
+- [x] Push the AndroSaver effect rework upstream: Tunnel music reactivity,
+  Phason movement, Ferrofluid bounce and rainbow, Chromatic spread, SlimeMold
+  full-frame seeding and faster colours, Tesseract geometry trail.
+- [x] Keep the upstream contracts intact: the Tunnel camera path stays
+  audio-independent, the Tunnel ride speed stays inside its limit, the Phason
+  field keeps changing slowly and the SlimeMold palette reference follows the
+  new intensity coupling.
+- [x] Cover the new behaviour with focused tests: Tunnel ride speed, Chromatic
+  drop spread, SlimeMold coverage, Tesseract trail bound and the Ferrofluid
+  bounce bound.
 
-Verification: 228 unit tests, the visual regression fixture and the headless
+Verification: 233 unit tests, the visual regression fixture and the headless
 smoke test for all 33 effects pass. The desktop window itself was not
 inspected for these effects.

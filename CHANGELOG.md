@@ -19,6 +19,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
   breathe out of step with the bass and mids, and their colours cycle faster
   and spread further apart with the mids. The pulse is applied after the
   viewport fit, so it stays visible instead of being cancelled by it.
+- 2026-11-13: Tunnel follows the music again: the ride speeds up with bass
+  and mids, the tube widens, the rings brighten and the interior stars spin
+  faster. A beat kicks the ride so it surges and settles. The camera path
+  stays independent of the audio, and the ride speed stays inside the existing
+  limit.
+- 2026-11-13: Phason evolves faster with the music. Its wave directions and
+  swell stay independent of fast audio changes, so the field never jumps.
+- 2026-11-13: Ferrofluid's peaks bounce on a spring kicked by the beats and
+  its skin carries a full spectrum instead of a single hue.
+- 2026-11-13: Chromatic spreads its drops over the frame and answers treble
+  less strongly, so the prismatic outlines interfere less.
+- 2026-11-13: SlimeMold seeds its agents across the whole frame instead of a
+  central blob, and its colour cycle follows the music faster.
+- 2026-11-13: Tesseract keeps a bounded geometry trail, like Cube, so the
+  wireframe leaves a fading echo behind it.
 
 ### Deprecated
 

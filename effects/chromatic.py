@@ -74,7 +74,7 @@ class Chromatic(Effect):
                 continue
 
             thick = max(1, int((2 + fade * 4) * display_scale))
-            warp = display_scale * (2.5 + high * 11.0 + bass * 5.0) * (0.45 + fade * 0.9)
+            warp = display_scale * (2.5 + high * 7.0 + bass * 5.0) * (0.45 + fade * 0.9)
             base_r = max(1.0, r)
             channels = (
                 ((255, 40, 80), -split, phase),
@@ -92,8 +92,10 @@ class Chromatic(Effect):
     def _spawn(self, bass, W, H):
         if len(self._rings) >= _MAX_RINGS:
             return
-        cx = W // 2 + int(self._rng.integers(-W // 6, W // 6 + 1))
-        cy = H // 2 + int(self._rng.integers(-H // 6, H // 6 + 1))
+        # Spread the drops over the frame. Spawning them all around the centre
+        # made their prismatic outlines cross and interfere.
+        cx = int(W * (0.12 + self._rng.random() * 0.76))
+        cy = int(H * (0.12 + self._rng.random() * 0.76))
         max_r = math.hypot(max(cx, W - cx), max(cy, H - cy)) * 1.1
         speed = 3.0 + bass * 5.0
         inten = 0.5 + bass * 0.5
