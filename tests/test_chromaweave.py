@@ -26,7 +26,7 @@ class ChromaWeaveTests(unittest.TestCase):
 
     def test_registry_keeps_existing_visual_indices_and_diagnostics_last(self):
         names = [name for name, _ in MODES]
-        self.assertEqual(names[29:], ['Ferrofluid', 'ChromaWeave', 'Horizon', 'Spectrum', 'Waterfall'])
+        self.assertEqual(names[29:], ['Ferrofluid', 'ChromaWeave', 'Horizon', 'Caustics', 'Lanterns', 'Spectrum', 'Waterfall'])
         self.assertEqual(len(names), len(set(names)))
 
     def test_silent_weave_has_colour_shadow_and_continuing_motion(self):

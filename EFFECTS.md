@@ -1,7 +1,7 @@
 <!-- Frame/options inputs replace ambient config; effect formulas are unchanged. -->
 # psysuals — Effects Reference (3.23.0)
 
-There are 34 registered modes. Mandelbox and Morphogenesis are removed in 3.20.0.
+There are 36 registered modes. Mandelbox and Morphogenesis are removed in 3.20.0.
 
 All effects consume the same shared audio signals. They differ only in how they interpret those signals visually.
 
@@ -68,7 +68,7 @@ framebuffer size, including HiDPI outputs.
 ## Mode list
 
 The `#` column is the human-readable ordinal. The `--mode` command-line
-option uses the zero-based registry index instead (`0` for Yantra through `33`
+option uses the zero-based registry index instead (`0` for Yantra through `35`
 for Waterfall); the number keys directly select only modes 1–9.
 
 | # | Key | Mode | Summary |
@@ -105,8 +105,10 @@ for Waterfall); the number keys directly select only modes 1–9.
 | 30 | `←` / `→` | Ferrofluid | Metallic magnetic droplets |
 | 31 | `←` / `→` | ChromaWeave | Iridescent eightfold ribbons and breathing neon petals |
 | 32 | `←` / `→` | Horizon | Spectrum landscape of solid ridges rolling toward a sun |
-| 33 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
-| 34 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
+| 33 | `←` / `→` | Caustics | Light net on a pool floor, cast through moving water |
+| 34 | `←` / `→` | Lanterns | Paper lanterns rising over a dark lake |
+| 35 | `←` / `→` | Spectrum | Log-spaced analyser bars with waveform overlay |
+| 36 | `←` / `→` | Waterfall | Scrolling time-frequency spectrogram |
 
 `Spectrum` and `Waterfall` are intentionally the final two registry entries.
 
@@ -372,17 +374,49 @@ a sky of stars.
   trails. 27 ridge rows are drawn from a fixed buffer of 28 rows with 46
   points each.
 - Selection: `--mode 31`, or `←` / `→`. This insertion leaves prior visual modes
-  in place, and moves Spectrum/Waterfall to zero-based indices 32/33. Saved
+  in place, and moved Spectrum/Waterfall to zero-based indices 32/33. Saved
   settings and presets follow them automatically.
 
-## 33. Spectrum
+## 33. Caustics
+
+Light on the floor of a pool. A water surface of travelling waves focuses
+sunlight onto pale sand as a shifting net of bright lines; the brightness
+follows how strongly the surface focuses the light at each point.
+
+- Audio: bass raises the waves, which sharpens and brightens the net; mids
+  drive the wind, so the waves travel faster; treble adds glints on the
+  brightest crossings and a cool shimmer on the net; each beat drops a ripple
+  that rings outward and bends the net (at most six at once).
+- Silence: the waves keep travelling slowly.
+- Rendering: CPU effect on a grid at most 256 cells wide, smoothly scaled to
+  the output; every frame is fully repainted.
+- Selection: `--mode 32`, or `←` / `→`.
+
+## 34. Lanterns
+
+Paper lanterns rise from a dark lake into a starry night. Each glows, sways
+in the wind and is mirrored in the water as a shimmering column of light;
+near lanterns are large and bright, far ones small points near the horizon.
+
+- Audio: bass makes the flames flicker and their glow swell; mids drive the
+  wind that sways them; treble sends sparks up from the lanterns and makes
+  their reflections shimmer; each beat releases one to three new lanterns
+  and flashes them.
+- Silence: a gentle stream of lanterns keeps rising.
+- Rendering: CPU effect; at most 42 lanterns and 160 sparks, glow sprites
+  cached per size; every frame is fully repainted.
+- Selection: `--mode 33`, or `←` / `→`. Caustics and Lanterns move
+  Spectrum/Waterfall to zero-based indices 34/35; saved settings and presets
+  follow them by name.
+
+## 35. Spectrum
 
 Classic analyser bars are spaced logarithmically, with peak markers and a waveform line layered over the centre of the screen.
 
 - Audio: log-spaced FFT bands control bar height; beat drives bar smoothing decay; MID_ENERGY shifts base hue; TREBLE_ENERGY modulates waveform overlay line thickness and vertical amplitude.
 - Visual notes: this is the plainest diagnostic mode and is useful for checking input levels quickly.
 
-## 34. Waterfall
+## 36. Waterfall
 
 A scrolling spectrogram stores recent history as rows, with hue encoding frequency and brightness encoding energy.
 
@@ -396,7 +430,7 @@ A scrolling spectrogram stores recent history as rows, with hue encoding frequen
 | Key | Action |
 |-----|--------|
 | `1` – `9` | Jump directly to modes 1–9 |
-| `←` / `→` | Previous / next mode across all 34 modes |
+| `←` / `→` | Previous / next mode across all 36 modes |
 | `Space` or mouse click | Next mode |
 | `↑` / `↓` | Adjust intensity for the current mode (`0.0 .. 2.0`), or adjust FlowField particles by 2,000 |
 | `Tab` | Open the settings pane |

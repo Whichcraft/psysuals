@@ -9,7 +9,8 @@ and movement.
 This guide draws on the established effect collection, including the stronger
 Hyperbolic bass response. Proposed directions below remain proposals; the
 ChromaWeave and Mycelium briefs record the implemented modes; Horizon, a
-spectrum landscape, is implemented and described in EFFECTS.md.
+spectrum landscape, and Caustics and Lanterns are implemented and
+described in EFFECTS.md.
 See [EFFECTS.md](EFFECTS.md) for current behaviour and
 [ARCHITECTURE.md](ARCHITECTURE.md) for implementation contracts.
 

@@ -29,7 +29,7 @@ class HorizonTests(unittest.TestCase):
 
     def test_registry_places_horizon_before_the_diagnostic_pair(self):
         names = [name for name, _ in MODES]
-        self.assertEqual(names[-3:], ['Horizon', 'Spectrum', 'Waterfall'])
+        self.assertEqual(names[-5:], ['Horizon', 'Caustics', 'Lanterns', 'Spectrum', 'Waterfall'])
         self.assertEqual(names.index('Horizon'), 31)
 
     def test_silence_still_shows_a_travelling_landscape(self):
