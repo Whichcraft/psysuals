@@ -7,6 +7,19 @@
 
 ---
 
+## New modes: Caustics and Lanterns
+
+**Caustics** is light on the floor of a pool: a shifting net of bright lines
+on sand, cast by sunlight through moving water. Bass raises the waves and
+sharpens the net, mids drive the wind, treble adds glints and a cool shimmer,
+and each beat drops a ripple that rings outward. **Lanterns** shows paper
+lanterns rising over a dark lake into a starry night, each mirrored in a
+shimmering column of light on the water. Bass makes the flames flicker and
+glow, mids sway them in the wind, treble sends sparks up from them, and each
+beat releases new lanterns. Both sit after Horizon (`--mode 32` and
+`--mode 33`); Spectrum and Waterfall move to 34/35, and saved settings and
+presets follow them by name. Not yet in a release.
+
 ## Version 3.23.0
 
 This release adds Horizon, a landscape built from the music, and fixes a long
@@ -168,7 +181,7 @@ gradually rather than immediately dropping to half size.
 - **🏗️ Modular Object-Oriented Architecture** — Re-written from a monolithic script into a sleek, professional engine. Specialized `AudioEngine`, `DisplayManager`, and `UIManager` classes ensure a clean, maintainable, and high-performance foundation.
 - **🖥️ Ultimate Multi-Monitor "Span Mode"** — Gone are the days of fixed dual-screen limits. The app scales dynamically, spawning child processes for every monitor you own, with synchronized mode switching across the entire span.
 - **🔊 Resilient Audio Pipeline** — Tolerant audio capture with a no-input fallback, silence-aware idle motion, live device switching, and spectral-flux beat detection.
-- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 34 registered effects, with focused tests for audio timing, display lifecycle, and effect safety bounds.
+- **⚖️ Built-in Benchmarking & Regression Checks** — Measure speed with `benchmarks.py`; the smoke test validates registry order and instantiates all 36 registered effects, with focused tests for audio timing, display lifecycle, and effect safety bounds.
 
 ---
 
@@ -276,7 +289,7 @@ Run on low-spec/low-power systems (caps framerate to 30 FPS and scales down simu
 
 The app restores the last saved display index on startup. Use `--display N` to
 override that for a single launch. Use `--mode N` to select the starting effect
-by its zero-based index from the 34-effect registry (`0`–`33`).
+by its zero-based index from the 36-effect registry (`0`–`35`).
 
 ### Controls
 
@@ -424,7 +437,7 @@ psysuals/
 │   ├── base.py               # Effect base class and contract
 │   ├── utils.py              # Shared colour helpers
 │   ├── palette.py            # Shared colour palette
-│   └── *.py                   # 34 registered visual implementations and helpers
+│   └── *.py                   # 36 registered visual implementations and helpers
 ├── ARCHITECTURE.md           # Code structure and extension guide
 ├── EFFECTS.md                # Full parameter reference for all effects
 ├── tests/                    # Automated settings, audio, graphics, and cleanup tests
@@ -519,7 +532,7 @@ RGBA frames matched the pre-change source. Resolution, populations and visual
 baseline tolerances were retained. The temporary pre-change reference is not a
 versioned benchmark artifact; this table records a one-off paired experiment.
 
-Run the reproducible current-state survey, including all 34 registered effects:
+Run the reproducible current-state survey, including all 36 registered effects:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python tests/diagnostics/fps_survey.py --backend egl --json-output /tmp/psysuals-fps.json

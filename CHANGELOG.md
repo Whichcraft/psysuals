@@ -9,7 +9,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- 2026-11-14: Caustics, a new mode: light on the floor of a pool, a shifting
+  net of bright lines cast through moving water. Bass sharpens the net, mids
+  drive the wind, treble adds glints, beats drop ripples.
+- 2026-11-14: Lanterns, a new mode: paper lanterns rising over a dark lake,
+  mirrored in shimmering reflections. Bass flickers the flames, mids sway
+  them, treble sends sparks up, beats release new lanterns. Both new modes
+  sit after Horizon; Spectrum and Waterfall move to zero-based indices
+  34/35.
+
 ### Changed
+
+- 2026-11-14: Settings and presets saved without effect names are mapped
+  through the 3.22 registry order, so any number of later insertions keeps
+  old selections on the same effect.
 
 ### Deprecated
 

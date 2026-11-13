@@ -29,6 +29,7 @@ BASELINE = {
     "Ferrofluid": (19200, 110168),
     "ChromaWeave": (19200, 428073),
     "Horizon": (19200, 269235),
+    "Caustics": (19200, 589797), "Lanterns": (19155, 184059),
     "Spectrum": (3299, 210051), "Waterfall": (2592, 57384),
 }
 
